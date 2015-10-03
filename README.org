@@ -1,0 +1,38 @@
+#+TITLE: Matrix.el - Emacs-Lisp interface to the Matrix Distributed Chat
+
+* Installation
+
+Right now this is just a single file that you put in to your =load-path= and
+require with =(require 'matrix-api)=. Eventually I'll put it in MELPA or something so
+that you can install it via =package.el=.
+
+* Usage
+
+This is a low-level API right now; I'm planning to wrap it with high-level API that lets you easily
+per-room events, and that sort of thing, and eventually a full-fledged Matrix client. The API itself
+is pretty tightly based on the official Python API.
+
+#+BEGIN_SRC emacs-lisp
+(let ((matrix-homeserver-base-url "https://yourhs.org/_matrix/client/api/v1"))
+  (unless matrix-token
+    (matrix-login-with-password "@you:yourhs.org" "[REDACTED]"))
+  (matrix-initial-sync 1)
+  (matrix-send-message "!yourroom:matrix.org" "Test post please ignore"))
+#+END_SRC
+
+* Contributing
+
+
+To submit patches:
+- Clone the repo
+- Create a git branch, code in a branch.
+- When you're done, send me a =git format-patch= style patch
+  - =git format-patch --to ryan@whatthefuck.computer master..HEAD > YOURBRANCHNAME.patch=
+  - Mail that patch to me at [[mailto:ryan@whatthefuck.computer][ryan@whatthefuck.computer]], and I will integrate it.
+    - Or send it to me on Matrix, I'm =@rrix:whatthefuck.computer=
+
+Project Discussion happens in =#ft_kickass:whatthefuck.computer=
+
+* License
+
+See LICENSE in the root of the repository for legal information.
