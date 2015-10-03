@@ -59,3 +59,18 @@ ARG-LIST is an alist of additional key/values to add to the submitted JSON."
          (matrix-login "m.login.password" (list (cons "user" username) (cons "password" password)))))
     (setq matrix-token (cdr (assoc 'access_token resp)))
     resp))
+
+(defun matrix-send-event (room-id event-type content)
+  (let* ((txn-id matrix-txn-id)
+         (path (format "/rooms/%s/send/%s/%s"
+                       (url-encode-url room-id)
+                       (url-encode-url event-type)
+                       (url-encode-url txn-id))))
+    (setq matrix-txn-id (+ 1 (or matrix-txn-id 0)))
+    (matrix-send "PUT" path content)))
+
+(defun matrix-send-message (room-id message)
+  (matrix-send-event room-id "m.room.message"
+                     (list (cons "msgtype" "m.text")
+                           (cons "body" message))))
+
