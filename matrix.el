@@ -7,7 +7,7 @@
 ;; Keywords: web
 ;; Homepage: http://doc.rix.si/matrix.html
 ;; Package-Version: 0.0.1
-;; Package-Requires: ("json" "oauth2")
+;; Package-Requires: ("json")
 
 ;; This file is not part of GNU Emacs.
 
@@ -24,8 +24,13 @@
 ;; You should have received a copy of the GNU General Public License along with
 ;; this file.  If not, see <http://www.gnu.org/licenses/>.
 
-(defvar matrix-homeserver-base-url "https://matrix.org/_matrix/client/api/v1"
-  "URI to your Matrix homeserver, defaults to the official homeserver.")
+(provide 'matrix)
+(require 'json)
+
+(defcustom matrix-homeserver-base-url "https://matrix.org/_matrix/client/api/v1"
+  "URI to your Matrix homeserver, defaults to the official homeserver."
+  :type 'string
+  :group 'matrix)
 
 (defvar matrix-token nil)
 (defvar matrix-txn-id nil)
