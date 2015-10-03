@@ -97,3 +97,10 @@ ARG-LIST is an alist of additional key/values to add to the submitted JSON."
 
 (defun matrix-get (key obj)
   (cdr (assoc key obj)))
+
+(defun matrix-transform-mxc-uri (uri)
+  (let ((components (split-string uri "/")))
+    (format "%s/_matrix/media/v1/download/%s/%s"
+            matrix-homeserver-base-url
+            (elt components 2)
+            (elt components 3))))

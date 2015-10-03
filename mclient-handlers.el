@@ -49,11 +49,5 @@
              (insert (format "<%s> " (matrix-get 'user_id data)))
              (insert (matrix-get 'body (matrix-get 'content data)))
              (insert ": ")
-             (insert (mclient-handlers-transform-mxc-uri (matrix-get 'url content))))))))
+             (insert (matrix-transform-mxc-uri (matrix-get 'url content))))))))
 
-(defun mclient-handlers-transform-mxc-uri (uri)
-  (let ((components (split-string uri "/")))
-    (format "%s/_matrix/media/v1/download/%s/%s"
-            matrix-homeserver-base-url
-            (elt components 2)
-            (elt components 3))))
