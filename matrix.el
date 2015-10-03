@@ -92,3 +92,5 @@ ARG-LIST is an alist of additional key/values to add to the submitted JSON."
 (defun matrix-event-poll (end-token timeout callback)
   (matrix-send-async "GET" "/events" nil (list (list "from" end-token) (list "timeout" timeout)) nil callback))
 
+(defun matrix-get (key obj)
+  (cdr (assoc key obj)))

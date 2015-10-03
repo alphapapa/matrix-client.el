@@ -57,8 +57,8 @@ for a username and password.
   (interactive)
   (if mclient-use-auth-source
       (let ((pwdata (mclient-read-auth-source)))
-        (matrix-login-with-password (cdr (assoc 'username pwdata))
-                                    (cdr (assoc 'password pwdata))))
+        (matrix-login-with-password (matrix-get 'username pwdata)
+                                    (matrix-get 'password pwdata)))
     (let ((username (read-string "Username: "))
           (password (read-string "Password: ")))
       (matrix-login-with-password username password))))
@@ -69,7 +69,9 @@ for a username and password.
     (mclient-login))
   (mclient-inject-event-listeners)
   (let* ((initial-data (matrix-initial-sync 25)))
-    (mclient-start-event-listener (cdr (assoc 'end initial-data)))))
+    (mapc 'mclient-set-up-room (matrix-get 'rooms initial-data))
+    (setq mclient-event-listener-running t)
+    (mclient-start-event-listener (matrix-get 'end initial-data))))
 
 (defun mclient-start-event-listener (end-tok)
   (matrix-event-poll
@@ -82,7 +84,7 @@ for a username and password.
   (let ((data (json-read)))
     (dolist (hook mclient-new-event-hook)
       (funcall hook data))
-    (mclient-start-event-listener (cdr (assoc 'end data)))))
+    (mclient-start-event-listener (matrix-get 'end data))))
 
 (defun mclient-inject-event-listeners ()
   "Inject the standard event listeners."
