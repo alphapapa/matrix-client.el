@@ -32,7 +32,7 @@
 
 (defun matrix-initial-sync (&optional limit)
   "Perform /initialSync."
-  (matrix-send "GET" "/initialSync" (cons 'limit limit)))
+  (matrix-send "GET" "/initialSync" nil (list (list 'limit limit))))
 
 (defun matrix-login (login-type arg-list)
   "Attempt to log in to the Matrix homeserver.
@@ -44,12 +44,11 @@ ARG-LIST is an alist of additional key/values to add to the submitted JSON."
 (defun matrix-send (method path &optional content query-params headers)
   (let* ((url-request-method(upcase method))
          (url-request-extra-headers (add-to-list 'headers '("Content-Type" . "application/json")))
-         (query-params (when matrix-token
-                         (add-to-list 'query-params (cons "access_token" matrix-token))))
+         (query-params (when matrix-token (add-to-list 'query-params (list "access_token" matrix-token))))
          (query-params (url-build-query-string query-params))
-         (url-request-data (json-encode content))
+         (url-request-data (when content (json-encode content)))
          (endpoint (concat matrix-homeserver-base-url path (unless (eq "" query-params)
-                                                             (concat "&" query-params)))))
+                                                             (concat "?" query-params)))))
     (with-current-buffer
         (url-retrieve-synchronously endpoint)
       (goto-char url-http-end-of-headers)
