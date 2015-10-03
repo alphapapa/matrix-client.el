@@ -54,6 +54,16 @@ ARG-LIST is an alist of additional key/values to add to the submitted JSON."
       (goto-char url-http-end-of-headers)
       (json-read))))
 
+(defun matrix-send-async (method path &optional content query-params headers cb)
+  (let* ((url-request-method(upcase method))
+         (url-request-extra-headers (add-to-list 'headers '("Content-Type" . "application/json")))
+         (query-params (when matrix-token (add-to-list 'query-params (list "access_token" matrix-token))))
+         (query-params (url-build-query-string query-params))
+         (url-request-data (when content (json-encode content)))
+         (endpoint (concat matrix-homeserver-base-url path (unless (eq "" query-params)
+                                                             (concat "?" query-params)))))
+    (url-retrieve endpoint cb)))
+
 (defun matrix-login-with-password (username password)
   (let ((resp 
          (matrix-login "m.login.password" (list (cons "user" username) (cons "password" password)))))
@@ -73,4 +83,7 @@ ARG-LIST is an alist of additional key/values to add to the submitted JSON."
   (matrix-send-event room-id "m.room.message"
                      (list (cons "msgtype" "m.text")
                            (cons "body" message))))
+
+(defun matrix-event-poll (end-token timeout callback)
+  (matrix-send-async "GET" "/events" nil (list (list "from" end-token) (list "timeout" timeout)) nil callback))
 
