@@ -25,6 +25,7 @@
 ;; this file.  If not, see <http://www.gnu.org/licenses/>.
 
 (provide 'mclient)
+(require 'mclient-handlers)
 
 (defcustom mclient-use-auth-source nil
   "When non-nil, attempt to load client username and password
@@ -47,6 +48,11 @@
   "A lists of functions that are evaluated when a new event comes
   in.")
 
+(defvar mclient-event-listener-running nil)
+
+(defvar mclient-active-rooms nil
+  "Rooms the active client is in")
+
 (defun mclient-login ()
   "Get a token form the Matrix homeserver.
 
@@ -68,16 +74,18 @@ for a username and password.
   (unless matrix-token
     (mclient-login))
   (mclient-inject-event-listeners)
+  (mclient-handlers-init)
   (let* ((initial-data (matrix-initial-sync 25)))
     (mapc 'mclient-set-up-room (matrix-get 'rooms initial-data))
     (setq mclient-event-listener-running t)
     (mclient-start-event-listener (matrix-get 'end initial-data))))
 
 (defun mclient-start-event-listener (end-tok)
-  (matrix-event-poll
-   end-tok
-   mclient-event-poll-timeout
-   'mclient-event-listener-callback))
+  (when mclient-event-listener-running
+    (matrix-event-poll
+     end-tok
+     mclient-event-poll-timeout
+     'mclient-event-listener-callback)))
 
 (defun mclient-event-listener-callback (status)
   (goto-char url-http-end-of-headers)
@@ -88,10 +96,56 @@ for a username and password.
 
 (defun mclient-inject-event-listeners ()
   "Inject the standard event listeners."
-  (add-to-list 'mclient-new-event-hook 'mclient-debug-event-maybe))
+  (add-to-list 'mclient-new-event-hook 'mclient-debug-event-maybe)
+  (add-to-list 'mclient-new-event-hook 'mclient-render-event-to-room))
 
 (defun mclient-debug-event-maybe (data)
   (with-current-buffer (get-buffer-create "*matrix-events*")
     (end-of-buffer)
     (insert "\n")
     (insert (prin1-to-string data))))
+
+(defun mclient-set-up-room (roomdata)
+  (let* ((room-id (matrix-get 'room_id roomdata))
+         (room-state (matrix-get 'state roomdata))
+         (room-name (matrix-get
+                     'name (matrix-get
+                            'content
+                            (first (mclient-filter (lambda (alist)
+                                                     (string-equal "m.room.name"
+                                                                   (matrix-get 'type alist))) room-state)))))
+         (room-topic (matrix-get
+                      'topic (matrix-get
+                              'content
+                              (first (mclient-filter (lambda (alist)
+                                                       (string-equal "m.room.topic"
+                                                                     (matrix-get 'type alist))) room-state)))))
+         (room-buf (get-buffer-create (or room-name room-id)))
+         (room-cons (cons room-id room-buf)))
+    (with-current-buffer room-buf
+      (setq header-line-format (format "%s: %s" room-name room-topic)))
+    (add-to-list 'mclient-active-rooms room-cons)))
+
+(defun mclient-disconnect ()
+  (interactive)
+  (setq mclient-active-rooms nil)
+  (setq mclient-event-listener-running nil))
+
+(defun mclient-reconnect ()
+  (interactive)
+  (mclient-disconnect)
+  (mclient))
+
+(defun mclient-filter (condp lst)
+  (delq nil
+        (mapcar (lambda (x)
+                  (and (funcall condp x) x))
+                lst)))
+
+(defun mclient-render-event-to-room (data)
+  (let ((chunk (matrix-get 'chunk data)))
+    (mapc (lambda (item)
+            (let* ((type (matrix-get 'type item))
+                   (handler (matrix-get type mclient-event-handlers)))
+              (when handler
+                (funcall handler item)))) chunk)))
