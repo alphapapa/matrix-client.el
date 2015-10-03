@@ -27,13 +27,16 @@
 (provide 'matrix)
 (require 'json)
 
-(defcustom matrix-homeserver-base-url "https://matrix.org/_matrix/client/api/v1"
+(defcustom matrix-homeserver-base-url "https://matrix.org/"
   "URI to your Matrix homeserver, defaults to the official homeserver."
   :type 'string
   :group 'matrix)
 
 (defvar matrix-token nil)
 (defvar matrix-txn-id nil)
+
+(defun matrix-homeserver-api-url ()
+  (format "%s/_matrix/client/api/v1" matrix-homeserver-base-url))
 
 (defun matrix-initial-sync (&optional limit)
   "Perform /initialSync."
@@ -52,8 +55,8 @@ ARG-LIST is an alist of additional key/values to add to the submitted JSON."
          (query-params (when matrix-token (add-to-list 'query-params (list "access_token" matrix-token))))
          (query-params (url-build-query-string query-params))
          (url-request-data (when content (json-encode content)))
-         (endpoint (concat matrix-homeserver-base-url path (unless (eq "" query-params)
-                                                             (concat "?" query-params)))))
+         (endpoint (concat (matrix-homeserver-api-url)
+                           path (unless (eq "" query-params) (concat "?" query-params)))))
     (with-current-buffer
         (url-retrieve-synchronously endpoint)
       (goto-char url-http-end-of-headers)
@@ -65,8 +68,8 @@ ARG-LIST is an alist of additional key/values to add to the submitted JSON."
          (query-params (when matrix-token (add-to-list 'query-params (list "access_token" matrix-token))))
          (query-params (url-build-query-string query-params))
          (url-request-data (when content (json-encode content)))
-         (endpoint (concat matrix-homeserver-base-url path (unless (eq "" query-params)
-                                                             (concat "?" query-params)))))
+         (endpoint (concat (matrix-homeserver-api-url) path
+                           (unless (eq "" query-params) (concat "?" query-params)))))
     (url-retrieve endpoint cb)))
 
 (defun matrix-login-with-password (username password)
