@@ -31,7 +31,8 @@
 
 (defun mclient-handlers-init ()
   "Set up all the mclient event type handlers"
-  (add-to-list 'mclient-event-handlers (cons "m.room.message" 'mclient-handler-m.room.message)))
+  (add-to-list 'mclient-event-handlers '("m.room.message" . mclient-handler-m.room.message))
+  (add-to-list 'mclient-event-handlers '("m.lightrix.pattern" . mclient-handler-m.lightrix.pattern)))
 
 (defun mclient-handler-m.room.message (data)
   (let* ((room-id (matrix-get 'room_id data))
@@ -51,3 +52,13 @@
              (insert ": ")
              (insert (matrix-transform-mxc-uri (matrix-get 'url content))))))))
 
+(defun mclient-handler-m.lightrix.pattern (data)
+  (let* ((room-id (matrix-get 'room_id data))
+         (content (matrix-get 'content data))
+         (msg-type (matrix-get 'msgtype content))
+         (room-buf (matrix-get room-id mclient-active-rooms)))
+    (with-current-buffer room-buf
+      (end-of-buffer)
+      (insert "\n")
+      (insert (format "<%s --> " (matrix-get 'user_id data)))
+      (insert (matrix-get 'pattern content)))))
