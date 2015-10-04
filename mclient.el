@@ -133,6 +133,24 @@ for a username and password.
     (insert "\n")
     (insert (prin1-to-string data))))
 
+(defun mclient-render-events-to-room (data)
+  (let ((chunk (matrix-get 'chunk data)))
+    (mapc 'mclient-render-event-to-room chunk)))
+
+(defun mclient-render-event-to-room (item)
+  (let* ((type (matrix-get 'type item))
+         (handler (matrix-get type mclient-event-handlers)))
+    (when handler
+      (funcall handler item))))
+
+(defun mclient-update-header-line ()
+  "Update the header line of the current buffer."
+  (if (> 0 (length mclient-room-typers))
+      (progn
+        (setq header-line-format (format "(%d typing...) %s: %s" (length mclient-room-typers)
+                                         mclient-room-name mclient-room-topic)))
+    (setq header-line-format (format "%s: %s" mclient-room-name mclient-room-topic))))
+
 (defun mclient-set-up-room (roomdata)
   (let* ((room-id (matrix-get 'room_id roomdata))
          (room-state (matrix-get 'state roomdata))
@@ -164,17 +182,3 @@ for a username and password.
         (mapcar (lambda (x)
                   (and (funcall condp x) x))
                 lst)))
-
-(defun mclient-render-events-to-room (data)
-  (let ((chunk (matrix-get 'chunk data)))
-    (mapc 'mclient-render-event-to-room chunk)))
-
-(defun mclient-render-event-to-room (item)
-  (let* ((type (matrix-get 'type item))
-         (handler (matrix-get type mclient-event-handlers)))
-    (when handler
-      (funcall handler item))))
-
-(defun mclient-update-header-line ()
-  "Update the header line of the current buffer."
-  (setq header-line-format (format "%s: %s" mclient-room-name mclient-room-topic)))

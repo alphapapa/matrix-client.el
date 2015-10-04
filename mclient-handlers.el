@@ -33,20 +33,9 @@
   (add-to-list 'mclient-event-handlers '("m.room.topic" . mclient-handler-m.room.topic))
   (add-to-list 'mclient-event-handlers '("m.room.name" . mclient-handler-m.room.name))
   (add-to-list 'mclient-event-handlers '("m.room.member" . mclient-handler-m.room.member))
-  (add-to-list 'mclient-event-handlers '("m.presence" . mclient-handler-m.presence)))
-
-(defun mclient-handler-m.room.name (data)
-  (with-current-buffer (matrix-get (matrix-get 'room_id data) mclient-active-rooms)
-    (setq-local mclient-room-name (matrix-get 'name (matrix-get 'content data)))
-    (when (get-buffer mclient-room-name)
-      (kill-buffer mclient-room-name))
-    (rename-buffer mclient-room-name)
-    (mclient-update-header-line)))
-
-(defun mclient-handler-m.room.topic (data)
-  (with-current-buffer (matrix-get (matrix-get 'room_id data) mclient-active-rooms)
-    (setq-local mclient-room-topic (matrix-get 'topic (matrix-get 'content data)))
-    (mclient-update-header-line)))
+  (add-to-list 'mclient-event-handlers '("m.presence" . mclient-handler-m.presence))
+  (add-to-list 'mclient-event-handlers '("m.typing" . mclient-handler-m.typing))
+  )
 
 (defun mclient-handler-m.room.message (data)
   (let* ((room-id (matrix-get 'room_id data))
@@ -55,14 +44,10 @@
          (room-buf (matrix-get room-id mclient-active-rooms)))
     (with-current-buffer room-buf
       (end-of-buffer)
-      (cond ((string-equal msg-type "m.text")
-             (insert "\n")
-             (insert (format "<%s> " (matrix-get 'user_id data)))
-             (insert (matrix-get 'body content)))
-            ((string-equal msg-type "m.image")
-             (insert "\n")
-             (insert (format "<%s> " (matrix-get 'user_id data)))
-             (insert (matrix-get 'body (matrix-get 'content data)))
+      (insert "\n")
+      (insert (format "📩 %s> " (mclient-displayname-from-user-id (matrix-get 'user_id data))))
+      (insert (matrix-get 'body content))
+      (cond ((string-equal msg-type "m.image")
              (insert ": ")
              (insert (matrix-transform-mxc-uri (matrix-get 'url content))))))))
 
@@ -74,7 +59,7 @@
     (with-current-buffer room-buf
       (end-of-buffer)
       (insert "\n")
-      (insert (format "<%s --> " (matrix-get 'user_id data)))
+      (insert (format "🌄 %s --> " (mclient-displayname-from-user-id (matrix-get 'user_id data))))
       (insert (matrix-get 'pattern content)))))
 
 (defun mclient-handler-m.room.member (data)
@@ -97,7 +82,7 @@
       (when mclient-render-membership
         (end-of-buffer)
         (insert "\n")
-        (insert (format "%s (%s) --> %s" display-name user-id membership))))))
+        (insert (format "🚪 %s (%s) --> %s" display-name user-id membership))))))
 
 (defun mclient-handler-m.presence (data)
   (let* ((content (matrix-get 'content data))
@@ -108,4 +93,26 @@
       (when mclient-render-presence
         (end-of-buffer)
         (insert "\n")
-        (insert (format "%s (%s) --> %s" display-name user-id presence))))))
+        (insert (format "🚚 %s (%s) --> %s" display-name user-id presence))))))
+
+(defun mclient-handler-m.room.name (data)
+  (with-current-buffer (matrix-get (matrix-get 'room_id data) mclient-active-rooms)
+    (setq-local mclient-room-name (matrix-get 'name (matrix-get 'content data)))
+    (when (get-buffer mclient-room-name)
+      (kill-buffer mclient-room-name))
+    (rename-buffer mclient-room-name)
+    (mclient-update-header-line)))
+
+(defun mclient-handler-m.room.topic (data)
+  (with-current-buffer (matrix-get (matrix-get 'room_id data) mclient-active-rooms)
+    (setq-local mclient-room-topic (matrix-get 'topic (matrix-get 'content data)))
+    (mclient-update-header-line)))
+
+(defun mclient-handler-m.typing (data)
+  (with-current-buffer (matrix-get (matrix-get 'room_id data) mclient-active-rooms)
+    (setq-local mclient-room-typers (matrix-get 'user_ids (matrix-get 'content data)))
+    (mclient-update-header-line)))
+
+(defun mclient-displayname-from-user-id (user-id)
+  (let* ((userdata (cdr (assoc user-id mclient-room-membership))))
+    (matrix-get 'displayname userdata)))
