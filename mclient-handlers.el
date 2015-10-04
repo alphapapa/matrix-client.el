@@ -165,4 +165,6 @@
 
 (defun mclient-displayname-from-user-id (user-id)
   (let* ((userdata (cdr (assoc user-id mclient-room-membership))))
-    (matrix-get 'displayname userdata)))
+    (or (matrix-get 'displayname userdata)
+        user-id)))
+
