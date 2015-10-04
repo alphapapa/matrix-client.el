@@ -129,9 +129,10 @@ for a username and password.
 
 (defun mclient-debug-event-maybe (data)
   (with-current-buffer (get-buffer-create "*matrix-events*")
-    (end-of-buffer)
-    (insert "\n")
-    (insert (prin1-to-string data))))
+    (when mclient-debug-events
+      (end-of-buffer)
+      (insert "\n")
+      (insert (prin1-to-string data)))))
 
 (defun mclient-render-events-to-room (data)
   (let ((chunk (matrix-get 'chunk data)))

@@ -34,8 +34,7 @@
   (add-to-list 'mclient-event-handlers '("m.room.name" . mclient-handler-m.room.name))
   (add-to-list 'mclient-event-handlers '("m.room.member" . mclient-handler-m.room.member))
   (add-to-list 'mclient-event-handlers '("m.presence" . mclient-handler-m.presence))
-  (add-to-list 'mclient-event-handlers '("m.typing" . mclient-handler-m.typing))
-  )
+  (add-to-list 'mclient-event-handlers '("m.typing" . mclient-handler-m.typing)))
 
 (defun mclient-handler-m.room.message (data)
   (let* ((room-id (matrix-get 'room_id data))
