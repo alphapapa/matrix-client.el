@@ -82,6 +82,9 @@
   "How close to the top of a buffer point needs to be before
   backfilling events.")
 
+(defvar mclient-event-stream-end-token nil)
+(defvar mclient-last-poll-buffer nil)
+
 (defun mclient-login ()
   "Get a token form the Matrix homeserver.
 
@@ -104,6 +107,9 @@ for a username and password.
     (mclient-login))
   (mclient-inject-event-listeners)
   (mclient-handlers-init)
+  (setq mclient-watchdog-timer (run-with-timer mclient-event-poll-timeout
+                                               mclient-event-poll-timeout
+                                               'mclient-check-idle-timeout))
   (let* ((initial-data (matrix-initial-sync 25)))
     (mapc 'mclient-set-up-room (matrix-get 'rooms initial-data))
     (setq mclient-event-listener-running t)
@@ -111,10 +117,12 @@ for a username and password.
 
 (defun mclient-start-event-listener (end-tok)
   (when mclient-event-listener-running
-    (matrix-event-poll
-     end-tok
-     mclient-event-poll-timeout
-     'mclient-event-listener-callback)))
+    (setq mclient-last-poll-buffer
+          (matrix-event-poll
+           end-tok
+           mclient-event-poll-timeout
+           'mclient-event-listener-callback))
+    (setq mclient-event-stream-end-token end-tok)))
 
 (defun mclient-event-listener-callback (status)
   (goto-char url-http-end-of-headers)
@@ -122,6 +130,11 @@ for a username and password.
     (dolist (hook mclient-new-event-hook)
       (funcall hook data))
     (mclient-start-event-listener (matrix-get 'end data))))
+
+(defun mclient-check-idle-timeout ()
+  (unless (not (not mclient-last-poll-buffer))
+    (message "Matrix timed out, re-connecting to stream")
+    (mclient-start-event-listener mclient-event-stream-end-token)))
 
 (defun mclient-inject-event-listeners ()
   "Inject the standard event listeners."
@@ -176,6 +189,7 @@ for a username and password.
   (interactive)
   (dolist (room-cons mclient-active-rooms)
     (kill-buffer (cdr room-cons)))
+  (cancel-timer mclient-watchdog-timer)
   (setq mclient-active-rooms nil)
   (setq mclient-event-listener-running nil))
 
