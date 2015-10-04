@@ -156,6 +156,7 @@ for a username and password.
 (defun mclient-set-up-room (roomdata)
   (let* ((room-id (matrix-get 'room_id roomdata))
          (room-state (matrix-get 'state roomdata))
+         (room-messages (matrix-get 'chunk (matrix-get 'messages roomdata)))
          (room-buf (get-buffer-create room-id))
          (room-cons (cons room-id room-buf))
          (render-membership mclient-render-membership)
@@ -164,9 +165,10 @@ for a username and password.
     (setq mclient-render-presence nil)
     (add-to-list 'mclient-active-rooms room-cons)
     (with-current-buffer room-buf
-      (erase-buffer)
-      (mapc 'mclient-render-event-to-room room-state))
       (matrix-client-mode)
+      (erase-buffer)
+      (mapc 'mclient-render-event-to-room room-state)
+      (mapc 'mclient-render-event-to-room room-messages))
     (setq mclient-render-membership render-membership)
     (setq mclient-render-presence render-presence)))
 
