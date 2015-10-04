@@ -26,6 +26,7 @@
 
 (provide 'mclient)
 (require 'mclient-handlers)
+(require 'mclient-modes)
 
 (defcustom mclient-use-auth-source nil
   "When non-nil, attempt to load client username and password
@@ -165,6 +166,7 @@ for a username and password.
     (with-current-buffer room-buf
       (erase-buffer)
       (mapc 'mclient-render-event-to-room room-state))
+      (matrix-client-mode)
     (setq mclient-render-membership render-membership)
     (setq mclient-render-presence render-presence)))
 
