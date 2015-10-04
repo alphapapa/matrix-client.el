@@ -26,6 +26,13 @@
 
 (provide 'mclient-handlers)
 
+(defmacro insert-read-only (text &rest extra-props)
+  `(add-text-properties
+    (point) (progn
+              (insert ,text)
+              (point))
+    '(read-only t ,@extra-props)))
+
 (defun mclient-handlers-init ()
   "Set up all the mclient event type handlers"
   (add-to-list 'mclient-event-handlers '("m.room.message" . mclient-handler-m.room.message))
@@ -45,22 +52,13 @@
     (with-current-buffer room-buf
       (end-of-buffer)
       (insert "\n")
-      (add-text-properties
-       (point) (progn
-                 (insert (format "📩 %s %s> "
-                                 (format-time-string "[%T]" (seconds-to-time (/ (matrix-get 'origin_server_ts data) 1000)))
-                                 (mclient-displayname-from-user-id (matrix-get 'user_id data))))
-                 (point))
-       (list 'face 'mclient-metadata
-             'read-only t))
-      (add-text-properties
-       (point) (progn
-                 (insert (matrix-get 'body content))
-                 (cond ((string-equal msg-type "m.image")
-                        (insert ": ")
-                        (insert (matrix-transform-mxc-uri (matrix-get 'url content)))))
-                 (point))
-       (list 'read-only t)))))
+      (insert-read-only (format "📩 %s %s> "
+                                (format-time-string "[%T]" (seconds-to-time (/ (matrix-get 'origin_server_ts data) 1000)))
+                                (mclient-displayname-from-user-id (matrix-get 'user_id data))) face mclient-metadata)
+      (insert-read-only (matrix-get 'body content))
+      (cond ((string-equal "m.image" msg-type)
+             (insert-read-only ": ")
+             (insert-read-only (matrix-transform-mxc-uri (matrix-get 'url content))))))))
 
 (defun mclient-handler-m.lightrix.pattern (data)
   (let* ((inhibit-read-only t)
@@ -71,17 +69,9 @@
     (with-current-buffer room-buf
       (end-of-buffer)
       (insert "\n")
-      (add-text-properties
-       (point) (progn
-                 (insert (format "🌄 %s --> " (mclient-displayname-from-user-id (matrix-get 'user_id data))))     
-                 (point))
-       (list 'face 'mclient-metadata
-             'read-only t))
-      (add-text-properties
-       (point) (progn
-                 (insert (matrix-get 'pattern content))
-                 (point))
-       (list 'read-only t)))))
+      (insert-read-only (format "🌄 %s --> " (mclient-displayname-from-user-id (matrix-get 'user_id data)))
+                        face mclient-metadata)     
+      (insert-read-only (matrix-get 'pattern content)))))
 
 (defun mclient-handler-m.room.member (data)
   (let* ((inhibit-read-only t)
@@ -103,13 +93,8 @@
                                          mclient-room-membership))))
       (when mclient-render-membership
         (end-of-buffer)
-        (insert "\n")
-        (add-text-properties
-         (point) (progn
-                   (insert (format "🚪 %s (%s) --> %s" display-name user-id membership))
-                   (point))
-         (list 'read-only t
-               'face 'mclient-metadata))))))
+        (insert-read-only "\n")
+        (insert-read-only (format "🚪 %s (%s) --> %s" display-name user-id membership) face mclient-metadata)))))
 
 (defun mclient-handler-m.presence (data)
   (let* ((inhibit-read-only t)
@@ -120,13 +105,8 @@
     (with-current-buffer (get-buffer-create "*matrix-events*")
       (when mclient-render-presence
         (end-of-buffer)
-        (insert "\n")
-        (add-text-properties
-         (point) (progn
-                   (insert (format "🚚 %s (%s) --> %s" display-name user-id presence))
-                   (point))
-         (list 'read-only t
-               'face 'mclient-metadata))))))
+        (insert-read-only "\n")
+        (insert-read-only (format "🚚 %s (%s) --> %s" display-name user-id presence) face mclient-metadata)))))
 
 (defun mclient-handler-m.room.name (data)
   (let ((inhibit-read-only t))
@@ -135,13 +115,8 @@
       (when mclient-room-name
         (rename-buffer mclient-room-name))
       (end-of-buffer)
-      (insert "\n")
-      (add-text-properties
-       (point) (progn
-                 (insert (format "📝 Room name changed --> %s" mclient-room-name))
-                 (point))
-       (list 'read-only t
-             'face 'mclient-metadata))
+      (insert-read-only "\n")
+      (insert-read-only (format "📝 Room name changed --> %s" mclient-room-name) face mclient-metadata)
       (mclient-update-header-line))))
 
 (defun mclient-handler-m.room.topic (data)
@@ -149,13 +124,8 @@
     (with-current-buffer (matrix-get (matrix-get 'room_id data) mclient-active-rooms)
       (setq-local mclient-room-topic (matrix-get 'topic (matrix-get 'content data)))
       (end-of-buffer)
-      (insert "\n")
-      (add-text-properties
-       (point) (progn
-                 (insert (format "✏️ Room name changed --> %s" mclient-room-topic))
-                 (point))
-       (list 'read-only t
-             'face 'mclient-metadata))
+      (insert-read-only "\n")
+      (insert-read-only (format "✏️ Topic name changed --> %s" mclient-room-topic) face mclient-metadata)
       (mclient-update-header-line))))
 
 (defun mclient-handler-m.typing (data)
