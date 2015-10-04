@@ -85,6 +85,20 @@
 (defvar mclient-event-stream-end-token nil)
 (defvar mclient-last-poll-buffer nil)
 
+(defun mclient ()
+  (interactive)
+  (unless matrix-token
+    (mclient-login))
+  (mclient-inject-event-listeners)
+  (mclient-handlers-init)
+  (setq mclient-watchdog-timer (run-with-timer mclient-event-poll-timeout
+                                               mclient-event-poll-timeout
+                                               'mclient-check-idle-timeout))
+  (let* ((initial-data (matrix-initial-sync 25)))
+    (mapc 'mclient-set-up-room (matrix-get 'rooms initial-data))
+    (setq mclient-event-listener-running t)
+    (mclient-start-event-listener (matrix-get 'end initial-data))))
+
 (defun mclient-login ()
   "Get a token form the Matrix homeserver.
 
@@ -101,19 +115,24 @@ for a username and password.
           (password (read-string "Password: ")))
       (matrix-login-with-password username password))))
 
-(defun mclient ()
-  (interactive)
-  (unless matrix-token
-    (mclient-login))
-  (mclient-inject-event-listeners)
-  (mclient-handlers-init)
-  (setq mclient-watchdog-timer (run-with-timer mclient-event-poll-timeout
-                                               mclient-event-poll-timeout
-                                               'mclient-check-idle-timeout))
-  (let* ((initial-data (matrix-initial-sync 25)))
-    (mapc 'mclient-set-up-room (matrix-get 'rooms initial-data))
-    (setq mclient-event-listener-running t)
-    (mclient-start-event-listener (matrix-get 'end initial-data))))
+(defun mclient-set-up-room (roomdata)
+  (let* ((room-id (matrix-get 'room_id roomdata))
+         (room-state (matrix-get 'state roomdata))
+         (room-messages (matrix-get 'chunk (matrix-get 'messages roomdata)))
+         (room-buf (get-buffer-create room-id))
+         (room-cons (cons room-id room-buf))
+         (render-membership mclient-render-membership)
+         (render-presence mclient-render-presence))
+    (setq mclient-render-membership nil)
+    (setq mclient-render-presence nil)
+    (add-to-list 'mclient-active-rooms room-cons)
+    (with-current-buffer room-buf
+      (matrix-client-mode)
+      (erase-buffer)
+      (mapc 'mclient-render-event-to-room room-state)
+      (mapc 'mclient-render-event-to-room room-messages))
+    (setq mclient-render-membership render-membership)
+    (setq mclient-render-presence render-presence)))
 
 (defun mclient-start-event-listener (end-tok)
   (when mclient-event-listener-running
@@ -165,25 +184,6 @@ for a username and password.
         (setq header-line-format (format "(%d typing...) %s: %s" (length mclient-room-typers)
                                          mclient-room-name mclient-room-topic)))
     (setq header-line-format (format "%s: %s" mclient-room-name mclient-room-topic))))
-
-(defun mclient-set-up-room (roomdata)
-  (let* ((room-id (matrix-get 'room_id roomdata))
-         (room-state (matrix-get 'state roomdata))
-         (room-messages (matrix-get 'chunk (matrix-get 'messages roomdata)))
-         (room-buf (get-buffer-create room-id))
-         (room-cons (cons room-id room-buf))
-         (render-membership mclient-render-membership)
-         (render-presence mclient-render-presence))
-    (setq mclient-render-membership nil)
-    (setq mclient-render-presence nil)
-    (add-to-list 'mclient-active-rooms room-cons)
-    (with-current-buffer room-buf
-      (matrix-client-mode)
-      (erase-buffer)
-      (mapc 'mclient-render-event-to-room room-state)
-      (mapc 'mclient-render-event-to-room room-messages))
-    (setq mclient-render-membership render-membership)
-    (setq mclient-render-presence render-presence)))
 
 (defun mclient-disconnect ()
   (interactive)
