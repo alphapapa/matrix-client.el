@@ -97,9 +97,8 @@
 (defun mclient-handler-m.room.name (data)
   (with-current-buffer (matrix-get (matrix-get 'room_id data) mclient-active-rooms)
     (setq-local mclient-room-name (matrix-get 'name (matrix-get 'content data)))
-    (when (get-buffer mclient-room-name)
-      (kill-buffer mclient-room-name))
-    (rename-buffer mclient-room-name)
+    (when mclient-room-name
+      (rename-buffer mclient-room-name))
     (mclient-update-header-line)))
 
 (defun mclient-handler-m.room.topic (data)

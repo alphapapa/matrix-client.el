@@ -170,6 +170,8 @@ for a username and password.
 
 (defun mclient-disconnect ()
   (interactive)
+  (dolist (room-cons mclient-active-rooms)
+    (kill-buffer (cdr room-cons)))
   (setq mclient-active-rooms nil)
   (setq mclient-event-listener-running nil))
 
