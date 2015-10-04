@@ -26,24 +26,6 @@
 
 (provide 'mclient-handlers)
 
-(defvar mclient-event-handlers '()
-  "An alist of (type . function) handler definitions for various matrix types")
-
-(defvar mclient-room-name nil
-  "The name of the room; bufferlocal")
-
-(defvar mclient-room-topic nil
-  "The name of the room; bufferlocal")
-
-(defvar mclient-room-membership nil
-  "The name of the room; bufferlocal")
-
-(defvar mclient-render-presence t
-  "Show presence changes in the main buffer windows")
-
-(defvar mclient-render-membership t
-  "Show membership changes in the main buffer windows")
-
 (defun mclient-handlers-init ()
   "Set up all the mclient event type handlers"
   (add-to-list 'mclient-event-handlers '("m.room.message" . mclient-handler-m.room.message))

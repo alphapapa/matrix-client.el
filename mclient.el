@@ -53,6 +53,34 @@
 (defvar mclient-active-rooms nil
   "Rooms the active client is in")
 
+(defvar mclient-event-handlers '()
+  "An alist of (type . function) handler definitions for various matrix types")
+
+(defvar mclient-room-name nil
+  "The name of the room; bufferlocal")
+
+(defvar mclient-room-topic nil
+  "The name of the room; bufferlocal")
+
+(defvar mclient-room-membership nil
+  "The name of the room; bufferlocal")
+
+(defvar mclient-room-typers nil
+  "A list of users currently typing in the room. bufferlocal")
+
+(defvar mclient-render-presence t
+  "Show presence changes in the main buffer windows")
+
+(defvar mclient-render-membership t
+  "Show membership changes in the main buffer windows")
+
+(defcustom mclient-backfill-count 10
+  "How many messages to backfill at a time when scrolling")
+
+(defcustom mclient-backfill-threshold 5
+  "How close to the top of a buffer point needs to be before
+  backfilling events.")
+
 (defun mclient-login ()
   "Get a token form the Matrix homeserver.
 
