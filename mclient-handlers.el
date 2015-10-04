@@ -29,10 +29,42 @@
 (defvar mclient-event-handlers '()
   "An alist of (type . function) handler definitions for various matrix types")
 
+(defvar mclient-room-name nil
+  "The name of the room; bufferlocal")
+
+(defvar mclient-room-topic nil
+  "The name of the room; bufferlocal")
+
+(defvar mclient-room-membership nil
+  "The name of the room; bufferlocal")
+
+(defvar mclient-render-presence t
+  "Show presence changes in the main buffer windows")
+
+(defvar mclient-render-membership t
+  "Show membership changes in the main buffer windows")
+
 (defun mclient-handlers-init ()
   "Set up all the mclient event type handlers"
   (add-to-list 'mclient-event-handlers '("m.room.message" . mclient-handler-m.room.message))
-  (add-to-list 'mclient-event-handlers '("m.lightrix.pattern" . mclient-handler-m.lightrix.pattern)))
+  (add-to-list 'mclient-event-handlers '("m.lightrix.pattern" . mclient-handler-m.lightrix.pattern))
+  (add-to-list 'mclient-event-handlers '("m.room.topic" . mclient-handler-m.room.topic))
+  (add-to-list 'mclient-event-handlers '("m.room.name" . mclient-handler-m.room.name))
+  (add-to-list 'mclient-event-handlers '("m.room.member" . mclient-handler-m.room.member))
+  (add-to-list 'mclient-event-handlers '("m.presence" . mclient-handler-m.presence)))
+
+(defun mclient-handler-m.room.name (data)
+  (with-current-buffer (matrix-get (matrix-get 'room_id data) mclient-active-rooms)
+    (setq-local mclient-room-name (matrix-get 'name (matrix-get 'content data)))
+    (when (get-buffer mclient-room-name)
+      (kill-buffer mclient-room-name))
+    (rename-buffer mclient-room-name)
+    (mclient-update-header-line)))
+
+(defun mclient-handler-m.room.topic (data)
+  (with-current-buffer (matrix-get (matrix-get 'room_id data) mclient-active-rooms)
+    (setq-local mclient-room-topic (matrix-get 'topic (matrix-get 'content data)))
+    (mclient-update-header-line)))
 
 (defun mclient-handler-m.room.message (data)
   (let* ((room-id (matrix-get 'room_id data))
@@ -62,3 +94,36 @@
       (insert "\n")
       (insert (format "<%s --> " (matrix-get 'user_id data)))
       (insert (matrix-get 'pattern content)))))
+
+(defun mclient-handler-m.room.member (data)
+  (let* ((room-id (matrix-get 'room_id data))
+         (content (matrix-get 'content data))
+         (user-id (matrix-get 'user_id data))
+         (membership (matrix-get 'membership content))
+         (display-name (matrix-get 'displayname content))
+         (room-buf (matrix-get room-id mclient-active-rooms)))
+    (with-current-buffer room-buf
+      (unless (boundp 'mclient-room-membership)
+        (setq-local mclient-room-membership '()))
+      (cond ((string-equal "join" membership)
+             (add-to-list 'mclient-room-membership (cons user-id content)))
+            ((or (string-equal "leave" membership) (string-equal "ban" membership))
+             (setq-local mclient-room-membership
+                         (mclient-filter (lambda (item)
+                                           (string-equal user-id (car item)))
+                                         mclient-room-membership))))
+      (when mclient-render-membership
+        (end-of-buffer)
+        (insert "\n")
+        (insert (format "%s (%s) --> %s" display-name user-id membership))))))
+
+(defun mclient-handler-m.presence (data)
+  (let* ((content (matrix-get 'content data))
+         (user-id (matrix-get 'user_id content))
+         (presence (matrix-get 'presence content))
+         (display-name (matrix-get 'displayname content)))
+    (with-current-buffer (get-buffer-create "*matrix-events*")
+      (when mclient-render-presence
+        (end-of-buffer)
+        (insert "\n")
+        (insert (format "%s (%s) --> %s" display-name user-id presence))))))

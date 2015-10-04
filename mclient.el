@@ -97,7 +97,7 @@ for a username and password.
 (defun mclient-inject-event-listeners ()
   "Inject the standard event listeners."
   (add-to-list 'mclient-new-event-hook 'mclient-debug-event-maybe)
-  (add-to-list 'mclient-new-event-hook 'mclient-render-event-to-room))
+  (add-to-list 'mclient-new-event-hook 'mclient-render-events-to-room))
 
 (defun mclient-debug-event-maybe (data)
   (with-current-buffer (get-buffer-create "*matrix-events*")
@@ -108,23 +108,18 @@ for a username and password.
 (defun mclient-set-up-room (roomdata)
   (let* ((room-id (matrix-get 'room_id roomdata))
          (room-state (matrix-get 'state roomdata))
-         (room-name (matrix-get
-                     'name (matrix-get
-                            'content
-                            (first (mclient-filter (lambda (alist)
-                                                     (string-equal "m.room.name"
-                                                                   (matrix-get 'type alist))) room-state)))))
-         (room-topic (matrix-get
-                      'topic (matrix-get
-                              'content
-                              (first (mclient-filter (lambda (alist)
-                                                       (string-equal "m.room.topic"
-                                                                     (matrix-get 'type alist))) room-state)))))
-         (room-buf (get-buffer-create (or room-name room-id)))
-         (room-cons (cons room-id room-buf)))
+         (room-buf (get-buffer-create room-id))
+         (room-cons (cons room-id room-buf))
+         (render-membership mclient-render-membership)
+         (render-presence mclient-render-presence))
+    (setq mclient-render-membership nil)
+    (setq mclient-render-presence nil)
+    (add-to-list 'mclient-active-rooms room-cons)
     (with-current-buffer room-buf
-      (setq header-line-format (format "%s: %s" room-name room-topic)))
-    (add-to-list 'mclient-active-rooms room-cons)))
+      (erase-buffer)
+      (mapc 'mclient-render-event-to-room room-state))
+    (setq mclient-render-membership render-membership)
+    (setq mclient-render-presence render-presence)))
 
 (defun mclient-disconnect ()
   (interactive)
@@ -142,10 +137,16 @@ for a username and password.
                   (and (funcall condp x) x))
                 lst)))
 
-(defun mclient-render-event-to-room (data)
+(defun mclient-render-events-to-room (data)
   (let ((chunk (matrix-get 'chunk data)))
-    (mapc (lambda (item)
-            (let* ((type (matrix-get 'type item))
-                   (handler (matrix-get type mclient-event-handlers)))
-              (when handler
-                (funcall handler item)))) chunk)))
+    (mapc 'mclient-render-event-to-room chunk)))
+
+(defun mclient-render-event-to-room (item)
+  (let* ((type (matrix-get 'type item))
+         (handler (matrix-get type mclient-event-handlers)))
+    (when handler
+      (funcall handler item))))
+
+(defun mclient-update-header-line ()
+  "Update the header line of the current buffer."
+  (setq header-line-format (format "%s: %s" mclient-room-name mclient-room-topic)))
