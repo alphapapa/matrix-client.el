@@ -44,7 +44,9 @@
     (with-current-buffer room-buf
       (end-of-buffer)
       (insert "\n")
-      (insert (format "📩 %s> " (mclient-displayname-from-user-id (matrix-get 'user_id data))))
+      (insert (format "📩 %s %s> "
+                      (format-time-string "[%T]" (seconds-to-time (/ (matrix-get 'origin_server_ts data) 1000)))
+                      (mclient-displayname-from-user-id (matrix-get 'user_id data))))
       (insert (matrix-get 'body content))
       (cond ((string-equal msg-type "m.image")
              (insert ": ")
