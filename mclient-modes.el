@@ -36,6 +36,9 @@
   "Major mode for Matrix client buffers.
 \\{matrix-client-mode-map}")
 
-;(add-hook matrix-client-mode-hook 'matrix-client-set-up-scroll-hook)
-
-
+(defface mclient-metadata
+  '((((class color) (background light)) (:foreground "#000088" :weight bold))
+    (((class color) (background dark)) (:foreground "#4444FF" :weight bold))
+    (t (:weight bold)))
+  "Face for chat metadata properties."
+  :group 'mclient-faces)

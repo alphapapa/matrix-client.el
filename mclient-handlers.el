@@ -37,34 +37,55 @@
   (add-to-list 'mclient-event-handlers '("m.typing" . mclient-handler-m.typing)))
 
 (defun mclient-handler-m.room.message (data)
-  (let* ((room-id (matrix-get 'room_id data))
+  (let* ((inhibit-read-only t)
+         (room-id (matrix-get 'room_id data))
          (content (matrix-get 'content data))
          (msg-type (matrix-get 'msgtype content))
          (room-buf (matrix-get room-id mclient-active-rooms)))
     (with-current-buffer room-buf
       (end-of-buffer)
       (insert "\n")
-      (insert (format "📩 %s %s> "
-                      (format-time-string "[%T]" (seconds-to-time (/ (matrix-get 'origin_server_ts data) 1000)))
-                      (mclient-displayname-from-user-id (matrix-get 'user_id data))))
-      (insert (matrix-get 'body content))
-      (cond ((string-equal msg-type "m.image")
-             (insert ": ")
-             (insert (matrix-transform-mxc-uri (matrix-get 'url content))))))))
+      (add-text-properties
+       (point) (progn
+                 (insert (format "📩 %s %s> "
+                                 (format-time-string "[%T]" (seconds-to-time (/ (matrix-get 'origin_server_ts data) 1000)))
+                                 (mclient-displayname-from-user-id (matrix-get 'user_id data))))
+                 (point))
+       (list 'face 'mclient-metadata
+             'read-only t))
+      (add-text-properties
+       (point) (progn
+                 (insert (matrix-get 'body content))
+                 (cond ((string-equal msg-type "m.image")
+                        (insert ": ")
+                        (insert (matrix-transform-mxc-uri (matrix-get 'url content)))))
+                 (point))
+       (list 'read-only t)))))
 
 (defun mclient-handler-m.lightrix.pattern (data)
-  (let* ((room-id (matrix-get 'room_id data))
+  (let* ((inhibit-read-only t)
+         (room-id (matrix-get 'room_id data))
          (content (matrix-get 'content data))
          (msg-type (matrix-get 'msgtype content))
          (room-buf (matrix-get room-id mclient-active-rooms)))
     (with-current-buffer room-buf
       (end-of-buffer)
       (insert "\n")
-      (insert (format "🌄 %s --> " (mclient-displayname-from-user-id (matrix-get 'user_id data))))
-      (insert (matrix-get 'pattern content)))))
+      (add-text-properties
+       (point) (progn
+                 (insert (format "🌄 %s --> " (mclient-displayname-from-user-id (matrix-get 'user_id data))))     
+                 (point))
+       (list 'face 'mclient-metadata
+             'read-only t))
+      (add-text-properties
+       (point) (progn
+                 (insert (matrix-get 'pattern content))
+                 (point))
+       (list 'read-only t)))))
 
 (defun mclient-handler-m.room.member (data)
-  (let* ((room-id (matrix-get 'room_id data))
+  (let* ((inhibit-read-only t)
+         (room-id (matrix-get 'room_id data))
          (content (matrix-get 'content data))
          (user-id (matrix-get 'user_id data))
          (membership (matrix-get 'membership content))
@@ -83,10 +104,16 @@
       (when mclient-render-membership
         (end-of-buffer)
         (insert "\n")
-        (insert (format "🚪 %s (%s) --> %s" display-name user-id membership))))))
+        (add-text-properties
+         (point) (progn
+                   (insert (format "🚪 %s (%s) --> %s" display-name user-id membership))
+                   (point))
+         (list 'read-only t
+               'face 'mclient-metadata))))))
 
 (defun mclient-handler-m.presence (data)
-  (let* ((content (matrix-get 'content data))
+  (let* ((inhibit-read-only t)
+         (content (matrix-get 'content data))
          (user-id (matrix-get 'user_id content))
          (presence (matrix-get 'presence content))
          (display-name (matrix-get 'displayname content)))
@@ -94,19 +121,42 @@
       (when mclient-render-presence
         (end-of-buffer)
         (insert "\n")
-        (insert (format "🚚 %s (%s) --> %s" display-name user-id presence))))))
+        (add-text-properties
+         (point) (progn
+                   (insert (format "🚚 %s (%s) --> %s" display-name user-id presence))
+                   (point))
+         (list 'read-only t
+               'face 'mclient-metadata))))))
 
 (defun mclient-handler-m.room.name (data)
-  (with-current-buffer (matrix-get (matrix-get 'room_id data) mclient-active-rooms)
-    (setq-local mclient-room-name (matrix-get 'name (matrix-get 'content data)))
-    (when mclient-room-name
-      (rename-buffer mclient-room-name))
-    (mclient-update-header-line)))
+  (let ((inhibit-read-only t))
+    (with-current-buffer (matrix-get (matrix-get 'room_id data) mclient-active-rooms)
+      (setq-local mclient-room-name (matrix-get 'name (matrix-get 'content data)))
+      (when mclient-room-name
+        (rename-buffer mclient-room-name))
+      (end-of-buffer)
+      (insert "\n")
+      (add-text-properties
+       (point) (progn
+                 (insert (format "📝 Room name changed --> %s" mclient-room-name))
+                 (point))
+       (list 'read-only t
+             'face 'mclient-metadata))
+      (mclient-update-header-line))))
 
 (defun mclient-handler-m.room.topic (data)
-  (with-current-buffer (matrix-get (matrix-get 'room_id data) mclient-active-rooms)
-    (setq-local mclient-room-topic (matrix-get 'topic (matrix-get 'content data)))
-    (mclient-update-header-line)))
+  (let ((inhibit-read-only t))
+    (with-current-buffer (matrix-get (matrix-get 'room_id data) mclient-active-rooms)
+      (setq-local mclient-room-topic (matrix-get 'topic (matrix-get 'content data)))
+      (end-of-buffer)
+      (insert "\n")
+      (add-text-properties
+       (point) (progn
+                 (insert (format "✏️ Room name changed --> %s" mclient-room-topic))
+                 (point))
+       (list 'read-only t
+             'face 'mclient-metadata))
+      (mclient-update-header-line))))
 
 (defun mclient-handler-m.typing (data)
   (with-current-buffer (matrix-get (matrix-get 'room_id data) mclient-active-rooms)
