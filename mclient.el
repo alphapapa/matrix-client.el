@@ -39,7 +39,7 @@
   :type 'boolean
   :group 'matrix-client)
 
-(defcustom mclient-event-poll-timeout 30000
+(defcustom mclient-event-poll-timeout 5000
   "How long to wait for a Matrix event in the EventStream before
   timing out and trying again"
   :type 'number
@@ -91,8 +91,8 @@
     (mclient-login))
   (mclient-inject-event-listeners)
   (mclient-handlers-init)
-  (setq mclient-watchdog-timer (run-with-timer mclient-event-poll-timeout
-                                               mclient-event-poll-timeout
+  (setq mclient-watchdog-timer (run-with-timer (/ mclient-event-poll-timeout 1000)
+                                               (/ mclient-event-poll-timeout 1000)
                                                'mclient-check-idle-timeout))
   (let* ((initial-data (matrix-initial-sync 25)))
     (mapc 'mclient-set-up-room (matrix-get 'rooms initial-data))
@@ -151,7 +151,7 @@ for a username and password.
     (mclient-start-event-listener (matrix-get 'end data))))
 
 (defun mclient-check-idle-timeout ()
-  (unless (not (not mclient-last-poll-buffer))
+  (when mclient-last-poll-buffer
     (message "Matrix timed out, re-connecting to stream")
     (mclient-start-event-listener mclient-event-stream-end-token)))
 
