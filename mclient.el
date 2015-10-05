@@ -152,7 +152,7 @@ for a username and password.
     (mclient-start-event-listener (matrix-get 'end data))))
 
 (defun mclient-check-idle-timeout ()
-  (unless (not (not mclient-last-poll-buffer))
+  (unless mclient-last-poll-buffer
     (message "Matrix timed out, re-connecting to stream")
     (mclient-start-event-listener mclient-event-stream-end-token)))
 
