@@ -129,6 +129,7 @@ for a username and password.
     (with-current-buffer room-buf
       (matrix-client-mode)
       (erase-buffer)
+      (mclient-render-message-line)
       (mapc 'mclient-render-event-to-room room-state)
       (mapc 'mclient-render-event-to-room room-messages))
     (setq mclient-render-membership render-membership)

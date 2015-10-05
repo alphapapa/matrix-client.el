@@ -44,7 +44,9 @@
          (room-buf (matrix-get room-id mclient-active-rooms)))
     (with-current-buffer room-buf
       (end-of-buffer)
-      (insert "\n")
+      (previous-line)
+      (end-of-line)
+      (insert-read-only "\n")
       (insert-read-only (format "📩 %s %s> "
                                 (format-time-string "[%T]" (seconds-to-time (/ (matrix-get 'origin_server_ts data) 1000)))
                                 (mclient-displayname-from-user-id (matrix-get 'user_id data))) face mclient-metadata)
@@ -61,6 +63,8 @@
          (room-buf (matrix-get room-id mclient-active-rooms)))
     (with-current-buffer room-buf
       (end-of-buffer)
+      (previous-line)
+      (end-of-line)
       (insert "\n")
       (insert-read-only (format "🌄 %s --> " (mclient-displayname-from-user-id (matrix-get 'user_id data)))
                         face mclient-metadata)     
@@ -86,6 +90,8 @@
                                          mclient-room-membership))))
       (when mclient-render-membership
         (end-of-buffer)
+        (previous-line)
+        (end-of-line)
         (insert-read-only "\n")
         (insert-read-only (format "🚪 %s (%s) --> %s" display-name user-id membership) face mclient-metadata)))))
 
@@ -98,6 +104,8 @@
     (with-current-buffer (get-buffer-create "*matrix-events*")
       (when mclient-render-presence
         (end-of-buffer)
+        (previous-line)
+        (end-of-line)
         (insert-read-only "\n")
         (insert-read-only (format "🚚 %s (%s) --> %s" display-name user-id presence) face mclient-metadata)))))
 
@@ -108,6 +116,8 @@
       (when mclient-room-name
         (rename-buffer mclient-room-name))
       (end-of-buffer)
+      (previous-line)
+      (end-of-line)
       (insert-read-only "\n")
       (insert-read-only (format "📝 Room name changed --> %s" mclient-room-name) face mclient-metadata)
       (mclient-update-header-line))))
@@ -117,6 +127,8 @@
     (with-current-buffer (matrix-get (matrix-get 'room_id data) mclient-active-rooms)
       (setq-local mclient-room-topic (matrix-get 'topic (matrix-get 'content data)))
       (end-of-buffer)
+      (previous-line)
+      (end-of-line)
       (insert-read-only "\n")
       (insert-read-only (format "✏️ Topic name changed --> %s" mclient-room-topic) face mclient-metadata)
       (mclient-update-header-line))))
