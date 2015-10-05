@@ -26,7 +26,6 @@
 
 (provide 'matrix)
 (require 'json)
-(require 'url-queue)
 
 (defcustom matrix-homeserver-base-url "https://matrix.org/"
   "URI to your Matrix homeserver, defaults to the official homeserver."
@@ -71,7 +70,7 @@ ARG-LIST is an alist of additional key/values to add to the submitted JSON."
          (url-request-data (when content (json-encode content)))
          (endpoint (concat (matrix-homeserver-api-url) path
                            (unless (eq "" query-params) (concat "?" query-params)))))
-    (url-queue-retrieve endpoint cb)))
+    (url-retrieve endpoint cb)))
 
 (defun matrix-login-with-password (username password)
   (let ((resp 
