@@ -26,13 +26,6 @@
 
 (provide 'mclient-handlers)
 
-(defmacro insert-read-only (text &rest extra-props)
-  `(add-text-properties
-    (point) (progn
-              (insert ,text)
-              (point))
-    '(read-only t ,@extra-props)))
-
 (defun mclient-handlers-init ()
   "Set up all the mclient event type handlers"
   (add-to-list 'mclient-event-handlers '("m.room.message" . mclient-handler-m.room.message))

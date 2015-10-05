@@ -203,3 +203,17 @@ for a username and password.
         (mapcar (lambda (x)
                   (and (funcall condp x) x))
                 lst)))
+
+(defmacro insert-read-only (text &rest extra-props)
+  `(add-text-properties
+    (point) (progn
+              (insert ,text)
+              (point))
+    '(read-only t ,@extra-props)))
+
+(defun mclient-render-message-line ()
+  (end-of-buffer)
+  (let ((inhibit-read-only t))
+    (insert "\n")
+    (insert-read-only (format "[%s]:" mclient-room-name))
+    (insert " ")))
