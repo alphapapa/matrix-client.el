@@ -29,6 +29,7 @@
 
 (defvar matrix-client-mode-map
   (let ((map (make-sparse-keymap)))
+    (define-key map (kbd "RET") 'mclient-send-active-line)
     map)
   "Keymap for `matrix-client-mode'")
 

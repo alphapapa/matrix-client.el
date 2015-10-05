@@ -63,6 +63,9 @@
 (defvar mclient-room-topic nil
   "The name of the room; bufferlocal")
 
+(defvar mclient-room-id nil
+  "The Matrix ID of the active room; bufferlocal")
+
 (defvar mclient-room-membership nil
   "The name of the room; bufferlocal")
 
@@ -96,6 +99,7 @@
                                                'mclient-check-idle-timeout))
   (let* ((initial-data (matrix-initial-sync 25)))
     (mapc 'mclient-set-up-room (matrix-get 'rooms initial-data))
+    (message "💣 You're jacked in, welcome to Matrix. (💗♥️rrix💓💕)")
     (setq mclient-event-listener-running t)
     (mclient-start-event-listener (matrix-get 'end initial-data))))
 
@@ -130,6 +134,7 @@ for a username and password.
       (matrix-client-mode)
       (erase-buffer)
       (mclient-render-message-line)
+      (setq-local mclient-room-id room-id)
       (mapc 'mclient-render-event-to-room room-state)
       (mapc 'mclient-render-event-to-room room-messages))
     (setq mclient-render-membership render-membership)
@@ -163,10 +168,11 @@ for a username and password.
 
 (defun mclient-debug-event-maybe (data)
   (with-current-buffer (get-buffer-create "*matrix-events*")
-    (when mclient-debug-events
-      (end-of-buffer)
-      (insert "\n")
-      (insert (prin1-to-string data)))))
+    (let ((inhibit-read-only t))
+      (when mclient-debug-events
+        (end-of-buffer)
+        (insert "\n")
+        (insert (prin1-to-string data))))))
 
 (defun mclient-render-events-to-room (data)
   (let ((chunk (matrix-get 'chunk data)))
@@ -216,5 +222,15 @@ for a username and password.
   (end-of-buffer)
   (let ((inhibit-read-only t))
     (insert "\n")
-    (insert-read-only (format "[%s]:" mclient-room-name))
+    (insert-read-only (format "🔥 [%s] ▶" mclient-room-id))
     (insert " ")))
+
+(defun mclient-send-active-line ()
+  (interactive)
+  (end-of-buffer)
+  (beginning-of-line)
+  (re-search-forward "▶")
+  (forward-char)
+  (kill-line)
+  (matrix-send-message mclient-room-id 
+                       (pop kill-ring)))
