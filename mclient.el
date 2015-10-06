@@ -57,20 +57,23 @@
 (defvar mclient-event-handlers '()
   "An alist of (type . function) handler definitions for various matrix types")
 
-(defvar mclient-room-name nil
+(defvar-local mclient-room-name nil
   "The name of the room; bufferlocal")
 
-(defvar mclient-room-topic nil
+(defvar-local mclient-room-topic nil
   "The name of the room; bufferlocal")
 
-(defvar mclient-room-id nil
+(defvar-local mclient-room-id nil
   "The Matrix ID of the active room; bufferlocal")
 
-(defvar mclient-room-membership nil
+(defvar-local mclient-room-membership nil
   "The name of the room; bufferlocal")
 
-(defvar mclient-room-typers nil
+(defvar-local mclient-room-typers nil
   "A list of users currently typing in the room. bufferlocal")
+
+(defvar-local mclient-room-end-token nil
+  "The most recent event-id, used to push read-receipts to the server")
 
 (defvar mclient-render-presence t
   "Show presence changes in the main buffer windows")
