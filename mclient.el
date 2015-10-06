@@ -167,7 +167,8 @@ for a username and password.
 (defun mclient-inject-event-listeners ()
   "Inject the standard event listeners."
   (add-to-list 'mclient-new-event-hook 'mclient-debug-event-maybe)
-  (add-to-list 'mclient-new-event-hook 'mclient-render-events-to-room))
+  (add-to-list 'mclient-new-event-hook 'mclient-render-events-to-room)
+  (add-to-list 'mclient-new-event-hook 'mclient-set-room-end-token))
 
 (defun mclient-debug-event-maybe (data)
   (with-current-buffer (get-buffer-create "*matrix-events*")
@@ -237,3 +238,15 @@ for a username and password.
   (kill-line)
   (matrix-send-message mclient-room-id 
                        (pop kill-ring)))
+
+(defun mclient-set-room-end-token (data)
+  "When an event comes in, file it in to the room so that we can
+  mark a cursor when visiting the buffer."
+  (mapc (lambda (data)
+          (let* ((room-id (matrix-get 'room_id data))
+                 (room-buf (matrix-get room-id mclient-active-rooms)))
+            (when room-buf
+              (with-current-buffer room-buf
+                (setq-local mclient-room-end-token (matrix-get 'event_id data)))))
+          ) (matrix-get 'chunk data)))
+
