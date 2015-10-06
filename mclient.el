@@ -250,3 +250,8 @@ for a username and password.
                 (setq-local mclient-room-end-token (matrix-get 'event_id data)))))
           ) (matrix-get 'chunk data)))
 
+(defun mclient-window-change-hook ()
+  "Send a read receipt if necessary."
+  (when (and mclient-room-id mclient-room-end-token)
+    (matrix-mark-as-read mclient-room-id mclient-room-end-token)))
+

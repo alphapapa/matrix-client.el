@@ -28,6 +28,7 @@
 
 (defun mclient-handlers-init ()
   "Set up all the mclient event type handlers"
+  (add-to-list 'window-configuration-change-hook 'mclient-window-change-hook)
   (add-to-list 'mclient-event-handlers '("m.room.message" . mclient-handler-m.room.message))
   (add-to-list 'mclient-event-handlers '("m.lightrix.pattern" . mclient-handler-m.lightrix.pattern))
   (add-to-list 'mclient-event-handlers '("m.room.topic" . mclient-handler-m.room.topic))
