@@ -41,7 +41,7 @@
 
 (defun matrix-initial-sync (&optional limit)
   "Perform /initialSync."
-  (matrix-send "GET" "/initialSync" nil (list (list 'limit limit))))
+  (matrix-send "GET" "/initialSync" nil (list (cons 'limit (number-to-string limit)))))
 
 (defun matrix-login (login-type arg-list)
   "Attempt to log in to the Matrix homeserver.
@@ -51,8 +51,7 @@ ARG-LIST is an alist of additional key/values to add to the submitted JSON."
   (matrix-send "POST" "/login" (add-to-list 'arg-list (cons "type" login-type))))
 
 (defun matrix-send (method path &optional content query-params headers)
-  (let* ((query-params (when matrix-token (add-to-list 'query-params (list "access_token" matrix-token))))
-         (query-params (url-build-query-string query-params))
+  (let* ((query-params (when matrix-token (add-to-list 'query-params (cons "access_token" matrix-token))))
          (url-request-data (when content (json-encode content)))
          (endpoint (concat (matrix-homeserver-api-url) path)))
     (advice-add 'request--curl-command :filter-return #'request--with-insecure)
@@ -60,29 +59,40 @@ ARG-LIST is an alist of additional key/values to add to the submitted JSON."
                            (request endpoint
                                     :type (upcase method)
                                     :params query-params
+                                    :sync t
                                     :parser 'json-read))
-                          ((string-equal "POST" (upcase method))
+                          ((or (string-equal "POST" (upcase method))
+                               (string-equal "PUT" (upcase method)))
                            (request endpoint
                                     :type (upcase method)
                                     :params query-params
+                                    :sync t
                                     :data (json-encode content)
                                     :headers (add-to-list 'headers '("Content-Type" . "application/json"))
                                     :parser 'json-read)))))
-      (advice-remove 'request-curl-command #'request--with-insecure)
+      (advice-remove 'request--curl-command #'request--with-insecure)
       (request-response-data response))))
 
 (defun request--with-insecure (command-list)
   (append command-list '("--insecure")))
 
 (defun matrix-send-async (method path &optional content query-params headers cb)
-  (let* ((url-request-method(upcase method))
-         (url-request-extra-headers (add-to-list 'headers '("Content-Type" . "application/json")))
-         (query-params (when matrix-token (add-to-list 'query-params (list "access_token" matrix-token))))
-         (query-params (url-build-query-string query-params))
-         (url-request-data (when content (json-encode content)))
-         (endpoint (concat (matrix-homeserver-api-url) path
-                           (unless (eq "" query-params) (concat "?" query-params)))))
-    (url-retrieve endpoint cb)))
+  (let* ((endpoint (concat (matrix-homeserver-api-url) path)))
+    (advice-add 'request--curl-command :filter-return #'request--with-insecure)
+    (request endpoint
+             :type (upcase method)
+             :params (when matrix-token (add-to-list 'query-params (cons "access_token" matrix-token)))
+             :parser 'json-read
+             :data (json-encode content)
+             :headers (add-to-list 'headers '("Content-Type" . "application/json"))
+             :complete (apply-partially #'matrix-async-cb-router cb))
+    (advice-remove 'request--curl-command #'request--with-insecure)))
+
+(defun* matrix-async-cb-router (cb &key data error-thrown &allow-other-keys)
+  (if error-thrown
+      (message "Error in Matrix async call: %s" error-thrown)
+    (when cb
+      (funcall cb data))))
 
 (defun matrix-login-with-password (username password)
   (let ((resp 
@@ -106,8 +116,8 @@ ARG-LIST is an alist of additional key/values to add to the submitted JSON."
 
 (defun matrix-event-poll (end-token timeout callback)
   (matrix-send-async "GET" "/events" nil
-                     (list (list "from" end-token)
-                           (list "timeout" timeout))
+                     (list (cons "from" end-token)
+                           (cons "timeout" (number-to-string timeout)))
                      nil callback))
 
 (defun matrix-get (key obj)

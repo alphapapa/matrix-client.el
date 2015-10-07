@@ -89,7 +89,6 @@
   backfilling events.")
 
 (defvar mclient-event-stream-end-token nil)
-(defvar mclient-last-poll-buffer nil)
 
 (defun mclient ()
   (interactive)
@@ -97,12 +96,9 @@
     (mclient-login))
   (mclient-inject-event-listeners)
   (mclient-handlers-init)
-  (setq mclient-watchdog-timer (run-with-timer mclient-event-poll-timeout
-                                               mclient-event-poll-timeout
-                                               'mclient-check-idle-timeout))
   (let* ((initial-data (matrix-initial-sync 25)))
     (mapc 'mclient-set-up-room (matrix-get 'rooms initial-data))
-    (message "💣 You're jacked in, welcome to Matrix. (💗♥️rrix💓💕)")
+    (message "💣 You're jacked in, welcome to Matrix. (💗♥💓💕)")
     (setq mclient-event-listener-running t)
     (mclient-start-event-listener (matrix-get 'end initial-data))))
 
@@ -145,24 +141,17 @@ for a username and password.
 
 (defun mclient-start-event-listener (end-tok)
   (when mclient-event-listener-running
-    (setq mclient-last-poll-buffer
-          (matrix-event-poll
-           end-tok
-           mclient-event-poll-timeout
-           'mclient-event-listener-callback))
+    (matrix-event-poll
+     end-tok
+     mclient-event-poll-timeout
+     'mclient-event-listener-callback)
     (setq mclient-event-stream-end-token end-tok)))
 
-(defun mclient-event-listener-callback (status)
-  (goto-char url-http-end-of-headers)
-  (let ((data (json-read)))
+(defun mclient-event-listener-callback (data)
+  (unless (eq (car data) 'error)
     (dolist (hook mclient-new-event-hook)
-      (funcall hook data))
-    (mclient-start-event-listener (matrix-get 'end data))))
-
-(defun mclient-check-idle-timeout ()
-  (unless mclient-last-poll-buffer
-    (message "Matrix timed out, re-connecting to stream")
-    (mclient-start-event-listener mclient-event-stream-end-token)))
+      (funcall hook data)))
+  (mclient-start-event-listener (matrix-get 'end data)))
 
 (defun mclient-inject-event-listeners ()
   "Inject the standard event listeners."
@@ -200,7 +189,6 @@ for a username and password.
   (interactive)
   (dolist (room-cons mclient-active-rooms)
     (kill-buffer (cdr room-cons)))
-  (cancel-timer mclient-watchdog-timer)
   (setq mclient-active-rooms nil)
   (setq mclient-event-listener-running nil))
 
