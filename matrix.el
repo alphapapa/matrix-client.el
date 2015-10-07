@@ -7,7 +7,7 @@
 ;; Keywords: web
 ;; Homepage: http://doc.rix.si/matrix.html
 ;; Package-Version: 0.0.1
-;; Package-Requires: ("json")
+;; Package-Requires: ("json" "request")
 
 ;; This file is not part of GNU Emacs.
 
@@ -26,6 +26,7 @@
 
 (provide 'matrix)
 (require 'json)
+(require 'request)
 
 (defcustom matrix-homeserver-base-url "https://matrix.org/"
   "URI to your Matrix homeserver, defaults to the official homeserver."
@@ -50,17 +51,28 @@ ARG-LIST is an alist of additional key/values to add to the submitted JSON."
   (matrix-send "POST" "/login" (add-to-list 'arg-list (cons "type" login-type))))
 
 (defun matrix-send (method path &optional content query-params headers)
-  (let* ((url-request-method(upcase method))
-         (url-request-extra-headers (add-to-list 'headers '("Content-Type" . "application/json")))
-         (query-params (when matrix-token (add-to-list 'query-params (list "access_token" matrix-token))))
+  (let* ((query-params (when matrix-token (add-to-list 'query-params (list "access_token" matrix-token))))
          (query-params (url-build-query-string query-params))
          (url-request-data (when content (json-encode content)))
-         (endpoint (concat (matrix-homeserver-api-url)
-                           path (unless (eq "" query-params) (concat "?" query-params)))))
-    (with-current-buffer
-        (url-retrieve-synchronously endpoint)
-      (goto-char url-http-end-of-headers)
-      (json-read))))
+         (endpoint (concat (matrix-homeserver-api-url) path)))
+    (advice-add 'request--curl-command :filter-return #'request--with-insecure)
+    (let ((response (cond ((string-equal "GET" (upcase method))
+                           (request endpoint
+                                    :type (upcase method)
+                                    :params query-params
+                                    :parser 'json-read))
+                          ((string-equal "POST" (upcase method))
+                           (request endpoint
+                                    :type (upcase method)
+                                    :params query-params
+                                    :data (json-encode content)
+                                    :headers (add-to-list 'headers '("Content-Type" . "application/json"))
+                                    :parser 'json-read)))))
+      (advice-remove 'request-curl-command #'request--with-insecure)
+      (request-response-data response))))
+
+(defun request--with-insecure (command-list)
+  (append command-list '("--insecure")))
 
 (defun matrix-send-async (method path &optional content query-params headers cb)
   (let* ((url-request-method(upcase method))
