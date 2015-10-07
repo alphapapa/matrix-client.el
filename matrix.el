@@ -133,8 +133,10 @@ ARG-LIST is an alist of additional key/values to add to the submitted JSON."
 (defun matrix-homeserver-api-url ()
   (format "%s/_matrix/client/api/v1" matrix-homeserver-base-url))
 
+(defun matrix-homeserver-api-url--v2_alpha ()
+  (format "%s/_matrix/client/v2_alpha" matrix-homeserver-base-url))
+
 (defun matrix-mark-as-read (room-id event-id)
-  (let ((matrix-homeserver-api-url (lambda ()
-                                     (format "%s/_matrix/client/v2_alpha" matrix-homeserver-base-url)))
-        (path (format "/rooms/%s/receipt/m.read/%s" room-id event-id)))
-    (matrix-send-async "POST" path nil nil nil (lambda (status)))))
+  (cl-letf (((symbol-function 'matrix-homeserver-api-url) #'matrix-homeserver-api-url--v2_alpha))
+    (let ((path (format "/rooms/%s/receipt/m.read/%s" room-id event-id)))
+      (matrix-send-async "POST" path nil nil nil (lambda (status))))))
