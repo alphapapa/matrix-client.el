@@ -34,6 +34,7 @@
   (add-to-list 'mclient-event-handlers '("m.room.topic" . mclient-handler-m.room.topic))
   (add-to-list 'mclient-event-handlers '("m.room.name" . mclient-handler-m.room.name))
   (add-to-list 'mclient-event-handlers '("m.room.member" . mclient-handler-m.room.member))
+  (add-to-list 'mclient-event-handlers '("m.room.aliases" . mclient-handler-m.room.aliases))
   (add-to-list 'mclient-event-handlers '("m.presence" . mclient-handler-m.presence))
   (add-to-list 'mclient-event-handlers '("m.typing" . mclient-handler-m.typing)))
 
@@ -105,17 +106,28 @@
 (defmclient-handler "m.room.name"
   ()
   ((setq-local mclient-room-name (matrix-get 'name (matrix-get 'content data)))
-   (when mclient-room-name
-     (rename-buffer mclient-room-name))
+   (cond (mclient-room-name
+          (rename-buffer mclient-room-name))
+         ((> (length mclient-room-aliases) 0)
+          (rename-buffer (elt mclient-room-aliases 0))))
    (insert-read-only "\n")
    (insert-read-only (format "📝 Room name changed --> %s" mclient-room-name) face mclient-metadata)
+   (mclient-update-header-line)))
+
+(defmclient-handler "m.room.aliases"
+  ()
+  ((setq-local mclient-room-aliases (matrix-get 'aliases (matrix-get 'content data)))
+   (cond (mclient-room-name
+          (rename-buffer mclient-room-name))
+         ((> (length mclient-room-aliases) 0)
+          (rename-buffer (elt mclient-room-aliases 0))))
+   (insert-read-only "\n")
+   (insert-read-only (format "📝 Room alias changed --> %s" mclient-room-name) face mclient-metadata)
    (mclient-update-header-line)))
 
 (defmclient-handler "m.room.topic"
   ()
   ((setq-local mclient-room-topic (matrix-get 'topic (matrix-get 'content data)))
-   (when mclient-room-topic
-     (rename-buffer mclient-room-topic))
    (insert-read-only "\n")
    (insert-read-only (format "✏ Room topic changed --> %s" mclient-room-topic) face mclient-metadata)
    (mclient-update-header-line)))
