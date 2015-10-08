@@ -35,6 +35,8 @@
 
 (defvar matrix-token nil)
 (defvar matrix-txn-id nil)
+(defvar matrix-error-hook nil
+  "List of functions to pass Matrix errors to")
 
 (defun matrix-homeserver-api-url ()
   (format "%s/_matrix/client/api/v1" matrix-homeserver-base-url))
@@ -90,7 +92,8 @@ ARG-LIST is an alist of additional key/values to add to the submitted JSON."
 
 (defun* matrix-async-cb-router (cb &key data error-thrown &allow-other-keys)
   (if error-thrown
-      (message "Error in Matrix async call: %s" error-thrown)
+      (dolist (handler matrix-error-hook)
+        (funcall handler error-thrown))
     (when cb
       (funcall cb data))))
 

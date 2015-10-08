@@ -243,3 +243,17 @@ for a username and password.
   (when (and mclient-room-id mclient-room-end-token)
     (matrix-mark-as-read mclient-room-id mclient-room-end-token)))
 
+
+(defun mclient-restart-listener-maybe (error-thrown)
+  (cond ((string-match "code 6" (cdr error-thrown))
+         (message "Lost connection with matrix, will re-attempt in %s ms" mclient-event-poll-timeout)
+         (mclient-restart-later))
+        ((string-match "code 7" (cdr error-thrown))
+         (message "Lost connection with matrix, will re-attempt in %s ms" mclient-event-poll-timeout)
+         (mclient-restart-later))
+        ((string-match "code 60" (cdr error-thrown))
+         (message "curl couldn't validate CA, not advising --insecure? File bug pls."))))
+
+(defun mclient-restart-later ()
+  (run-with-timer (/ mclient-event-poll-timeout 1000) nil (lambda ()
+                                                            (mclient-start-event-listener mclient-event-stream-end-token))))
