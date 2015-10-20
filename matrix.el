@@ -90,10 +90,10 @@ ARG-LIST is an alist of additional key/values to add to the submitted JSON."
              :complete (apply-partially #'matrix-async-cb-router cb))
     (advice-remove 'request--curl-command #'request--with-insecure)))
 
-(defun* matrix-async-cb-router (cb &key data error-thrown &allow-other-keys)
-  (if error-thrown
+(defun* matrix-async-cb-router (cb &key data error-thrown symbol-status &allow-other-keys)
+  (if (or error-thrown (eq symbol-status 'timeout))
       (dolist (handler matrix-error-hook)
-        (funcall handler error-thrown))
+        (funcall handler symbol-status error-thrown))
     (when cb
       (funcall cb data))))
 
@@ -143,3 +143,18 @@ ARG-LIST is an alist of additional key/values to add to the submitted JSON."
   (cl-letf (((symbol-function 'matrix-homeserver-api-url) #'matrix-homeserver-api-url--v2_alpha))
     (let ((path (format "/rooms/%s/receipt/m.read/%s" room-id event-id)))
       (matrix-send-async "POST" path nil nil nil (lambda (status))))))
+
+(defun matrix-join-room (room-id)
+  (let* ((txn-id matrix-txn-id)
+         (path (format "/join/%s" (url-hexify-string room-id))))
+    (matrix-get 'room_id (matrix-send "POST" path (list)))))
+
+(defun matrix-leave-room (room-id)
+  (let* ((txn-id matrix-txn-id)
+         (path (format "/rooms/%s/leave" (url-encode-url room-id))))
+    (matrix-get 'room_id (matrix-send "POST" path (list)))))
+
+(defun matrix-sync-room (room-id)
+  (let* ((txn-id matrix-txn-id)
+         (path (format "/rooms/%s/initialSync" (url-hexify-string room-id))))
+    (matrix-send "GET" path (list))))

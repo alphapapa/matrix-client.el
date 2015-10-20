@@ -28,6 +28,8 @@
 
 (defun mclient-handlers-init ()
   "Set up all the mclient event type handlers"
+  (setq mclient-event-handlers nil)
+  (setq mclient-input-filters nil)
   (add-to-list 'window-configuration-change-hook 'mclient-window-change-hook)
   (add-to-list 'mclient-event-handlers '("m.room.message" . mclient-handler-m.room.message))
   (add-to-list 'mclient-event-handlers '("m.lightrix.pattern" . mclient-handler-m.lightrix.pattern))
@@ -36,7 +38,10 @@
   (add-to-list 'mclient-event-handlers '("m.room.member" . mclient-handler-m.room.member))
   (add-to-list 'mclient-event-handlers '("m.room.aliases" . mclient-handler-m.room.aliases))
   (add-to-list 'mclient-event-handlers '("m.presence" . mclient-handler-m.presence))
-  (add-to-list 'mclient-event-handlers '("m.typing" . mclient-handler-m.typing)))
+  (add-to-list 'mclient-event-handlers '("m.typing" . mclient-handler-m.typing))
+  (add-to-list 'mclient-input-filters 'mclient-send-to-current-room)
+  (add-to-list 'mclient-input-filters 'mclient-input-filter-join)
+  (add-to-list 'mclient-input-filters 'mclient-input-filter-leave))
 
 (defmacro defmclient-handler (msgtype varlist body)
   (let ((fname (intern (format "mclient-handler-%s" msgtype))))
@@ -59,10 +64,15 @@
    (insert-read-only (format "📩 %s %s> "
                              (format-time-string "[%T]" (seconds-to-time (/ (matrix-get 'origin_server_ts data) 1000)))
                              (mclient-displayname-from-user-id (matrix-get 'user_id data))) face mclient-metadata)
-   (insert-read-only (matrix-get 'body content))
-   (cond ((string-equal "m.image" msg-type)
+   (cond ((string-equal "m.emote" msg-type)
+          (insert-read-only "* ")
+          (insert-read-only (matrix-get 'body content)))
+         ((string-equal "m.image" msg-type)
+          (insert-read-only (matrix-get 'body content))(insert-read-only (matrix-get 'body content))
           (insert-read-only ": ")
-          (insert-read-only (matrix-transform-mxc-uri (matrix-get 'url content)))))))
+          (insert-read-only (matrix-transform-mxc-uri (matrix-get 'url content))))
+         (t
+          (insert-read-only (matrix-get 'body content))))))
 
 (defmclient-handler "m.lightrix.pattern"
   ((content (matrix-get 'content data)))
@@ -142,3 +152,21 @@
     (or (matrix-get 'displayname userdata)
         user-id)))
 
+(defun mclient-input-filter-join (text)
+  (when (string-match "^/j\\(oin\\)? +\\(.*\\)" text)
+    (let ((room (substring text (match-beginning 2) (match-end 2))))
+      (mclient-set-up-room
+       (matrix-sync-room
+        (matrix-join-room room))))
+    t))
+
+(defun mclient-input-filter-leave (text)
+  (when (and (string-match "^/leave.*" text)
+             (matrix-leave-room mclient-room-id))
+    (kill-buffer)
+    t))
+
+(defun mclient-input-filter-part (text)
+  (when (string-match "^/part.*" text)
+    (matrix-leave-room mclient-room-id)
+    t))

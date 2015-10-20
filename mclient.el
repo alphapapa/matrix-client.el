@@ -90,6 +90,10 @@
 
 (defvar mclient-event-stream-end-token nil)
 
+(defvar mclient-input-filters nil
+  "List of functions to run input through; return non-nil to halt
+  further processing of messages")
+
 (defun mclient ()
   (interactive)
   (unless matrix-token
@@ -118,6 +122,22 @@ for a username and password.
           (password (read-string "Password: ")))
       (matrix-login-with-password username password))))
 
+(defun mclient-disconnect ()
+  (interactive)
+  (dolist (room-cons mclient-active-rooms)
+    (kill-buffer (cdr room-cons)))
+  (setq mclient-active-rooms nil)
+  (setq mclient-event-listener-running nil))
+
+(defun mclient-reconnect (arg)
+  (interactive "P")
+  (if (or (not arg) mclient-event-stream-end-token)
+      (progn
+        (mclient-stream-from-end-token))
+    (progn
+      (mclient-disconnect)
+      (mclient))))
+
 (defun mclient-set-up-room (roomdata)
   (let* ((room-id (matrix-get 'room_id roomdata))
          (room-state (matrix-get 'state roomdata))
@@ -138,6 +158,11 @@ for a username and password.
       (mapc 'mclient-render-event-to-room room-messages))
     (setq mclient-render-membership render-membership)
     (setq mclient-render-presence render-presence)))
+
+(defun mclient-window-change-hook ()
+  "Send a read receipt if necessary."
+  (when (and mclient-room-id mclient-room-end-token)
+    (matrix-mark-as-read mclient-room-id mclient-room-end-token)))
 
 (defun mclient-start-event-listener (end-tok)
   (when mclient-event-listener-running
@@ -185,18 +210,6 @@ for a username and password.
                                          mclient-room-name mclient-room-topic)))
     (setq header-line-format (format "%s: %s" mclient-room-name mclient-room-topic))))
 
-(defun mclient-disconnect ()
-  (interactive)
-  (dolist (room-cons mclient-active-rooms)
-    (kill-buffer (cdr room-cons)))
-  (setq mclient-active-rooms nil)
-  (setq mclient-event-listener-running nil))
-
-(defun mclient-reconnect ()
-  (interactive)
-  (mclient-disconnect)
-  (mclient))
-
 (defun mclient-filter (condp lst)
   (delq nil
         (mapcar (lambda (x)
@@ -224,8 +237,17 @@ for a username and password.
   (re-search-forward "▶")
   (forward-char)
   (kill-line)
-  (matrix-send-message mclient-room-id 
-                       (pop kill-ring)))
+  (let ((filter-this-text (apply-partially 'mclient-run-through-input-filter (pop kill-ring))))
+    (reduce filter-this-text
+            mclient-input-filters
+            :initial-value nil)))
+
+(defun mclient-run-through-input-filter (text previous-ret filter)
+  (unless previous-ret
+    (funcall filter text)))
+
+(defun mclient-send-to-current-room (text)
+  (matrix-send-message mclient-room-id text))
 
 (defun mclient-set-room-end-token (data)
   "When an event comes in, file it in to the room so that we can
@@ -238,22 +260,21 @@ for a username and password.
                 (setq-local mclient-room-end-token (matrix-get 'event_id data)))))
           ) (matrix-get 'chunk data)))
 
-(defun mclient-window-change-hook ()
-  "Send a read receipt if necessary."
-  (when (and mclient-room-id mclient-room-end-token)
-    (matrix-mark-as-read mclient-room-id mclient-room-end-token)))
-
-
-(defun mclient-restart-listener-maybe (error-thrown)
-  (cond ((string-match "code 6" (cdr error-thrown))
-         (message "Lost connection with matrix, will re-attempt in %s ms" mclient-event-poll-timeout)
-         (mclient-restart-later))
-        ((string-match "code 7" (cdr error-thrown))
-         (message "Lost connection with matrix, will re-attempt in %s ms" mclient-event-poll-timeout)
+(defun mclient-restart-listener-maybe (sym error-thrown)
+  (cond ((or (string-match "code 6" (cdr error-thrown))
+             (eq sym 'parse-error)
+             (eq sym 'timeout)
+             (string-match "interrupt" (cdr error-thrown))
+             (string-match "code 7" (cdr error-thrown)))
+         (message "Lost connection with matrix, will re-attempt in %s ms"
+                  (/ mclient-event-poll-timeout 2))
          (mclient-restart-later))
         ((string-match "code 60" (cdr error-thrown))
          (message "curl couldn't validate CA, not advising --insecure? File bug pls."))))
 
+(defun mclient-stream-from-end-token ()
+  (mclient-start-event-listener mclient-event-stream-end-token))
+
 (defun mclient-restart-later ()
-  (run-with-timer (/ mclient-event-poll-timeout 1000) nil (lambda ()
-                                                            (mclient-start-event-listener mclient-event-stream-end-token))))
+  (run-with-timer (/ mclient-event-poll-timeout 1000) nil
+                  'mclient-stream-from-end-token))
