@@ -40,6 +40,7 @@
   (add-to-list 'mclient-event-handlers '("m.presence" . mclient-handler-m.presence))
   (add-to-list 'mclient-event-handlers '("m.typing" . mclient-handler-m.typing))
   (add-to-list 'mclient-input-filters 'mclient-send-to-current-room)
+  (add-to-list 'mclient-input-filters 'mclient-input-filter-emote)
   (add-to-list 'mclient-input-filters 'mclient-input-filter-join)
   (add-to-list 'mclient-input-filters 'mclient-input-filter-leave))
 
@@ -169,4 +170,12 @@
 (defun mclient-input-filter-part (text)
   (when (string-match "^/part.*" text)
     (matrix-leave-room mclient-room-id)
+    t))
+
+(defun mclient-input-filter-emote (text)
+  (when (string-match "^/me +\\(.*\\)" text)
+    (let ((emote (substring text (match-beginning 1) (match-end 1))))
+      (matrix-send-event mclient-room-id "m.room.message"
+                         `(("msgtype" . "m.emote")
+                           ("body" . ,emote))))
     t))
