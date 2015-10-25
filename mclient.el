@@ -114,14 +114,21 @@ using data from auth-source. Otherwise, the user will be prompted
 for a username and password.
 "
   (interactive)
-  (if mclient-use-auth-source
-      (let ((pwdata (mclient-read-auth-source)))
-        (matrix-login-with-password (matrix-get 'username pwdata)
-                                    (matrix-get 'password pwdata)))
-    (let ((username (read-string "Username: "))
-          (password (read-string "Password: ")))
-      (matrix-login-with-password username password))))
-
+  (let* ((auth-source-creation-prompts
+          '((username . "Matrix identity: ")
+            (secret . "Matrix password for %u (homeserver: %h): ")))
+         (found (nth 0 (auth-source-search :max 1
+                                           :host matrix-homeserver-base-url
+                                           :require '(:user :secret)
+                                           :create t))))
+    (when (and
+           found
+           (matrix-login-with-password (plist-get found :user)
+                                       (let ((secret (plist-get found :secret)))
+                                         (if (functionp secret)
+                                             (funcall secret)
+                                           secret)))
+           (funcall (plist-get found :save-function))))))
 (defun mclient-disconnect ()
   (interactive)
   (dolist (room-cons mclient-active-rooms)
