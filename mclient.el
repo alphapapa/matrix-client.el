@@ -237,13 +237,12 @@ for a username and password.
   (re-search-forward "▶")
   (forward-char)
   (kill-line)
-  (let ((filter-this-text (apply-partially 'mclient-run-through-input-filter (pop kill-ring))))
-    (reduce filter-this-text
-            mclient-input-filters
-            :initial-value nil)))
+  (reduce 'mclient-run-through-input-filter
+          mclient-input-filters
+          :initial-value (pop kill-ring)))
 
-(defun mclient-run-through-input-filter (text previous-ret filter)
-  (unless previous-ret
+(defun mclient-run-through-input-filter (text filter)
+  (when text
     (funcall filter text)))
 
 (defun mclient-send-to-current-room (text)

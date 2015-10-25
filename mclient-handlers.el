@@ -154,28 +154,35 @@
         user-id)))
 
 (defun mclient-input-filter-join (text)
-  (when (string-match "^/j\\(oin\\)? +\\(.*\\)" text)
-    (let ((room (substring text (match-beginning 2) (match-end 2))))
-      (mclient-set-up-room
-       (matrix-sync-room
-        (matrix-join-room room))))
-    t))
+  (if (string-match "^/j\\(oin\\)? +\\(.*\\)" text)
+      (progn
+        (let ((room (substring text (match-beginning 2) (match-end 2))))
+          (mclient-set-up-room
+           (matrix-sync-room
+            (matrix-join-room room))))
+        nil)
+    text))
 
 (defun mclient-input-filter-leave (text)
-  (when (and (string-match "^/leave.*" text)
-             (matrix-leave-room mclient-room-id))
-    (kill-buffer)
-    t))
+  (if (and (string-match "^/leave.*" text)
+           (matrix-leave-room mclient-room-id))
+      (progn
+        (kill-buffer)
+        nil)
+    text))
 
 (defun mclient-input-filter-part (text)
-  (when (string-match "^/part.*" text)
-    (matrix-leave-room mclient-room-id)
-    t))
+  (if (string-match "^/part.*" text)
+      (progn
+        (matrix-leave-room mclient-room-id)
+        nil)
+    text))
 
 (defun mclient-input-filter-emote (text)
-  (when (string-match "^/me +\\(.*\\)" text)
-    (let ((emote (substring text (match-beginning 1) (match-end 1))))
-      (matrix-send-event mclient-room-id "m.room.message"
-                         `(("msgtype" . "m.emote")
-                           ("body" . ,emote))))
-    t))
+  (if (string-match "^/me +\\(.*\\)" text)
+      (let ((emote (substring text (match-beginning 1) (match-end 1))))
+        (matrix-send-event mclient-room-id "m.room.message"
+                           `(("msgtype" . "m.emote")
+                             ("body" . ,emote)))
+        nil)
+    text))
