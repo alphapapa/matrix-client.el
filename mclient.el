@@ -129,6 +129,7 @@ for a username and password.
                                              (funcall secret)
                                            secret)))
            (funcall (plist-get found :save-function))))))
+
 (defun mclient-disconnect ()
   (interactive)
   (dolist (room-cons mclient-active-rooms)
