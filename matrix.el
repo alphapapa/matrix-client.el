@@ -36,6 +36,7 @@
 (require 'json)
 (require 'request)
 
+;;;###autoload
 (defcustom matrix-homeserver-base-url "https://matrix.org/"
   "URI to your Matrix homeserver, defaults to the official homeserver."
   :type 'string

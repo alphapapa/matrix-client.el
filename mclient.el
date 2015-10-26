@@ -38,14 +38,17 @@
 
 ;;; Code:
 
+(require 'matrix)
 (require 'mclient-handlers)
 (require 'mclient-modes)
 
+;;;###autoload
 (defcustom mclient-debug-events nil
   "When non-nil, log raw events to *matrix-events* buffer."
   :type 'boolean
   :group 'matrix-client)
 
+;;;###autoload
 (defcustom mclient-event-poll-timeout 30000
   "How long to wait for a Matrix event in the EventStream before timing out and trying again."
   :type 'number
@@ -89,9 +92,11 @@ See `defmclient-handler'.")
 (defvar mclient-render-membership t
   "Show membership changes in the main buffer windows.")
 
+;;;###autoload
 (defcustom mclient-backfill-count 10
   "How many messages to backfill at a time when scrolling.")
 
+;;;###autoload
 (defcustom mclient-backfill-threshold 5
   "How close to the top of a buffer point needs to be before backfilling events.")
 
@@ -104,6 +109,7 @@ Each of these functions take a single argument, the TEXT the user
 inputs.  They can modify that text and return a new version of
 it, or they can return nil to prevent further processing of it.")
 
+;;;###autoload
 (defun matrix-client ()
   "Connect to Matrix.
 
@@ -121,6 +127,7 @@ in."
     (setq mclient-event-listener-running t)
     (mclient-start-event-listener (matrix-get 'end initial-data))))
 
+;;;###autoload
 (defun mclient-login ()
   "Get a token form the Matrix homeserver.
 
