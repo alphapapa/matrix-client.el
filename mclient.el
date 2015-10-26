@@ -172,7 +172,7 @@ connect, clearing all room data."
         (mclient-stream-from-end-token))
     (progn
       (mclient-disconnect)
-      (mclient))))
+      (matrix-client))))
 
 (defun mclient-set-up-room (roomdata)
   "Set up a room from its initialSync ROOMDATA."
