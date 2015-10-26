@@ -74,24 +74,24 @@ optional alist of URL parameters.  HEADERS is optional HTTP
 headers to add to the request.
 
 The return value is the `json-read' response from homeserver."
-  (let* ((query-params (when matrix-token (add-to-list 'query-params (cons \"access_token\" matrix-token))))
+  (let* ((query-params (when matrix-token (add-to-list 'query-params (cons "access_token" matrix-token))))
          (url-request-data (when content (json-encode content)))
          (endpoint (concat (matrix-homeserver-api-url) path)))
     (advice-add 'request--curl-command :filter-return #'request--with-insecure)
-    (let ((response (cond ((string-equal \"GET\" (upcase method))
+    (let ((response (cond ((string-equal "GET" (upcase method))
                            (request endpoint
                                     :type (upcase method)
                                     :params query-params
                                     :sync t
                                     :parser 'json-read))
-                          ((or (string-equal \"POST\" (upcase method))
-                               (string-equal \"PUT\" (upcase method)))
+                          ((or (string-equal "POST" (upcase method))
+                               (string-equal "PUT" (upcase method)))
                            (request endpoint
                                     :type (upcase method)
                                     :params query-params
                                     :sync t
                                     :data (json-encode content)
-                                    :headers (add-to-list 'headers '(\"Content-Type\" . \"application/json\"))
+                                    :headers (add-to-list 'headers '("Content-Type" . "application/json"))
                                     :parser 'json-read)))))
       (advice-remove 'request--curl-command #'request--with-insecure)
       (request-response-data response))))
