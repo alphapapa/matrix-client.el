@@ -6,7 +6,7 @@
 ;; Created: 21 June 2015
 ;; Keywords: web
 ;; Homepage: http://doc.rix.si/matrix.html
-;; Package-Version: 0.0.1
+;; Package-Version: 0.1.0
 ;; Package-Requires: ((json) (request))
 
 ;; This file is not part of GNU Emacs.
