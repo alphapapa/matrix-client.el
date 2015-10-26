@@ -7,7 +7,7 @@
 ;; Keywords: web
 ;; Homepage: http://doc.rix.si/matrix.html
 ;; Package-Version: 0.0.1
-;; Package-Requires: ("json")
+;; Package-Requires: ((json))
 
 ;; This file is not part of GNU Emacs.
 
