@@ -24,10 +24,22 @@
 ;; You should have received a copy of the GNU General Public License along with
 ;; this file.  If not, see <http://www.gnu.org/licenses/>.
 
-(provide 'mclient-handlers)
+;;; Commentary:
+
+;; This file holds the standard matrix-client handlers and input filters. See the docstring of
+;; [`mclient-handlers-init'] and [`defmclient-handler'] for information about these.
+
+;;; Code:
 
 (defun mclient-handlers-init ()
-  "Set up all the mclient event type handlers"
+  "Set up all the mclient event type handlers.
+
+
+Each mclient-event-handler is an alist of matrix message type and
+the function that handles them.  Currently only a single handler
+for each event is supported.  The handler takes a single argument,
+DATA, which is a `json-read' object from the Event stream.  See
+the Matrix spec for more information about its format."
   (setq mclient-event-handlers nil)
   (setq mclient-input-filters nil)
   (add-to-list 'window-configuration-change-hook 'mclient-window-change-hook)
@@ -45,6 +57,25 @@
   (add-to-list 'mclient-input-filters 'mclient-input-filter-leave))
 
 (defmacro defmclient-handler (msgtype varlist body)
+  "Create an mclient-handler.
+
+This macro generates a standard function which provides some
+standard variables that each event handler can use to render an
+event sanely.  It also sets [`inhibit-read-only'] to true to
+allow you to freely render in to the buffer.
+
+MSGTYPE is the type of the message to handle.
+
+Provided Variables:
+
+- `room-id': the Matrix room id the message is intended for
+- `room-buf': the buffer tied to the Matrix room which the
+  message is intended for.
+- Any other variables in VARLIST are provided as well.
+
+BODY is the function itself.  See, for example,
+[`mclient-handler-m.presence'] for an example of what this looks
+like."
   (let ((fname (intern (format "mclient-handler-%s" msgtype))))
     `(defun ,fname (data)
        (let* ((inhibit-read-only t)
@@ -53,8 +84,8 @@
               ,@varlist)
          (with-current-buffer room-buf
            (save-excursion
-             (end-of-buffer)
-             (previous-line)
+             (goto-char (point-max))
+             (forward-line -1)
              (end-of-line)
              ,@body))))))
 
@@ -149,11 +180,13 @@
     (mclient-update-header-line)))
 
 (defun mclient-displayname-from-user-id (user-id)
+  "Get the Display name for a USER-ID."
   (let* ((userdata (cdr (assoc user-id mclient-room-membership))))
     (or (matrix-get 'displayname userdata)
         user-id)))
 
 (defun mclient-input-filter-join (text)
+  "Input filter to handle JOINs.  Filters TEXT."
   (if (string-match "^/j\\(oin\\)? +\\(.*\\)" text)
       (progn
         (let ((room (substring text (match-beginning 2) (match-end 2))))
@@ -164,6 +197,7 @@
     text))
 
 (defun mclient-input-filter-leave (text)
+  "Input filter to handle LEAVEs.  Filters TEXT."
   (if (and (string-match "^/leave.*" text)
            (matrix-leave-room mclient-room-id))
       (progn
@@ -172,6 +206,7 @@
     text))
 
 (defun mclient-input-filter-part (text)
+  "Input filter to handle PARTs.  Filters TEXT."
   (if (string-match "^/part.*" text)
       (progn
         (matrix-leave-room mclient-room-id)
@@ -179,6 +214,7 @@
     text))
 
 (defun mclient-input-filter-emote (text)
+  "Input filter to handle emotes.  Filters TEXT."
   (if (string-match "^/me +\\(.*\\)" text)
       (let ((emote (substring text (match-beginning 1) (match-end 1))))
         (matrix-send-event mclient-room-id "m.room.message"
@@ -186,3 +222,6 @@
                              ("body" . ,emote)))
         nil)
     text))
+
+(provide 'mclient-handlers)
+;;; mclient-handlers.el ends here

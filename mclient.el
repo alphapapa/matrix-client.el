@@ -24,77 +24,88 @@
 ;; You should have received a copy of the GNU General Public License along with
 ;; this file.  If not, see <http://www.gnu.org/licenses/>.
 
-(provide 'mclient)
+;;; Commentary:
+
+;; `mclient' provides most of the core plumbing for an interactive Matrix chat
+;; client. It uses the Matrix event stream framework to dispatch a global event
+;; stream to individual rooms. There are a set of 'event handlers' and 'input
+;; filters' in `mclient-handlers' which are used to implement the render flow of
+;; the various event types and actions a user can take.
+
+;;; Code:
+
 (require 'mclient-handlers)
 (require 'mclient-modes)
 
-(defcustom mclient-use-auth-source nil
-  "When non-nil, attempt to load client username and password
-  from authinfo.  XXX: Fill in information about format"
-  :type 'boolean
-  :group 'matrix-client)
-
 (defcustom mclient-debug-events nil
-  "When non-nil, log all events to *matrix-events* buffer"
+  "When non-nil, log raw events to *matrix-events* buffer."
   :type 'boolean
   :group 'matrix-client)
 
 (defcustom mclient-event-poll-timeout 30000
-  "How long to wait for a Matrix event in the EventStream before
-  timing out and trying again"
+  "How long to wait for a Matrix event in the EventStream before timing out and trying again."
   :type 'number
   :group 'matrix-client)
 
 (defvar mclient-new-event-hook nil
-  "A lists of functions that are evaluated when a new event comes
-  in.")
+  "A lists of functions that are evaluated when a new event comes in.")
 
 (defvar mclient-event-listener-running nil)
 
 (defvar mclient-active-rooms nil
-  "Rooms the active client is in")
+  "Rooms the active client is in.")
 
 (defvar mclient-event-handlers '()
-  "An alist of (type . function) handler definitions for various matrix types")
+  "An alist of (type . function) handler definitions for various matrix types.
+
+Each of these receives the raw event as a single DATA argument.
+See `defmclient-handler'.")
 
 (defvar-local mclient-room-name nil
-  "The name of the room; bufferlocal")
+  "The name of the buffer's room.")
 
 (defvar-local mclient-room-topic nil
-  "The name of the room; bufferlocal")
+  "The topic of the buffer's room.")
 
 (defvar-local mclient-room-id nil
-  "The Matrix ID of the active room; bufferlocal")
+  "The Matrix ID of the buffer's room.")
 
 (defvar-local mclient-room-membership nil
-  "The name of the room; bufferlocal")
+  "The list of members of the buffer's room.")
 
 (defvar-local mclient-room-typers nil
-  "A list of users currently typing in the room. bufferlocal")
+  "The list of members of the buffer's room who are currently typing.")
 
 (defvar-local mclient-room-end-token nil
-  "The most recent event-id, used to push read-receipts to the server")
+  "The most recent event-id in a room, used to push read-receipts to the server.")
 
 (defvar mclient-render-presence t
-  "Show presence changes in the main buffer windows")
+  "Show presence changes in the main buffer windows.")
 
 (defvar mclient-render-membership t
-  "Show membership changes in the main buffer windows")
+  "Show membership changes in the main buffer windows.")
 
 (defcustom mclient-backfill-count 10
-  "How many messages to backfill at a time when scrolling")
+  "How many messages to backfill at a time when scrolling.")
 
 (defcustom mclient-backfill-threshold 5
-  "How close to the top of a buffer point needs to be before
-  backfilling events.")
+  "How close to the top of a buffer point needs to be before backfilling events.")
 
 (defvar mclient-event-stream-end-token nil)
 
 (defvar mclient-input-filters nil
-  "List of functions to run input through; return non-nil to halt
-  further processing of messages")
+  "List of functions to run input through.
 
-(defun mclient ()
+Each of these functions take a single argument, the TEXT the user
+inputs.  They can modify that text and return a new version of
+it, or they can return nil to prevent further processing of it.")
+
+(defun matrix-client ()
+  "Connect to Matrix.
+
+This will attempt to log you in if you don't have a valid
+[`matrix-token'] and will create room buffers for each room you are
+in."
   (interactive)
   (unless matrix-token
     (mclient-login))
@@ -110,9 +121,8 @@
   "Get a token form the Matrix homeserver.
 
 If [`mclient-use-auth-source'] is non-nil, attempt to log in
-using data from auth-source. Otherwise, the user will be prompted
-for a username and password.
-"
+using data from auth-source.  Otherwise, the user will be prompted
+for a username and password."
   (interactive)
   (let* ((auth-source-creation-prompts
           '((username . "Matrix identity: ")
@@ -128,9 +138,11 @@ for a username and password.
                                          (if (functionp secret)
                                              (funcall secret)
                                            secret)))
-           (funcall (plist-get found :save-function))))))
+           (let ((save-func (plist-get found :save-function)))
+             (when save-func (funcall save-func)))))))
 
 (defun mclient-disconnect ()
+  "Disconnect from Matrix and kill all active room buffers."
   (interactive)
   (dolist (room-cons mclient-active-rooms)
     (kill-buffer (cdr room-cons)))
@@ -138,6 +150,11 @@ for a username and password.
   (setq mclient-event-listener-running nil))
 
 (defun mclient-reconnect (arg)
+  "Reconnect to Matrix.
+
+Without a `prefix-arg' ARG it will simply restart the
+mclient-stream poller, but with a prefix it will disconnect and
+connect, clearing all room data."
   (interactive "P")
   (if (or (not arg) mclient-event-stream-end-token)
       (progn
@@ -147,6 +164,7 @@ for a username and password.
       (mclient))))
 
 (defun mclient-set-up-room (roomdata)
+  "Set up a room from its initialSync ROOMDATA."
   (let* ((room-id (matrix-get 'room_id roomdata))
          (room-state (matrix-get 'state roomdata))
          (room-messages (matrix-get 'chunk (matrix-get 'messages roomdata)))
@@ -173,6 +191,7 @@ for a username and password.
     (matrix-mark-as-read mclient-room-id mclient-room-end-token)))
 
 (defun mclient-start-event-listener (end-tok)
+  "Start the event listener if it is not already running, from the END-TOK end token."
   (when mclient-event-listener-running
     (matrix-event-poll
      end-tok
@@ -181,6 +200,10 @@ for a username and password.
     (setq mclient-event-stream-end-token end-tok)))
 
 (defun mclient-event-listener-callback (data)
+  "The callback which `matrix-event-poll' pushes its data in to.
+
+This calls each function in mclient-new-event-hook with the data
+object with a single argument, DATA."
   (unless (eq (car data) 'error)
     (dolist (hook mclient-new-event-hook)
       (funcall hook data)))
@@ -193,6 +216,7 @@ for a username and password.
   (add-to-list 'mclient-new-event-hook 'mclient-set-room-end-token))
 
 (defun mclient-debug-event-maybe (data)
+  "Debug DATA to *matrix-events* if `mclient-debug-events' is non-nil."
   (with-current-buffer (get-buffer-create "*matrix-events*")
     (let ((inhibit-read-only t))
       (when mclient-debug-events
@@ -201,10 +225,12 @@ for a username and password.
         (insert (prin1-to-string data))))))
 
 (defun mclient-render-events-to-room (data)
+  "Given a chunk of data from an /initialSyc, render each element from DATA in to its room."
   (let ((chunk (matrix-get 'chunk data)))
     (mapc 'mclient-render-event-to-room chunk)))
 
 (defun mclient-render-event-to-room (item)
+  "Feed ITEM in to its proper `mclient-event-handlers' handler."
   (let* ((type (matrix-get 'type item))
          (handler (matrix-get type mclient-event-handlers)))
     (when handler
@@ -219,12 +245,14 @@ for a username and password.
     (setq header-line-format (format "%s: %s" mclient-room-name mclient-room-topic))))
 
 (defun mclient-filter (condp lst)
+  "A standard filter, feed it a function CONDP and a LST."
   (delq nil
         (mapcar (lambda (x)
                   (and (funcall condp x) x))
                 lst)))
 
 (defmacro insert-read-only (text &rest extra-props)
+  "Insert a block of TEXT as read-only, with the ability to add EXTRA-PROPS such as face."
   `(add-text-properties
     (point) (progn
               (insert ,text)
@@ -232,6 +260,7 @@ for a username and password.
     '(read-only t ,@extra-props)))
 
 (defun mclient-render-message-line ()
+  "Insert a message input at the end of the buffer."
   (end-of-buffer)
   (let ((inhibit-read-only t))
     (insert "\n")
@@ -239,6 +268,7 @@ for a username and password.
     (insert " ")))
 
 (defun mclient-send-active-line ()
+  "Send the current message-line text after running it through input-filters."
   (interactive)
   (end-of-buffer)
   (beginning-of-line)
@@ -250,15 +280,16 @@ for a username and password.
           :initial-value (pop kill-ring)))
 
 (defun mclient-run-through-input-filter (text filter)
+  "Run each TEXT through a single FILTER.  Used by `mclient-send-active-line'."
   (when text
     (funcall filter text)))
 
 (defun mclient-send-to-current-room (text)
+  "Send a string TEXT to the current buffer's room."
   (matrix-send-message mclient-room-id text))
 
 (defun mclient-set-room-end-token (data)
-  "When an event comes in, file it in to the room so that we can
-  mark a cursor when visiting the buffer."
+  "When an event DATA comes in, file it in to the room so that we can mark a cursor when visiting the buffer."
   (mapc (lambda (data)
           (let* ((room-id (matrix-get 'room_id data))
                  (room-buf (matrix-get room-id mclient-active-rooms)))
@@ -268,6 +299,9 @@ for a username and password.
           ) (matrix-get 'chunk data)))
 
 (defun mclient-restart-listener-maybe (sym error-thrown)
+  "The error handler for mclient's event-poll.
+
+SYM and ERROR-THROWN come from Request and are used to decide whether to connect."
   (cond ((or (string-match "code 6" (cdr error-thrown))
              (eq sym 'parse-error)
              (eq sym 'timeout)
@@ -280,8 +314,13 @@ for a username and password.
          (message "curl couldn't validate CA, not advising --insecure? File bug pls."))))
 
 (defun mclient-stream-from-end-token ()
+  "Restart the mclient stream from the saved end-token."
   (mclient-start-event-listener mclient-event-stream-end-token))
 
 (defun mclient-restart-later ()
+  "Try to restart the Matrix poller later, maybe."
   (run-with-timer (/ mclient-event-poll-timeout 1000) nil
                   'mclient-stream-from-end-token))
+
+(provide 'mclient)
+;;; mclient.el ends here

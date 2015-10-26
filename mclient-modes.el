@@ -24,17 +24,24 @@
 ;; You should have received a copy of the GNU General Public License along with
 ;; this file.  If not, see <http://www.gnu.org/licenses/>.
 
-(provide 'mclient-modes)
+;;; Commentary:
+
+;; this file describes the major-mode for Matrix-Client buffers. See the docstring
+;; for `matrix-client-mode' for more information.
+
+;;; Code:
+
 (require 'simple)
 
 (defvar matrix-client-mode-map
   (let ((map (make-sparse-keymap)))
     (define-key map (kbd "RET") 'mclient-send-active-line)
     map)
-  "Keymap for `matrix-client-mode'")
+  "Keymap for `matrix-client-mode'.")
 
 (define-derived-mode matrix-client-mode fundamental-mode "Matrix Client"
   "Major mode for Matrix client buffers.
+
 \\{matrix-client-mode-map}")
 
 (defface mclient-metadata
@@ -43,3 +50,6 @@
     (t (:weight bold)))
   "Face for chat metadata properties."
   :group 'mclient-faces)
+
+(provide 'mclient-modes)
+;;; mclient-modes.el ends here
