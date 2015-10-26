@@ -96,15 +96,16 @@ like."
    (insert-read-only (format "📩 %s %s> "
                              (format-time-string "[%T]" (seconds-to-time (/ (matrix-get 'origin_server_ts data) 1000)))
                              (mclient-displayname-from-user-id (matrix-get 'user_id data))) face mclient-metadata)
-   (cond ((string-equal "m.emote" msg-type)
-          (insert-read-only "* ")
-          (insert-read-only (matrix-get 'body content)))
-         ((string-equal "m.image" msg-type)
-          (insert-read-only (matrix-get 'body content))(insert-read-only (matrix-get 'body content))
-          (insert-read-only ": ")
-          (insert-read-only (matrix-transform-mxc-uri (matrix-get 'url content))))
-         (t
-          (insert-read-only (matrix-get 'body content))))))
+   (when content
+     (cond ((string-equal "m.emote" msg-type)
+            (insert-read-only "* ")
+            (insert-read-only (matrix-get 'body content)))
+           ((string-equal "m.image" msg-type)
+            (insert-read-only (matrix-get 'body content))(insert-read-only (matrix-get 'body content))
+            (insert-read-only ": ")
+            (insert-read-only (matrix-transform-mxc-uri (matrix-get 'url content))))
+           (t
+            (insert-read-only (matrix-get 'body content)))))))
 
 (defmclient-handler "m.lightrix.pattern"
   ((content (matrix-get 'content data)))
