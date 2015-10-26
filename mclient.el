@@ -26,11 +26,15 @@
 
 ;;; Commentary:
 
-;; `mclient' provides most of the core plumbing for an interactive Matrix chat
-;; client. It uses the Matrix event stream framework to dispatch a global event
-;; stream to individual rooms. There are a set of 'event handlers' and 'input
-;; filters' in `mclient-handlers' which are used to implement the render flow of
-;; the various event types and actions a user can take.
+;; `mclient' is a chat client and API library for the Matrix.org decentralized
+;; RPC system.
+
+;; Implementation-wise `mclient' itself provides most of the core plumbing for
+;; an interactive Matrix chat client. It uses the Matrix event stream framework
+;; to dispatch a global event stream to individual rooms. There are a set of
+;; 'event handlers' and 'input filters' in `mclient-handlers' which are used to
+;; implement the render flow of the various event types and actions a user can
+;; take.
 
 ;;; Code:
 
