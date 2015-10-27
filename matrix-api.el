@@ -76,7 +76,7 @@ The return value is the `json-read' response from homeserver."
   (let* ((query-params (when matrix-token (add-to-list 'query-params (cons "access_token" matrix-token))))
          (url-request-data (when content (json-encode content)))
          (endpoint (concat (matrix-homeserver-api-url) path)))
-    (advice-add 'request--curl-command :filter-return #'request--with-insecure)
+    (ad-activate 'request--curl-command)
     (let ((response (cond ((string-equal "GET" (upcase method))
                            (request endpoint
                                     :type (upcase method)
@@ -92,14 +92,12 @@ The return value is the `json-read' response from homeserver."
                                     :data (json-encode content)
                                     :headers (add-to-list 'headers '("Content-Type" . "application/json"))
                                     :parser 'json-read)))))
-      (advice-remove 'request--curl-command #'request--with-insecure)
+      (ad-deactivate 'request--curl-command)
       (request-response-data response))))
 
-(defun request--with-insecure (command-list)
-  "Advice function to add -k to curl call for `matrix-send-event'.
-
-COMMAND-LIST is internal request-plumbing."
-  (append command-list '("--insecure")))
+(defadvice request--curl-command (around matrix-api-request--with-insecure activate)
+  "Advise function to add -k to curl call for `matrix-send-event'."
+  (setq ad-return-value (append ad-do-it '("--insecure"))))
 
 (defun matrix-send-async (method path &optional content query-params headers cb)
   "Perform an asynchronous Matrix API call.
@@ -112,7 +110,7 @@ HEADERS is optional HTTP headers to add to the request.
 CB is the callback which will be called by `request' when the
 call completes"
   (let* ((endpoint (concat (matrix-homeserver-api-url) path)))
-    (advice-add 'request--curl-command :filter-return #'request--with-insecure)
+    (ad-activate 'request--curl-command)
     (request endpoint
              :type (upcase method)
              :params (when matrix-token (add-to-list 'query-params (cons "access_token" matrix-token)))
@@ -120,7 +118,7 @@ call completes"
              :data (json-encode content)
              :headers (add-to-list 'headers '("Content-Type" . "application/json"))
              :complete (apply-partially #'matrix-async-cb-router cb))
-    (advice-remove 'request--curl-command #'request--with-insecure)))
+    (ad-deactivate 'request--curl-command)))
 
 (defun* matrix-async-cb-router (cb &key data error-thrown symbol-status &allow-other-keys)
   (if (or error-thrown (eq symbol-status 'timeout))
