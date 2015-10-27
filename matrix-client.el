@@ -38,7 +38,7 @@
 
 ;;; Code:
 
-(require 'matrix)
+(require 'matrix-api)
 (require 'matrix-client-handlers)
 (require 'matrix-client-modes)
 
