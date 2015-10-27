@@ -120,14 +120,14 @@ like."
    (membership (matrix-get 'membership content))
    (display-name (matrix-get 'displayname content)))
   ((unless (boundp 'matrix-client-room-membership)
-     (setq-local matrix-client-room-membership '()))
+     (set (make-local-variable 'matrix-client-room-membership) '()))
    (cond ((string-equal "join" membership)
           (add-to-list 'matrix-client-room-membership (cons user-id content)))
          ((or (string-equal "leave" membership) (string-equal "ban" membership))
-          (setq-local matrix-client-room-membership
-                      (matrix-client-filter (lambda (item)
-                                        (string-equal user-id (car item)))
-                                      matrix-client-room-membership))))
+          (set (make-local-variable 'matrix-client-room-membership)
+               (matrix-client-filter (lambda (item)
+                                       (string-equal user-id (car item)))
+                                     matrix-client-room-membership))))
    (when matrix-client-render-membership
      (insert-read-only "\n")
      (insert-read-only (format "🚪 %s (%s) --> %s" display-name user-id membership) face matrix-client-metadata))))
@@ -148,7 +148,7 @@ like."
 
 (defmatrix-client-handler "m.room.name"
   ()
-  ((setq-local matrix-client-room-name (matrix-get 'name (matrix-get 'content data)))
+  ((set (make-local-variable 'matrix-client-room-name) (matrix-get 'name (matrix-get 'content data)))
    (cond (matrix-client-room-name
           (rename-buffer matrix-client-room-name))
          ((> (length matrix-client-room-aliases) 0)
@@ -159,7 +159,7 @@ like."
 
 (defmatrix-client-handler "m.room.aliases"
   ()
-  ((setq-local matrix-client-room-aliases (matrix-get 'aliases (matrix-get 'content data)))
+  ((set (make-local-variable 'matrix-client-room-aliases) (matrix-get 'aliases (matrix-get 'content data)))
    (cond (matrix-client-room-name
           (rename-buffer matrix-client-room-name))
          ((> (length matrix-client-room-aliases) 0)
@@ -170,14 +170,14 @@ like."
 
 (defmatrix-client-handler "m.room.topic"
   ()
-  ((setq-local matrix-client-room-topic (matrix-get 'topic (matrix-get 'content data)))
+  ((set (make-local-variable 'matrix-client-room-topic) (matrix-get 'topic (matrix-get 'content data)))
    (insert-read-only "\n")
    (insert-read-only (format "✏ Room topic changed --> %s" matrix-client-room-topic) face matrix-client-metadata)
    (matrix-client-update-header-line)))
 
 (defun matrix-client-handler-m.typing (data)
   (with-current-buffer (matrix-get (matrix-get 'room_id data) matrix-client-active-rooms)
-    (setq-local matrix-client-room-typers (matrix-get 'user_ids (matrix-get 'content data)))
+    (set (make-local-variable 'matrix-client-room-typers) (matrix-get 'user_ids (matrix-get 'content data)))
     (matrix-client-update-header-line)))
 
 (defun matrix-client-displayname-from-user-id (user-id)

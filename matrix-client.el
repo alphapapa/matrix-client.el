@@ -190,7 +190,7 @@ connect, clearing all room data."
       (matrix-client-mode)
       (erase-buffer)
       (matrix-client-render-message-line)
-      (setq-local matrix-client-room-id room-id)
+      (set (make-local-variable 'matrix-client-room-id) room-id)
       (mapc 'matrix-client-render-event-to-room room-state)
       (mapc 'matrix-client-render-event-to-room room-messages))
     (setq matrix-client-render-membership render-membership)
