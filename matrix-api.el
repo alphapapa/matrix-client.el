@@ -1,4 +1,4 @@
-;;; matrix.el --- An ELisp client for the Matrix.org RPC
+;;; matrix-api.el --- An ELisp client for the Matrix.org RPC
 
 ;; Copyright (C) 2015 Ryan Rix
 ;; Author: Ryan Rix <ryan@whatthefuck.computer>
@@ -7,11 +7,10 @@
 ;; Keywords: web
 ;; Homepage: http://doc.rix.si/matrix.html
 ;; Package-Version: 0.1.0
-;; Package-Requires: ((json) (request))
 
 ;; This file is not part of GNU Emacs.
 
-;; matrix.el is free software: you can redistribute it and/or modify it
+;; matrix-api.el is free software: you can redistribute it and/or modify it
 ;; under the terms of the GNU General Public License as published by the Free
 ;; Software Foundation, either version 3 of the License, or (at your option) any
 ;; later version.
@@ -27,7 +26,7 @@
 ;;; Commentary:
 
 ;; This is a pure-elisp implementation of the Matrix.org RPC protocol
-;; specification 0.1. It forms the basis of the included `mclient' Matrix chat
+;; specification 0.1. It forms the basis of the included `matrix-client' Matrix chat
 ;; client, and can be used as a general RPC system using `matrix-send-event' and
 ;; `matrix-event-poll'.
 
@@ -132,7 +131,7 @@ call completes"
 
 (defun matrix-login-with-password (username password)
   "Given a USERNAME and PASSWORD log in to the homeserver and save the token."
-  (let ((resp 
+  (let ((resp
          (matrix-login "m.login.password" (list (cons "user" username) (cons "password" password)))))
     (setq matrix-token (cdr (assoc 'access_token resp)))
     resp))
@@ -211,5 +210,5 @@ those events as its argument."
          (path (format "/rooms/%s/initialSync" (url-hexify-string room-id))))
     (matrix-send "GET" path (list))))
 
-(provide 'matrix)
-;;; matrix.el ends here
+(provide 'matrix-api)
+;;; matrix-api.el ends here

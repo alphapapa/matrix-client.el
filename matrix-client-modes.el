@@ -1,4 +1,4 @@
-;;; mclient-modes.el --- Modes for a Matrix.org chat client
+;;; matrix-client-modes.el --- Modes for a Matrix.org chat client
 
 ;; Copyright (C) 2015 Ryan Rix
 ;; Author: Ryan Rix <ryan@whatthefuck.computer>
@@ -11,12 +11,12 @@
 
 ;; This file is not part of GNU Emacs.
 
-;; mclient-modes.el is free software: you can redistribute it and/or modify it
+;; matrix-client-modes.el is free software: you can redistribute it and/or modify it
 ;; under the terms of the GNU General Public License as published by the Free
 ;; Software Foundation, either version 3 of the License, or (at your option) any
 ;; later version.
 ;;
-;; mclient-modes.el is distributed in the hope that it will be useful, but
+;; matrix-client-modes.el is distributed in the hope that it will be useful, but
 ;; WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
 ;; FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
 ;; more details.
@@ -35,7 +35,7 @@
 
 (defvar matrix-client-mode-map
   (let ((map (make-sparse-keymap)))
-    (define-key map (kbd "RET") 'mclient-send-active-line)
+    (define-key map (kbd "RET") 'matrix-client-send-active-line)
     map)
   "Keymap for `matrix-client-mode'.")
 
@@ -44,12 +44,12 @@
 
 \\{matrix-client-mode-map}")
 
-(defface mclient-metadata
+(defface matrix-client-metadata
   '((((class color) (background light)) (:foreground "#000088" :weight bold))
     (((class color) (background dark)) (:foreground "#4444FF" :weight bold))
     (t (:weight bold)))
   "Face for chat metadata properties."
-  :group 'mclient-faces)
+  :group 'matrix-client-faces)
 
-(provide 'mclient-modes)
-;;; mclient-modes.el ends here
+(provide 'matrix-client-modes)
+;;; matrix-client-modes.el ends here
