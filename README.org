@@ -2,17 +2,19 @@
 
 * Installation
 
-Right now this is just a single directoy that you put in to your =load-path= and require with
-=(require 'mclient)=. Eventually I'll put it in MELPA or something so that you can install it via
-=package.el=.
+=matrix-client= is installable via MELPA. Otherwise you can add this directory to your =load-path=
+and =(require 'matrix-client)=.
 
 * Usage
 
 There are two parts, a low-level API, and a terrible barely-alpha-quality client.
 
-** matrix.el
+Either deploy your own homeserver or register account on the public homeserver
+https://matrix.org/beta/#/login . After you've done that, =M-x matrix-client= will set you up with
+buffers corresponding to your Matrix rooms. You can join new ones with /join, leave with /leave or
+/part, and hook in to the custom functions provided by =matrix-client=.
 
-This is a low-level API right now; I'm planning to wrap it with high-level API that lets you easily
+=matrix-api= is a low-level API right now; I'm planning to wrap it with high-level API that lets you easily
 per-room events, and that sort of thing, and eventually a full-fledged Matrix client. The API itself
 is pretty tightly based on the official Python API.
 
@@ -23,16 +25,6 @@ is pretty tightly based on the official Python API.
   (matrix-initial-sync 1)
   (matrix-send-message "!yourroom:matrix.org" "Test post please ignore"))
 #+END_SRC
-
-** mclient.el
-
-This is a pretty rough implementation of a Matrix client; hopefully it'll become less rough as I
-work on it. =M-x mclient= will prompt you for a username and password, and jack you in to the
-matrix.org homeserver, unless you override =matrix-homeserver-base-url= to provide your own.
-
-It barely works, and does a lot of janky things, but it is passable as a client for now. It may not
-handle network reconnects and such things well right now, feel free to =M-x mclient-reconnect= if
-you think it's misbehaving.
 
 * Contributing
 
