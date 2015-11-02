@@ -193,8 +193,8 @@ connect, clearing all room data."
     (with-current-buffer room-buf
       (matrix-client-mode)
       (erase-buffer)
-      (matrix-client-render-message-line)
       (set (make-local-variable 'matrix-client-room-id) room-id)
+      (matrix-client-render-message-line)
       (mapc 'matrix-client-render-event-to-room room-state)
       (mapc 'matrix-client-render-event-to-room room-messages))
     (setq matrix-client-render-membership render-membership)
@@ -202,8 +202,8 @@ connect, clearing all room data."
 
 (defun matrix-client-window-change-hook ()
   "Send a read receipt if necessary."
-  (message "%s as read from %s" matrix-client-room-end-token matrix-client-room-id)
   (when (and matrix-client-room-id matrix-client-room-end-token)
+    (message "%s as read from %s" matrix-client-room-end-token matrix-client-room-id)
     (matrix-mark-as-read matrix-client-room-id matrix-client-room-end-token)))
 
 (defun matrix-client-start-event-listener (end-tok)
