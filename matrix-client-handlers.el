@@ -141,8 +141,6 @@ like."
     (with-current-buffer (get-buffer-create "*matrix-events*")
       (when matrix-client-render-presence
         (end-of-buffer)
-        (previous-line)
-        (end-of-line)
         (insert-read-only "\n")
         (insert-read-only (format "🚚 %s (%s) --> %s" display-name user-id presence) face matrix-client-metadata)))))
 
