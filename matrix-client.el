@@ -250,8 +250,9 @@ object with a single argument, DATA."
   "Feed ITEM in to its proper `matrix-client-event-handlers' handler."
   (let* ((type (matrix-get 'type item))
          (handler (matrix-get type matrix-client-event-handlers)))
-    (when handler
-      (funcall handler item))))
+    (if handler
+        (funcall handler item)
+      (message "%s message type has no handler. %s" type item))))
 
 (defun matrix-client-update-header-line ()
   "Update the header line of the current buffer."
