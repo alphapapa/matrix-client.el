@@ -267,6 +267,7 @@ object with a single argument, DATA."
                   (and (funcall condp x) x))
                 lst)))
 
+;;;###autoload
 (defmacro insert-read-only (text &rest extra-props)
   "Insert a block of TEXT as read-only, with the ability to add EXTRA-PROPS such as face."
   `(add-text-properties
