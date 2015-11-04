@@ -198,7 +198,8 @@ connect, clearing all room data."
       (mapc 'matrix-client-render-event-to-room room-state)
       (mapc 'matrix-client-render-event-to-room room-messages))
     (setq matrix-client-render-membership render-membership)
-    (setq matrix-client-render-presence render-presence)))
+    (setq matrix-client-render-presence render-presence)
+    (switch-to-buffer room-buf)))
 
 (defun matrix-client-window-change-hook ()
   "Send a read receipt if necessary."
