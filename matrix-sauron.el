@@ -82,9 +82,8 @@
                                  (point-marker))))))
             (when (and (equal type "m.room.message")
                        (not (string-match matrix-username username)))
-              (message "%d %d %s" prio membership (buffer-name room-buf))
               (sauron-add-event 'matrix prio
-                                (matrix-get 'body content)
+                                (format "<%s> %s" username (matrix-get 'body content))
                                 (lexical-let* ((target-mark target)
                                                (target-buf room-buf))
                                   (lambda ()
