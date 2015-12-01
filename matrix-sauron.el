@@ -63,8 +63,10 @@
   (mapc (lambda (data)
           (let* ((room-id (matrix-get 'room_id data))
                  (room-buf (matrix-get room-id matrix-client-active-rooms))
-                 (membership (with-current-buffer room-buf
-                               (length matrix-client-room-membership)))
+                 (membership (if room-buf
+                                 (with-current-buffer room-buf
+                                   (length matrix-client-room-membership))
+                               0))
                  (type (matrix-get 'type data))
                  (content (matrix-get 'content data))
                  (username (matrix-get 'user_id data))
