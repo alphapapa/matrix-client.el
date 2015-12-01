@@ -59,26 +59,35 @@
     (remove-hook 'matrix-client-new-event-hook 'matrix-add-sauron-event)
     (setq sauron-matrix-running nil)))
 
-(defun matrix-add-sauron-event (data)
-  (mapc (lambda (data)          
+(defun matrix-add-sauron-event (chunk)
+  (mapc (lambda (data)
           (let* ((room-id (matrix-get 'room_id data))
                  (room-buf (matrix-get room-id matrix-client-active-rooms))
+                 (membership (with-current-buffer room-buf
+                               (length matrix-client-room-membership)))
                  (type (matrix-get 'type data))
                  (content (matrix-get 'content data))
+                 (username (matrix-get 'user_id data))
+                 (prio sauron-prio-matrix-new-messages)
+                 (prio (if (= membership 2)
+                           (+ 1 prio)
+                         prio))
                  (target (if (buffer-live-p room-buf)
                              (save-excursion
                                (with-current-buffer room-buf
                                  (end-of-buffer)
                                  (previous-line)
                                  (point-marker))))))
-            (when (equal type "m.room.message")
-              (sauron-add-event 'matrix sauron-prio-matrix-new-messages
+            (when (and (equal type "m.room.message")
+                       (not (string-match matrix-username username)))
+              (message "%d %d %s" prio membership (buffer-name room-buf))
+              (sauron-add-event 'matrix prio
                                 (matrix-get 'body content)
                                 (lexical-let* ((target-mark target)
                                                (target-buf room-buf))
                                   (lambda ()
                                     (sauron-switch-to-marker-or-buffer (or target-mark target-buf))))))))
-        (matrix-get 'chunk data)))
+        (matrix-get 'chunk chunk)))
 
 (provide 'matrix-sauron)
 
