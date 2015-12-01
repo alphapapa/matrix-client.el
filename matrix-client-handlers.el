@@ -124,9 +124,30 @@ like."
    (assq-delete-all user-id matrix-client-room-membership)
    (when (string-equal "join" membership)
      (add-to-list 'matrix-client-room-membership (cons user-id content)))
+   (matrix-update-room-name)
    (when matrix-client-render-membership
      (insert-read-only "\n")
-     (insert-read-only (format "🚪 %s (%s) --> %s" display-name user-id membership) face matrix-client-metadata))))
+     (insert-read-only (format "🚪 %s (%s) --> %s" display-name user-id membership) face matrix-client-metadata))
+   ))
+
+(defun matrix-update-room-name ()
+  "If a room has a name, rename the buffer; if a room has only two
+  people in it use the membership for the buffer name."
+  (cond ((stringp matrix-client-room-name)
+         (rename-buffer matrix-client-room-name))
+        ((> (length matrix-client-room-aliases) 0)
+         (rename-buffer (elt matrix-client-room-aliases 0)))
+        ((eq (length matrix-client-room-membership) 2)
+         (let* ((user (elt (matrix-client-filter
+                            (lambda (member)
+                              (not (eq matrix-username (first member))))
+                            matrix-client-room-membership)
+                           0))
+                (buf (or (matrix-get 'displayname user)
+                         (elt user 0))))
+           (if (eq (current-buffer) (get-buffer buf))
+               (rename-buffer buf)
+             (rename-buffer (generate-new-buffer-name buf)))))))
 
 (defun matrix-client-handler-m.presence (data)
   (let* ((inhibit-read-only t)
@@ -143,10 +164,7 @@ like."
 (defmatrix-client-handler "m.room.name"
   ()
   ((set (make-local-variable 'matrix-client-room-name) (matrix-get 'name (matrix-get 'content data)))
-   (cond (matrix-client-room-name
-          (rename-buffer matrix-client-room-name))
-         ((> (length matrix-client-room-aliases) 0)
-          (rename-buffer (elt matrix-client-room-aliases 0))))
+   (matrix-update-room-name)
    (insert-read-only "\n")
    (insert-read-only (format "📝 Room name changed --> %s" matrix-client-room-name) face matrix-client-metadata)
    (matrix-client-update-header-line)))
@@ -154,10 +172,7 @@ like."
 (defmatrix-client-handler "m.room.aliases"
   ()
   ((set (make-local-variable 'matrix-client-room-aliases) (matrix-get 'aliases (matrix-get 'content data)))
-   (cond (matrix-client-room-name
-          (rename-buffer matrix-client-room-name))
-         ((> (length matrix-client-room-aliases) 0)
-          (rename-buffer (elt matrix-client-room-aliases 0))))
+   (matrix-update-room-name)
    (insert-read-only "\n")
    (insert-read-only (format "📝 Room alias changed --> %s" matrix-client-room-name) face matrix-client-metadata)
    (matrix-client-update-header-line)))

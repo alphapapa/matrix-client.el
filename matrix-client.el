@@ -75,6 +75,9 @@ See `defmatrix-client-handler'.")
 (defvar-local matrix-client-room-name nil
   "The name of the buffer's room.")
 
+(defvar-local matrix-client-room-aliases nil
+  "The alises of the buffer's room.")
+
 (defvar-local matrix-client-room-topic nil
   "The topic of the buffer's room.")
 
