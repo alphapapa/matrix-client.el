@@ -58,6 +58,26 @@
   :type 'number
   :group 'matrix-client)
 
+;;;###autoload
+(defcustom matrix-client-backfill-count 10
+  "How many messages to backfill at a time when scrolling."
+  :group 'matrix-client)
+
+;;;###autoload
+(defcustom matrix-client-backfill-threshold 5
+  "How close to the top of a buffer point needs to be before backfilling events."
+  :group 'matrix-client)
+
+;;;###autoload
+(defcustom matrix-client-render-presence t
+  "Show presence changes in the main buffer windows."
+  :group 'matrix-client)
+
+;;;###autoload
+(defcustom matrix-client-render-membership t
+  "Show membership changes in the main buffer windows."
+  :group 'matrix-client)
+
 (defvar matrix-client-new-event-hook nil
   "A lists of functions that are evaluated when a new event comes in.")
 
@@ -93,22 +113,8 @@ See `defmatrix-client-handler'.")
 (defvar-local matrix-client-room-end-token nil
   "The most recent event-id in a room, used to push read-receipts to the server.")
 
-(defvar matrix-client-render-presence t
-  "Show presence changes in the main buffer windows.")
-
-(defvar matrix-client-render-membership t
-  "Show membership changes in the main buffer windows.")
-
 (defvar matrix-username nil
   "Your Matrix username.")
-
-;;;###autoload
-(defcustom matrix-client-backfill-count 10
-  "How many messages to backfill at a time when scrolling.")
-
-;;;###autoload
-(defcustom matrix-client-backfill-threshold 5
-  "How close to the top of a buffer point needs to be before backfilling events.")
 
 (defvar matrix-client-event-stream-end-token nil)
 
