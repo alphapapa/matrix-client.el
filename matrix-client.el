@@ -153,6 +153,7 @@ for a username and password."
                                          (if (functionp secret)
                                              (funcall secret)
                                            secret)))
+           (setq matrix-username (plist-get found :user))
            (let ((save-func (plist-get found :save-function)))
              (when save-func (funcall save-func)))))))
 
