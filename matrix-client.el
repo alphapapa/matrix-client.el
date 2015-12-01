@@ -99,6 +99,9 @@ See `defmatrix-client-handler'.")
 (defvar matrix-client-render-membership t
   "Show membership changes in the main buffer windows.")
 
+(defvar matrix-username nil
+  "Your Matrix username.")
+
 ;;;###autoload
 (defcustom matrix-client-backfill-count 10
   "How many messages to backfill at a time when scrolling.")
