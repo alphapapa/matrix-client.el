@@ -113,7 +113,7 @@ like."
                                        (buffer-string))))))
               (insert-read-only bufferstring)))
            ((string-equal "m.image" msg-type)
-            (insert-read-only (matrix-get 'body content))(insert-read-only (matrix-get 'body content))
+            (insert-read-only (matrix-get 'body content))
             (insert-read-only ": ")
             (insert-read-only (matrix-transform-mxc-uri (matrix-get 'url content))))
            (t
