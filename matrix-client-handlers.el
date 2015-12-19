@@ -91,7 +91,8 @@ like."
 
 (defmatrix-client-handler "m.room.message"
   ((content (matrix-get 'content data))
-   (msg-type (matrix-get 'msgtype content)))
+   (msg-type (matrix-get 'msgtype content))
+   (format (matrix-get 'format content)))
   ((insert-read-only "\n")
    (insert-read-only (format "📩 %s %s> "
                              (format-time-string "[%T]" (seconds-to-time (/ (matrix-get 'origin_server_ts data) 1000)))
@@ -100,6 +101,16 @@ like."
      (cond ((string-equal "m.emote" msg-type)
             (insert-read-only "* ")
             (insert-read-only (matrix-get 'body content)))
+           ((string-equal "org.matrix.custom.html" format)
+            (let* ((bufferstring (with-temp-buffer
+                                   (insert (matrix-get 'formatted_body content))
+                                   (beginning-of-buffer)
+                                   (let* ((document (libxml-parse-html-region (point) (point-max))))
+                                     (with-temp-buffer
+                                       (shr-insert-document document)
+                                       (beginning-of-buffer)
+                                       (buffer-string))))))
+              (insert-read-only bufferstring)))
            ((string-equal "m.image" msg-type)
             (insert-read-only (matrix-get 'body content))(insert-read-only (matrix-get 'body content))
             (insert-read-only ": ")
