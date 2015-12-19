@@ -184,12 +184,11 @@ Without a `prefix-arg' ARG it will simply restart the
 matrix-client-stream poller, but with a prefix it will disconnect and
 connect, clearing all room data."
   (interactive "P")
-  (if (or (not arg) matrix-client-event-stream-end-token)
+  (if (or arg (not matrix-client-event-stream-end-token))
       (progn
-        (matrix-client-stream-from-end-token))
-    (progn
-      (matrix-client-disconnect)
-      (matrix-client))))
+        (matrix-client-disconnect)
+        (matrix-client))
+    (matrix-client-stream-from-end-token)))
 
 (defun matrix-client-set-up-room (roomdata)
   "Set up a room from its initialSync ROOMDATA."
