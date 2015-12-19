@@ -109,6 +109,7 @@ like."
                                      (with-temp-buffer
                                        (shr-insert-document document)
                                        (beginning-of-buffer)
+                                       (delete-blank-lines)
                                        (buffer-string))))))
               (insert-read-only bufferstring)))
            ((string-equal "m.image" msg-type)
