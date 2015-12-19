@@ -78,6 +78,12 @@
   "Show membership changes in the main buffer windows."
   :group 'matrix-client)
 
+;;;###autoload
+(defcustom matrix-client-render-html (featurep 'shr)
+  "Render HTML messages in buffers. These are currently the
+ad-hoc 'org.matrix.custom.html' messages that Vector emits."
+  :group 'matrix-client)
+
 (defvar matrix-client-new-event-hook nil
   "A lists of functions that are evaluated when a new event comes in.")
 

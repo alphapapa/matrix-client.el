@@ -101,7 +101,7 @@ like."
      (cond ((string-equal "m.emote" msg-type)
             (insert-read-only "* ")
             (insert-read-only (matrix-get 'body content)))
-           ((string-equal "org.matrix.custom.html" format)
+           ((and matrix-client-render-html (string-equal "org.matrix.custom.html" format))
             (let* ((bufferstring (with-temp-buffer
                                    (insert (matrix-get 'formatted_body content))
                                    (beginning-of-buffer)
