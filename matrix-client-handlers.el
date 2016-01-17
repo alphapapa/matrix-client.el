@@ -105,6 +105,8 @@ like."
             (let* ((bufferstring (with-temp-buffer
                                    (insert (matrix-get 'formatted_body content))
                                    (beginning-of-buffer)
+                                   (replace-regexp "\\(<br />\\)+" "<br />")
+                                   (beginning-of-buffer)
                                    (let* ((document (libxml-parse-html-region (point) (point-max))))
                                      (with-temp-buffer
                                        (shr-insert-document document)
