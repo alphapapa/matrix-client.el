@@ -84,6 +84,12 @@
 ad-hoc 'org.matrix.custom.html' messages that Vector emits."
   :group 'matrix-client)
 
+;;;###autoload
+(defcustom matrix-client-enable-watchdog t
+  "If enabled, a timer will be run after twice the interval of
+`matrix-client-event-poll-timeout'."
+  :group 'matrix-client)
+
 (defvar matrix-client-new-event-hook nil
   "A lists of functions that are evaluated when a new event comes in.")
 
@@ -131,6 +137,13 @@ Each of these functions take a single argument, the TEXT the user
 inputs.  They can modify that text and return a new version of
 it, or they can return nil to prevent further processing of it.")
 
+(defvar matrix-client-watchdog-last-message-ts nil
+  "Number of seconds since epoch of the last message.
+
+Used in the watchdog timer to fire a reconnect attempt.")
+
+(defvar matrix-client-watchdog-timer nil)
+
 ;;;###autoload
 (defun matrix-client ()
   "Connect to Matrix.
@@ -146,6 +159,8 @@ in."
   (let* ((initial-data (matrix-initial-sync 25)))
     (mapc 'matrix-client-set-up-room (matrix-get 'rooms initial-data))
     (message "💣 You're jacked in, welcome to Matrix. (💗♥💓💕)")
+    (when matrix-client-enable-watchdog
+      (matrix-client-setup-watchdog-timer))
     (setq matrix-client-event-listener-running t)
     (matrix-client-start-event-listener (matrix-get 'end initial-data))))
 
@@ -234,11 +249,34 @@ connect, clearing all room data."
      'matrix-client-event-listener-callback)
     (setq matrix-client-event-stream-end-token end-tok)))
 
+(defun matrix-client-setup-watchdog-timer ()
+  "Start a watchdog timer to fire after twice the client timeout.
+
+I have yet to find a sane way to handle timeouts from request.el
+reliably yet, so this watchdog will ensure there is a reconnect
+if you go offline. It works by setting a timer to run after the
+client should definitely have called the callback. If it hasn't,
+it triggers a re-stream and then sets the timer to wait for the
+next event to come in."
+  (let* ((epoch-now (time-to-seconds))
+         (diff-should (/ (* 2 matrix-client-event-poll-timeout) 1000)))
+    (when matrix-client-watchdog-timer
+      (let* ((epoch-last matrix-client-watchdog-last-message-ts))
+        (when (< diff-should (- epoch-now epoch-last))
+          ;; we hit our timeout.
+          (matrix-client-stream-from-end-token))
+        (cancel-timer matrix-client-watchdog-timer)))
+    ;; restart the timer
+    (setq matrix-client-watchdog-timer
+          (run-with-timer diff-should nil 'matrix-client-setup-watchdog-timer))))
+
 (defun matrix-client-event-listener-callback (data)
   "The callback which `matrix-event-poll' pushes its data in to.
 
 This calls each function in matrix-client-new-event-hook with the data
 object with a single argument, DATA."
+  (setq matrix-client-watchdog-last-message-ts
+        (time-to-seconds))
   (unless (eq (car data) 'error)
     (dolist (hook matrix-client-new-event-hook)
       (funcall hook data)))
