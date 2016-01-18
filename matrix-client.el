@@ -264,7 +264,10 @@ next event to come in."
       (let* ((epoch-last matrix-client-watchdog-last-message-ts))
         (when (< diff-should (- epoch-now epoch-last))
           ;; we hit our timeout.
-          (matrix-client-stream-from-end-token))
+          (matrix-client-stream-from-end-token)
+          (message "Detected timeout of Matrix Client; restarting. Last message seen was %s seconds ago."
+                   epoch-now epoch-last diff-should
+                   (- epoch-now epoch-last)))
         (cancel-timer matrix-client-watchdog-timer)))
     ;; restart the timer
     (setq matrix-client-watchdog-timer
