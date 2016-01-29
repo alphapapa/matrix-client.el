@@ -42,6 +42,9 @@
 (defvar sauron-matrix-running nil
   "When non-nil, matrix-sauron is running.")
 
+(defvar matrix-sauron-pushrules nil
+  "Matrix homeserver push rules")
+
 (defun matrix-sauron-start ()
   "Start matrix-sauron."
   (if (and (boundp 'matrix-homeserver-base-url)
@@ -49,6 +52,7 @@
       (progn
         (when sauron-matrix-running
           (error "matrix-sauron is already running. Call sauron-matrix-stop first."))
+        (matrix-sauron-fetch-rules)
         (add-hook 'matrix-client-new-event-hook 'matrix-add-sauron-event)
         (setq sauron-matrix-running t))
     (message "matrix-client not loadable, so matrix-sauron could not start.")))
@@ -58,6 +62,62 @@
   (when sauron-matrix-running
     (remove-hook 'matrix-client-new-event-hook 'matrix-add-sauron-event)
     (setq sauron-matrix-running nil)))
+
+(defun matrix-sauron-fetch-rules ()
+  "Fetch and parse the push rules from the server."
+  (let* ((resp (matrix-send "GET" "/pushrules/")))
+    (setq matrix-sauron-pushrules (matrix-get 'global resp))))
+
+(defun matrix-sfind (str array)
+  (condition-case nil
+      (cl-find str array :test 'string-equal)
+    (error nil)))
+
+(defun matrix-sauron-process-event-with-pushrules (prio room-id membership content username)
+  ;; Process each pushrule type-break
+  (let ((final-prio
+         (+ prio
+            ;; Underride
+            ;; Rooms
+            (reduce
+             #'+
+             (map 'list
+                  (lambda (rule)
+                    (when (matrix-get 'enabled rule)
+                      (let* ((actions (matrix-get 'actions rule))
+                             (rule-id (matrix-get 'rule_id rule))
+                             (score-mod (if (matrix-sfind "dont_notify" actions)
+                                            -5 1)))
+                        (if (string-equal room-id rule-id)
+                            (progn
+                              (message "%d %d %s" -prio score-mod rule-id)
+                              score-mod)
+                          0))))
+                  (matrix-get 'room matrix-sauron-pushrules)))
+            ;; Content
+            (reduce
+             #'+
+             (map 'list
+                  (lambda (rule) 
+                    (when (matrix-get 'enabled rule)
+                      (let* ((actions (matrix-get 'actions rule))
+                             (rule-id (matrix-get 'rule_id rule))
+                             (body (matrix-get 'body content))
+                             (pattern (matrix-get 'pattern rule))
+                             (score-mod (if (matrix-sfind "dont_notify" actions)
+                                            -5 1)))
+                        (if (and body (string-match pattern body))
+                            (progn
+                              (message "%d %d %s" -prio score-mod rule-id)
+                              score-mod)
+                          0))))
+                  (matrix-get 'content matrix-sauron-pushrules)))
+            ;; Sender
+            ;; Override
+            )))
+    (cond ((< 0 final-prio) 0)
+          ((< final-prio 5) 5)
+          (t final-prio))))
 
 (defun matrix-add-sauron-event (chunk)
   (mapc (lambda (data)
@@ -71,17 +131,14 @@
                  (content (matrix-get 'content data))
                  (username (matrix-get 'user_id data))
                  (prio sauron-prio-matrix-new-messages)
-                 (prio (if (= membership 2)
-                           (+ 1 prio)
-                         prio))
+                 (prio (matrix-sauron-process-event-with-pushrules prio room-id membership content username))
                  (target (if (buffer-live-p room-buf)
                              (save-excursion
                                (with-current-buffer room-buf
                                  (end-of-buffer)
                                  (previous-line)
                                  (point-marker))))))
-            (when (and (equal type "m.room.message")
-                       (not (string-match matrix-username username)))
+            (when (not (and username (string-match matrix-username username)))
               (sauron-add-event 'matrix prio
                                 (format "<%s> %s" username (matrix-get 'body content))
                                 (lexical-let* ((target-mark target)
