@@ -90,7 +90,7 @@
                                             -5 1)))
                         (if (string-equal room-id rule-id)
                             (progn
-                              (message "%d %d %s" -prio score-mod rule-id)
+                              (message "%d %s" score-mod rule-id)
                               score-mod)
                           0))))
                   (matrix-get 'room matrix-sauron-pushrules)))
@@ -108,16 +108,16 @@
                                             -5 1)))
                         (if (and body (string-match pattern body))
                             (progn
-                              (message "%d %d %s" -prio score-mod rule-id)
+                              (message "%d %s" score-mod rule-id)
                               score-mod)
                           0))))
                   (matrix-get 'content matrix-sauron-pushrules)))
             ;; Sender
             ;; Override
             )))
-    (cond ((< 0 final-prio) 0)
-          ((< final-prio 5) 5)
-          (t final-prio))))
+    (cond ((< final-prio 0) (progn 0))
+          ((< 5 final-prio) (progn 5))
+          (t (progn (message "%d" final-prio) final-prio)))))
 
 (defun matrix-add-sauron-event (chunk)
   (mapc (lambda (data)
