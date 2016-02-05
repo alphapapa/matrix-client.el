@@ -341,8 +341,7 @@ object with a single argument, DATA."
   (end-of-buffer)
   (let ((inhibit-read-only t))
     (insert "\n")
-    (insert-read-only (format "🔥 [%s] ▶" matrix-client-room-id))
-    (insert " ")))
+    (insert-read-only (format "🔥 [%s] ▶ " matrix-client-room-id) rear-nonsticky t)))
 
 (defun matrix-client-send-active-line ()
   "Send the current message-line text after running it through input-filters."
