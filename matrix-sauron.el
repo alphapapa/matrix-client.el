@@ -117,7 +117,7 @@
             )))
     (cond ((< final-prio 0) (progn 0))
           ((< 5 final-prio) (progn 5))
-          (t (progn (message "%d" final-prio) final-prio)))))
+          (t (progn final-prio)))))
 
 (defun matrix-add-sauron-event (chunk)
   (mapc (lambda (data)
