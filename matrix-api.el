@@ -40,35 +40,31 @@
   "This is a list of functions to pass Matrix errors to.")
 
 (defclass matrix-connection ()
-  (base-url :init-arg :base-url
-            :type string
-            :initform "https://matrix.org"
-            :custom string
-            :documentation "URI to your Matrix homeserver, defaults to the official homeserver.")
-  (token :init-arg :token
-         :type string
-         :custom string)
-  (txn-id :init-arg :txn-id
-          :type string))
+  ((base-url :initarg :base-url
+             :type string
+             :initform "https://matrix.org"
+             :documentation "URI to your Matrix homeserver, defaults to the official homeserver.")
+   (token :initarg :token
+          :type string
+          :custom string
+          :documentation "Matrix access_token")
+   (txn-id :initarg :txn-id
+           :type string)))
 
-(defun matrix-homeserver-api-url ()
-  "Message `matrix-homeserver-base-url' in to a fully-qualified API endpoint URL."
-  (format "%s/_matrix/client/api/v1" matrix-homeserver-base-url))
-
-(defun matrix-initial-sync (&optional limit)
-  "Perform /initialSync.
-
-Fetch up to LIMIT events for each room."
-  (matrix-send "GET" "/initialSync" nil (list (cons 'limit (number-to-string limit)))))
-
-(defun matrix-login (login-type arg-list)
+(defmethod matrix-login ((con matrix-connection) login-type arg-list)
   "Attempt to log in to the Matrix homeserver.
 
 LOGIN-TYPE is the value for the `type' key.
 ARG-LIST is an alist of additional key/values to add to the submitted JSON."
-  (matrix-send "POST" "/login" (add-to-list 'arg-list (cons "type" login-type))))
+  (let ((resp (matrix-send con "POST" "/login" (add-to-list 'arg-list (cons "type" login-type)))))
+    (oset con 'token (cdr (assoc 'access_token resp)))
+    resp))
 
-(defun matrix-send (method path &optional content query-params headers)
+(defmethod matrix-login-with-password ((con matrix-connection) username password)
+  "Given a USERNAME and PASSWORD log in to the homeserver and save the token."
+  (matrix-login con "m.login.password" (list (cons "user" username) (cons "password" password))))
+
+(defmethod matrix-send ((con matrix-connection) method path &optional content query-params headers api-version)
   "Send an event to the matrix homeserver.
 
 METHOD is the HTTP method the given API endpoint PATH uses.
@@ -78,7 +74,9 @@ optional alist of URL parameters.  HEADERS is optional HTTP
 headers to add to the request.
 
 The return value is the `json-read' response from homeserver."
-  (let* ((query-params (when matrix-token (add-to-list 'query-params (cons "access_token" matrix-token))))
+  (let* ((token (oref con token))
+         (query-params (when token
+                         (add-to-list 'query-params (cons "access_token" token))))
          (url-request-data (when content (json-encode content)))
          (endpoint (concat (matrix-homeserver-api-url) path)))
     (ad-activate 'request--curl-command)
@@ -104,7 +102,7 @@ The return value is the `json-read' response from homeserver."
   "Advise function to add -k to curl call for `matrix-send-event'."
   (setq ad-return-value (append ad-do-it '("--insecure"))))
 
-(defun matrix-send-async (method path &optional content query-params headers cb)
+(defmethod matrix-send-async ((con matrix-connection) method path &optional content query-params headers cb)
   "Perform an asynchronous Matrix API call.
 
 METHOD is the HTTP method the given API endpoint PATH uses.
@@ -114,30 +112,35 @@ QUERY-PARAMS is an optional alist of URL parameters.
 HEADERS is optional HTTP headers to add to the request.
 CB is the callback which will be called by `request' when the
 call completes"
-  (let* ((endpoint (concat (matrix-homeserver-api-url) path)))
+  (let* ((token (oref con token))
+         (endpoint (concat (matrix-homeserver-api-url) path)))
     (ad-activate 'request--curl-command)
     (request endpoint
              :type (upcase method)
-             :params (when matrix-token (add-to-list 'query-params (cons "access_token" matrix-token)))
+             :params (when token
+                       (add-to-list 'query-params (cons "access_token" token)))
              :parser 'json-read
              :data (json-encode content)
              :headers (add-to-list 'headers '("Content-Type" . "application/json"))
-             :complete (apply-partially #'matrix-async-cb-router cb))
+             :complete (apply-partially #'matrix-async-cb-router cb con))
     (ad-deactivate 'request--curl-command)))
 
-(defun* matrix-async-cb-router (cb &key data error-thrown symbol-status &allow-other-keys)
+(defun* matrix-async-cb-router (cb con &key data error-thrown symbol-status &allow-other-keys)
   (if (or error-thrown (eq symbol-status 'timeout))
       (dolist (handler matrix-error-hook)
-        (funcall handler symbol-status error-thrown))
+        (funcall handler con symbol-status error-thrown))
     (when cb
-      (funcall cb data))))
+      (funcall cb con data))))
 
-(defun matrix-login-with-password (username password)
-  "Given a USERNAME and PASSWORD log in to the homeserver and save the token."
-  (let ((resp
-         (matrix-login "m.login.password" (list (cons "user" username) (cons "password" password)))))
-    (setq matrix-token (cdr (assoc 'access_token resp)))
-    resp))
+(defun matrix-homeserver-api-url ()
+  "Message `matrix-homeserver-base-url' in to a fully-qualified API endpoint URL."
+  (format "%s/_matrix/client/api/v1" matrix-homeserver-base-url))
+
+(defun matrix-initial-sync (&optional limit)
+  "Perform /initialSync.
+
+Fetch up to LIMIT events for each room."
+  (matrix-send "GET" "/initialSync" nil (list (cons 'limit (number-to-string limit)))))
 
 (defun matrix-send-event (room-id event-type content)
   "Send a raw event to the room ROOM-ID.
