@@ -34,6 +34,7 @@
 
 (require 'json)
 (require 'request)
+(require 'matrix-helpers)
 (require 'eieio)
 
 (defvar matrix-error-hook nil
@@ -78,7 +79,7 @@ The return value is the `json-read' response from homeserver."
          (query-params (when token
                          (add-to-list 'query-params (cons "access_token" token))))
          (url-request-data (when content (json-encode content)))
-         (endpoint (concat (matrix-homeserver-api-url) path)))
+         (endpoint (concat (matrix-homeserver-api-url api-version) path)))
     (ad-activate 'request--curl-command)
     (let ((response (cond ((string-equal "GET" (upcase method))
                            (request endpoint
@@ -102,7 +103,7 @@ The return value is the `json-read' response from homeserver."
   "Advise function to add -k to curl call for `matrix-send-event'."
   (setq ad-return-value (append ad-do-it '("--insecure"))))
 
-(defmethod matrix-send-async ((con matrix-connection) method path &optional content query-params headers cb)
+(defmethod matrix-send-async ((con matrix-connection) method path &optional content query-params headers cb api-version)
   "Perform an asynchronous Matrix API call.
 
 METHOD is the HTTP method the given API endpoint PATH uses.
@@ -113,7 +114,7 @@ HEADERS is optional HTTP headers to add to the request.
 CB is the callback which will be called by `request' when the
 call completes"
   (let* ((token (oref con token))
-         (endpoint (concat (matrix-homeserver-api-url) path)))
+         (endpoint (concat (matrix-homeserver-api-url api-version) path)))
     (ad-activate 'request--curl-command)
     (request endpoint
              :type (upcase method)
@@ -132,36 +133,26 @@ call completes"
     (when cb
       (funcall cb con data))))
 
-(defun matrix-homeserver-api-url ()
-  "Message `matrix-homeserver-base-url' in to a fully-qualified API endpoint URL."
-  (format "%s/_matrix/client/api/v1" matrix-homeserver-base-url))
-
-(defun matrix-initial-sync (&optional limit)
-  "Perform /initialSync.
-
-Fetch up to LIMIT events for each room."
-  (matrix-send "GET" "/initialSync" nil (list (cons 'limit (number-to-string limit)))))
-
-(defun matrix-send-event (room-id event-type content)
+(defmethod matrix-send-event ((con matrix-connection) room-id event-type content)
   "Send a raw event to the room ROOM-ID.
 
 EVENT-TYPE is the matrix event type to send (See the Spec)
 CONTENT is a `json-encode' compatible list to include in the event."
-  (let* ((txn-id matrix-txn-id)
+  (let* ((txn-id (oref con :txn-id))
          (path (format "/rooms/%s/send/%s/%s"
                        (url-encode-url room-id)
                        (url-encode-url event-type)
                        matrix-txn-id)))
-    (setq matrix-txn-id (+ 1 (or matrix-txn-id 0)))
-    (matrix-send "PUT" path content)))
+    (oset con :txn-id (+ 1 (or txn-id 0)))
+    (matrix-send con "PUT" path content)))
 
-(defun matrix-send-message (room-id message)
+(defmethod matrix-send-message ((con matrix-connection) room-id message)
   "Send to the room ROOM-ID the string MESSAGE."
-  (matrix-send-event room-id "m.room.message"
+  (matrix-send-event con room-id "m.room.message"
                      (list (cons "msgtype" "m.text")
                            (cons "body" message))))
 
-(defun matrix-event-poll (end-token timeout callback)
+(defmethod matrix-event-poll ((con matrix-connection) end-token timeout callback)
   "Start an event poller starting from END-TOKEN.
 
 It will wait at least TIMEOUT seconds before calling the
@@ -172,49 +163,28 @@ those events as its argument."
                            (cons "timeout" (number-to-string timeout)))
                      nil callback))
 
-(defun matrix-get (key obj)
-  "Easy JSON accessor, get KEY's value from OBJ."
-  (cdr (assoc key obj)))
-
-(defun matrix-transform-mxc-uri (uri)
-  "Turn an MXC content URI in to an HTTP URL."
-  (let ((components (split-string uri "/")))
-    (format "%s/_matrix/media/v1/download/%s/%s"
-            matrix-homeserver-base-url
-            (elt components 2)
-            (elt components 3))))
-
-(defun matrix-homeserver-api-url ()
-  "Create a v1 API base URL from the homeserver base url."
-  (format "%s/_matrix/client/api/v1" matrix-homeserver-base-url))
-
-(defun matrix-homeserver-api-url--v2_alpha ()
-  "Create a v2_alpha API base URL from the homeserver base url."
-  (format "%s/_matrix/client/v2_alpha" matrix-homeserver-base-url))
-
-(defun matrix-mark-as-read (room-id event-id)
+(defmethod matrix-mark-as-read ((con matrix-connection) room-id event-id)
   "In room ROOM-ID mark a given event EVENT-ID as read."
-  (cl-letf (((symbol-function 'matrix-homeserver-api-url) #'matrix-homeserver-api-url--v2_alpha))
-    (let ((path (format "/rooms/%s/receipt/m.read/%s" room-id event-id)))
-      (matrix-send-async "POST" path nil nil nil (lambda (status))))))
+  (let ((path (format "/rooms/%s/receipt/m.read/%s" room-id event-id)))
+    (matrix-send-async con "POST" path nil nil nil (lambda (status)) "v2_alpha")))
 
-(defun matrix-join-room (room-id)
+(defmethod matrix-join-room ((con matrix-connection) room-id)
   "Join the room ROOM-ID."
-  (let* ((txn-id matrix-txn-id)
+  (let* ((txn-id (oref con :txn-id))
          (path (format "/join/%s" (url-hexify-string room-id))))
-    (matrix-get 'room_id (matrix-send "POST" path (list)))))
+    (matrix-get 'room_id (matrix-send con "POST" path (list)))))
 
-(defun matrix-leave-room (room-id)
+(defmethod matrix-leave-room ((con matrix-connection) room-id)
   "Leave the room ROOM-ID."
-  (let* ((txn-id matrix-txn-id)
+  (let* ((txn-id (oref con :txn-id))
          (path (format "/rooms/%s/leave" (url-encode-url room-id))))
-    (matrix-get 'room_id (matrix-send "POST" path (list)))))
+    (matrix-get 'room_id (matrix-send con "POST" path (list)))))
 
-(defun matrix-sync-room (room-id)
+(defmethod matrix-sync-room ((con matrix-connection) room-id)
   "Perform an /initialSync of a single room ROOM-ID."
-  (let* ((txn-id matrix-txn-id)
+  (let* ((txn-id (oref con :txn-id))
          (path (format "/rooms/%s/initialSync" (url-hexify-string room-id))))
-    (matrix-send "GET" path (list))))
+    (matrix-send con "GET" path (list))))
 
 (provide 'matrix-api)
 ;;; matrix-api.el ends here
