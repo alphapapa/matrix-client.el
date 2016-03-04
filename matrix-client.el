@@ -90,52 +90,92 @@ ad-hoc 'org.matrix.custom.html' messages that Vector emits."
 `matrix-client-event-poll-timeout'."
   :group 'matrix-client)
 
-(defvar matrix-client-new-event-hook nil
-  "A lists of functions that are evaluated when a new event comes in.")
-
-(defvar matrix-client-event-listener-running nil)
-
-(defvar matrix-client-active-rooms nil
-  "Rooms the active client is in.")
-
 (defvar matrix-client-event-handlers '()
   "An alist of (type . function) handler definitions for various matrix types.
 
 Each of these receives the raw event as a single DATA argument.
+See `defmatrix-client-handler'. This value is used as the default
+for every `matrix-client-connection' and can be overridden on a
+connection basis.")
+
+;; (defvar matrix-client-active-rooms nil
+;;   "Rooms the active client is in.")
+
+;; (defvar matrix-client-event-listener-running nil)
+
+;; (defvar matrix-client-new-event-hook nil
+;;   )
+
+(defclass matrix-client-connection (matrix-connection)
+  ((running :initarg :running
+            :initform nil
+            :documentation "BOOL specifiying if the event listener is currently running.")
+   (rooms :initarg :rooms
+          :documentation "List of matrix-room objects")
+   (event-handlers :initarg :event-handlers
+                   :initform matrix-client-event-handlers
+                   :documentation "An alist of (type . function) handler definitions for various matrix types.
+
+Each of these receives the raw event as a single DATA argument.
 See `defmatrix-client-handler'.")
+   (event-hook :initarg :event-hook
+               :documentation "A lists of functions that are evaluated when a new event comes in.")
+   (username :initarg :username
+             :documentation "Your Matrix username.")
+   (end-token)
+   (input-filters :initarg :inputfilters
+                  :documentation "List of functions to run input through.
 
-(defvar-local matrix-client-room-name nil
-  "The name of the buffer's room.")
+Each of these functions take a single argument, the TEXT the user
+inputs.  They can modify that text and return a new version of
+it, or they can return nil to prevent further processing of it.")))
 
-(defvar-local matrix-client-room-aliases nil
-  "The alises of the buffer's room.")
+;; (defvar matrix-username nil
+;;   "Your Matrix username.")
 
-(defvar-local matrix-client-room-topic nil
-  "The topic of the buffer's room.")
+;; (defvar matrix-client-event-stream-end-token nil)
 
-(defvar-local matrix-client-room-id nil
-  "The Matrix ID of the buffer's room.")
+;; (defvar matrix-client-input-filters nil
+;;   )
 
-(defvar-local matrix-client-room-membership nil
-  "The list of members of the buffer's room.")
+;; (defvar-local matrix-client-room-name nil
+;;   )
+
+(defclass matrix-client-room ()
+  ((buffer :initarg :buffer
+           :documentation "The buffer that contains the room's chat session")
+   (name :initarg :room-name
+         :documentation "The name of the buffer's room.")
+   (aliases :initarg :aliases
+            :documentation "The alises of the buffer's room.") 
+   (topic :initarg :topic
+          :documentation "The topic of the buffer's room.")
+   (id :initarg :id
+       :documentation "The Matrix ID of the buffer's room.")
+   (membership :initarg :membership
+               :documentation "The list of members of the buffer's room.")
+   (end-token :init-arg :end-token
+              :documentation "The most recent event-id in a room, used to push read-receipts to the server.")))
+
+
+;; (defvar-local matrix-client-room-aliases nil
+;;   )
+
+;; (defvar-local matrix-client-room-topic nil
+;;   )
+
+;; (defvar-local matrix-client-room-id nil
+;;   )
+
+;; (defvar-local matrix-client-room-membership nil
+;;   )
 
 (defvar-local matrix-client-room-typers nil
   "The list of members of the buffer's room who are currently typing.")
 
-(defvar-local matrix-client-room-end-token nil
-  "The most recent event-id in a room, used to push read-receipts to the server.")
+;; (defvar-local matrix-client-room-end-token nil
+;;   )
 
-(defvar matrix-username nil
-  "Your Matrix username.")
-
-(defvar matrix-client-event-stream-end-token nil)
-
-(defvar matrix-client-input-filters nil
-  "List of functions to run input through.
-
-Each of these functions take a single argument, the TEXT the user
-inputs.  They can modify that text and return a new version of
-it, or they can return nil to prevent further processing of it.")
 
 (defvar matrix-client-watchdog-last-message-ts nil
   "Number of seconds since epoch of the last message.
