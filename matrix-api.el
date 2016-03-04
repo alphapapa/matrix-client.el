@@ -34,17 +34,22 @@
 
 (require 'json)
 (require 'request)
+(require 'eieio)
 
-;;;###autoload
-(defcustom matrix-homeserver-base-url "https://matrix.org/"
-  "URI to your Matrix homeserver, defaults to the official homeserver."
-  :type 'string
-  :group 'matrix)
-
-(defvar matrix-token nil)
-(defvar matrix-txn-id nil)
 (defvar matrix-error-hook nil
   "This is a list of functions to pass Matrix errors to.")
+
+(defclass matrix-connection ()
+  (base-url :init-arg :base-url
+            :type string
+            :initform "https://matrix.org"
+            :custom string
+            :documentation "URI to your Matrix homeserver, defaults to the official homeserver.")
+  (token :init-arg :token
+         :type string
+         :custom string)
+  (txn-id :init-arg :txn-id
+          :type string))
 
 (defun matrix-homeserver-api-url ()
   "Message `matrix-homeserver-base-url' in to a fully-qualified API endpoint URL."
