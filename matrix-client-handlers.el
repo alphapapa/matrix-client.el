@@ -79,7 +79,7 @@ BODY is the function itself.  See, for example,
 [`matrix-client-handler-m.presence'] for an example of what this looks
 like."
   (let ((fname (intern (format "matrix-client-handler-%s" msgtype))))
-    `(defmethod ,fname ((con matrix-client-connection) room data)
+    `(defun ,fname (con room data)
        (let* ((inhibit-read-only t)
               (room-id (oref room :id))
               (room-buf (oref room :buffer))
@@ -97,8 +97,10 @@ like."
    (format (matrix-get 'format content)))
   ((insert-read-only "\n")
    (insert-read-only (format "📩 %s %s> "
-                             (format-time-string "[%T]" (seconds-to-time (/ (matrix-get 'origin_server_ts data) 1000)))
-                             (matrix-client-displayname-from-user-id (matrix-get 'user_id data))) face matrix-client-metadata)
+                             (format-time-string
+                              "[%T]" (seconds-to-time (/ (matrix-get 'origin_server_ts data) 1000)))
+                             (matrix-client-displayname-from-user-id
+                              room (matrix-get 'sender data))) face matrix-client-metadata)
    (when content
      (cond ((string-equal "m.emote" msg-type)
             (insert-read-only "* ")
@@ -127,44 +129,51 @@ like."
 (defmatrix-client-handler "m.lightrix.pattern"
   ((content (matrix-get 'content data)))
   ((insert "\n")
-   (insert-read-only (format "🌄 %s --> " (matrix-client-displayname-from-user-id (matrix-get 'user_id data)))
-                     face matrix-client-metadata)     
+   (insert-read-only (format "🌄 %s --> " (matrix-client-displayname-from-user-id room (matrix-get 'user_id data)))
+                     face matrix-client-metadata)
    (insert-read-only (matrix-get 'pattern content))))
 
 (defmatrix-client-handler "m.room.member"
   ((content (matrix-get 'content data))
-   (user-id (matrix-get 'user_id data))
+   (user-id (matrix-get 'sender data))
    (membership (matrix-get 'membership content))
+   (room-membership (and (slot-boundp room :membership)
+                         (oref room :membership)))
    (display-name (matrix-get 'displayname content)))
-  ((unless (boundp 'matrix-client-room-membership)
-     (set (make-local-variable 'matrix-client-room-membership) '()))
-   (assq-delete-all user-id matrix-client-room-membership)
+  ((assq-delete-all user-id room-membership)
    (when (string-equal "join" membership)
-     (add-to-list 'matrix-client-room-membership (cons user-id content)))
-   (matrix-update-room-name)
+     (add-to-list 'room-membership (cons user-id content)))
+   (oset room :membership room-membership)
+   (matrix-update-room-name room)
    (when matrix-client-render-membership
      (insert-read-only "\n")
-     (insert-read-only (format "🚪 %s (%s) --> %s" display-name user-id membership) face matrix-client-metadata))
-   ))
+     (insert-read-only (format "🚪 %s (%s) --> %s" display-name user-id membership) face matrix-client-metadata))))
 
-(defun matrix-update-room-name ()
+(defun matrix-update-room-name (room)
   "If a room has a name, rename the buffer; if a room has only two
   people in it use the membership for the buffer name."
-  (cond ((stringp matrix-client-room-name)
-         (rename-buffer matrix-client-room-name))
-        ((> (length matrix-client-room-aliases) 0)
-         (rename-buffer (elt matrix-client-room-aliases 0)))
-        ((eq (length matrix-client-room-membership) 2)
-         (let* ((user (elt (matrix-client-filter
-                            (lambda (member)
-                              (not (eq matrix-username (first member))))
-                            matrix-client-room-membership)
-                           0))
-                (buf (or (matrix-get 'displayname user)
-                         (elt user 0))))
-           (if (eq (current-buffer) (get-buffer buf))
-               (rename-buffer buf)
-             (rename-buffer (generate-new-buffer-name buf)))))))
+  (let* ((username (and (slot-boundp (oref room :con) :username)
+                        (oref (oref room :con) :username)))
+         (name (cond ((and (slot-boundp room :room-name)
+                           (> (length (oref room :room-name)) 0))
+                      (oref room :room-name))
+                     ((and (slot-boundp room :aliases)
+                           (> (length (oref room :aliases)) 0))
+                      (elt (oref room :aliases) 0))
+                     ((and (slot-boundp room :membership)
+                           (eq (length (oref room :membership)) 2))
+                      (let* ((user (elt (matrix-client-filter
+                                         (lambda (member)
+                                           (not (eq username (first member))))
+                                         (oref room :membership))
+                                        0))
+                             (buf (or (matrix-get 'displayname user)
+                                      (elt user 0))))
+                        (if buf
+                            (if (eq (current-buffer) (get-buffer buf))
+                                buf
+                              (generate-new-buffer-name buf))))))))
+    (when name (rename-buffer name))))
 
 (defun matrix-client-handler-m.presence (data)
   (let* ((inhibit-read-only t)
@@ -180,36 +189,44 @@ like."
 
 (defmatrix-client-handler "m.room.name"
   ()
-  ((set (make-local-variable 'matrix-client-room-name) (matrix-get 'name (matrix-get 'content data)))
-   (matrix-update-room-name)
+  ((oset room :room-name (matrix-get 'name (matrix-get 'content data)))
+   (matrix-update-room-name room)
    (insert-read-only "\n")
-   (insert-read-only (format "📝 Room name changed --> %s" matrix-client-room-name) face matrix-client-metadata)
-   (matrix-client-update-header-line)))
+   (insert-read-only (format "📝 Room name changed --> %s" (oref room :room-name)) face matrix-client-metadata)
+   (matrix-client-update-header-line room)))
 
 (defmatrix-client-handler "m.room.aliases"
-  ()
-  ((set (make-local-variable 'matrix-client-room-aliases) (matrix-get 'aliases (matrix-get 'content data)))
-   (matrix-update-room-name)
+  ((new-alias (matrix-get 'name (matrix-get 'content data)))
+   (old-aliases (and (slot-boundp room :aliases)
+                     (oref room :aliases)))
+   (new-alias-list (append old-aliases
+                           (list new-alias))))
+  ((oset room :aliases new-alias-list)
+   (matrix-update-room-name room)
    (insert-read-only "\n")
-   (insert-read-only (format "📝 Room alias changed --> %s" matrix-client-room-name) face matrix-client-metadata)
-   (matrix-client-update-header-line)))
+   (insert-read-only (format "📝 Room alias changed --> %s" new-alias-list) face matrix-client-metadata)
+   (matrix-client-update-header-line room)))
 
 (defmatrix-client-handler "m.room.topic"
   ()
   ((set (make-local-variable 'matrix-client-room-topic) (matrix-get 'topic (matrix-get 'content data)))
    (insert-read-only "\n")
    (insert-read-only (format "✏ Room topic changed --> %s" matrix-client-room-topic) face matrix-client-metadata)
-   (matrix-client-update-header-line)))
+   (matrix-client-update-header-line room)))
 
 (defun matrix-client-handler-m.typing (data)
   (with-current-buffer (matrix-get (matrix-get 'room_id data) matrix-client-active-rooms)
     (set (make-local-variable 'matrix-client-room-typers) (matrix-get 'user_ids (matrix-get 'content data)))
-    (matrix-client-update-header-line)))
+    (matrix-client-update-header-line room)))
 
-(defun matrix-client-displayname-from-user-id (user-id)
+(defun matrix-client-displayname-from-user-id (room user-id)
   "Get the Display name for a USER-ID."
-  (let* ((userdata (cdr (assoc user-id matrix-client-room-membership))))
-    (or (matrix-get 'displayname userdata)
+  (let* ((membership (and (slot-boundp room :membership)
+                          (oref room :membership)))
+         (userdata (cdr (assoc user-id membership)))
+         (displayname (matrix-get 'displayname userdata)))
+    (message "%s %s" user-id displayname)
+    (or displayname
         user-id)))
 
 (defun matrix-client-input-filter-join (text)

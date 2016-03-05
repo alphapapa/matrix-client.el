@@ -146,22 +146,23 @@ event-handlers and input-filters.")
 ;; (defvar-local matrix-client-room-name nil
 ;;   )
 
-(defclass matrix-client-room ()
-  ((buffer :initarg :buffer
-           :documentation "The buffer that contains the room's chat session")
-   (name :initarg :room-name
-         :documentation "The name of the buffer's room.")
-   (aliases :initarg :aliases
-            :documentation "The alises of the buffer's room.") 
-   (topic :initarg :topic
-          :documentation "The topic of the buffer's room.")
-   (id :initarg :id
-       :documentation "The Matrix ID of the buffer's room.")
-   (membership :initarg :membership
-               :documentation "The list of members of the buffer's room.")
-   (end-token :init-arg :end-token
-              :documentation "The most recent event-id in a room, used to push read-receipts to the server.")))
-
+(udefclass matrix-client-room ()
+           ((con :initarg :con)
+            (buffer :initarg :buffer
+                    :documentation "The buffer that contains the room's chat session")
+            (name :initarg :room-name
+                  :documentation "The name of the buffer's room.")
+            (aliases :initarg :aliases
+                     :documentation "The alises of the buffer's room.") 
+            (topic :initarg :topic
+                   :documentation "The topic of the buffer's room.")
+            (id :initarg :id
+                :documentation "The Matrix ID of the buffer's room.")
+            (typers :initarg :typers)
+            (membership :initarg :membership
+                        :documentation "The list of members of the buffer's room.")
+            (end-token :init-arg :end-token
+                       :documentation "The most recent event-id in a room, used to push read-receipts to the server.")))
 
 ;; (defvar-local matrix-client-room-aliases nil
 ;;   )
@@ -269,7 +270,7 @@ for a username and password."
   (when (get-buffer room-id)
     (kill-buffer room-id))
   (let* ((room-buf (get-buffer-create room-id))
-         (room-obj (matrix-client-room room-id :buffer room-buf))
+         (room-obj (matrix-client-room room-id :buffer room-buf :con con))
          (new-room-list (append (oref con :rooms) (list (cons room-id room-obj)))))
     (with-current-buffer room-buf
       (matrix-client-mode)
@@ -277,6 +278,8 @@ for a username and password."
       (matrix-client-render-message-line))
     (switch-to-buffer room-buf)
     (oset con :rooms new-room-list)
+    (oset room-obj :id room-id)
+    (oset room-obj :buffer room-buf)
     room-obj))
 
 (defmethod matrix-client-room-event ((con matrix-client-connection) room-id event)
@@ -288,7 +291,7 @@ for a username and password."
 (defmethod matrix-client-render-event-to-room ((con matrix-client-connection) room item)
   "Feed ITEM in to its proper `matrix-client-event-handlers' handler."
   (let* ((type (matrix-get 'type item))
-         (handler (matrix-get type matrix-client-event-handlers)))
+         (handler (matrix-get type (oref con :event-handlers))))
     (when handler
       (funcall handler con room item))))
 
@@ -309,13 +312,18 @@ for a username and password."
         (insert "\n")
         (insert (prin1-to-string data))))))
 
-(defun matrix-client-update-header-line ()
+(defun matrix-client-update-header-line (room)
   "Update the header line of the current buffer."
-  (if (> 0 (length matrix-client-room-typers))
-      (progn
-        (setq header-line-format (format "(%d typing...) %s: %s" (length matrix-client-room-typers)
-                                         matrix-client-room-name matrix-client-room-topic)))
-    (setq header-line-format (format "%s: %s" matrix-client-room-name matrix-client-room-topic))))
+  (let ((typers (and (slot-boundp room :typers)
+                     (oref room :typers)))
+        (name (and (slot-boundp room :room-name)
+                   (oref room :room-name)))
+        (topic (and (slot-boundp room :topic)
+                    (oref room :topic))))
+    (if (> 0 (length typers))
+        (progn
+          (setq header-line-format (format "(%d typing...) %s: %s" (length typers) name topic)))
+      (setq header-line-format (format "%s: %s" name topic)))))
 
 ;;;###autoload
 (defmacro insert-read-only (text &rest extra-props)

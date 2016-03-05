@@ -47,15 +47,16 @@
 
 (defun matrix-sauron-start ()
   "Start matrix-sauron."
-  (if (and (boundp 'matrix-homeserver-base-url)
-           matrix-homeserver-base-url)
-      (progn
-        (when sauron-matrix-running
-          (error "matrix-sauron is already running. Call sauron-matrix-stop first."))
-        (matrix-sauron-fetch-rules)
-        (add-hook 'matrix-client-new-event-hook 'matrix-add-sauron-event)
-        (setq sauron-matrix-running t))
-    (message "matrix-client not loadable, so matrix-sauron could not start.")))
+  ;; (if (and (boundp 'matrix-homeserver-base-url)
+  ;;          matrix-homeserver-base-url)
+  ;;     (progn
+  ;;       (when sauron-matrix-running
+  ;;         (error "matrix-sauron is already running. Call sauron-matrix-stop first."))
+  ;;       (matrix-sauron-fetch-rules)
+  ;;       (add-hook 'matrix-client-new-event-hook 'matrix-add-sauron-event)
+  ;;       (setq sauron-matrix-running t))
+  ;;   (message "matrix-client not loadable, so matrix-sauron could not start."))
+  )
 
 (defun matrix-sauron-stop ()
   "Stops and cleans up matrix-sauron."
