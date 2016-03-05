@@ -31,8 +31,8 @@
 
 (defun matrix-homeserver-api-url (&optional version)
   "Message `matrix-homeserver-base-url' in to a fully-qualified API endpoint URL."
-  (let ((version (or version "v1")))
-    (format "%s/_matrix/client/api/%s" matrix-homeserver-base-url version)))
+  (let ((version (or version "api/v1")))
+    (format "%s/_matrix/client/%s" matrix-homeserver-base-url version)))
 
 (defun matrix-get (key obj)
   "Easy JSON accessor, get KEY's value from OBJ."

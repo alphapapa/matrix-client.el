@@ -111,6 +111,7 @@ connection basis.")
             :initform nil
             :documentation "BOOL specifiying if the event listener is currently running.")
    (rooms :initarg :rooms
+          :initform nil
           :documentation "List of matrix-room objects")
    (event-handlers :initarg :event-handlers
                    :initform matrix-client-event-handlers
@@ -123,12 +124,16 @@ See `defmatrix-client-handler'.")
    (username :initarg :username
              :documentation "Your Matrix username.")
    (end-token)
-   (input-filters :initarg :inputfilters
+   (input-filters :initarg :input-filters
                   :documentation "List of functions to run input through.
 
 Each of these functions take a single argument, the TEXT the user
 inputs.  They can modify that text and return a new version of
-it, or they can return nil to prevent further processing of it.")))
+it, or they can return nil to prevent further processing of it."))
+  :documentation "This is the basic UI encapsulation of a Matrix connection.
+
+To build a UI on top of `matrix-api' start here, wire up
+event-handlers and input-filters.")
 
 ;; (defvar matrix-username nil
 ;;   "Your Matrix username.")
@@ -176,6 +181,8 @@ it, or they can return nil to prevent further processing of it.")))
 ;; (defvar-local matrix-client-room-end-token nil
 ;;   )
 
+(defvar matrix-client-connections '()
+  "Alist of (username . connection)")
 
 (defvar matrix-client-watchdog-last-message-ts nil
   "Number of seconds since epoch of the last message.
@@ -185,48 +192,69 @@ Used in the watchdog timer to fire a reconnect attempt.")
 (defvar matrix-client-watchdog-timer nil)
 
 ;;;###autoload
-(defun matrix-client ()
-  "Connect to Matrix.
+(defun matrix-client (username)
+  "Connect to Matrix."
+  (interactive "i")
+  (let* ((base-url matrix-homeserver-base-url)
+         (con (if username ;; Pass a username in to get an existing connection
+                  (matrix-get username matrix-client-connections)
+                (matrix-client-connection
+                 matrix-homeserver-base-url
+                 :base-url matrix-homeserver-base-url))))
+    (unless (and (slot-boundp con :token) (oref con :token))
+      (matrix-client-login con))
+    (unless (oref con :running)
+      (matrix-client-inject-event-listeners con)
+      (matrix-client-handlers-init con))
+    (add-to-list 'matrix-client-connections (cons (oref con :username) con))
+    (message "You're jacked in, welcome to Matrix. Your messages will arrive momentarily.")
+    (matrix-sync con nil t matrix-client-event-poll-timeout
+                 (apply-partially #'matrix-client-sync-handler con))
+    ;; (let* ((initial-data (matrix-initial-sync con 25)))
+    ;;   (mapc 'matrix-client-set-up-room (matrix-get 'rooms initial-data))
+    ;;   
+    ;;   (when matrix-client-enable-watchdog
+    ;;     (matrix-client-setup-watchdog-timer))
+    ;;   (setq matrix-client-event-listener-running t)
+    ;;   (matrix-client-start-event-listener (matrix-get 'end initial-data)))
+    ))
 
-This will attempt to log you in if you don't have a valid
-[`matrix-token'] and will create room buffers for each room you are
-in."
-  (interactive)
-  (unless matrix-token
-    (matrix-client-login))
-  (matrix-client-inject-event-listeners)
-  (matrix-client-handlers-init)
-  (let* ((initial-data (matrix-initial-sync 25)))
-    (mapc 'matrix-client-set-up-room (matrix-get 'rooms initial-data))
-    (message "💣 You're jacked in, welcome to Matrix. (💗♥💓💕)")
-    (when matrix-client-enable-watchdog
-      (matrix-client-setup-watchdog-timer))
-    (setq matrix-client-event-listener-running t)
-    (matrix-client-start-event-listener (matrix-get 'end initial-data))))
+(defmethod matrix-client-sync-handler ((con matrix-client-connection) data)
+  (dolist (room-data (matrix-get 'leave (matrix-get 'rooms data)))
+    (debug)
+    )
+  (dolist (room-data (matrix-get 'join (matrix-get 'rooms data)))
+    (debug)
+    )
+  (dolist (room-data (matrix-get 'invite (matrix-get 'rooms data)))
+    (debug)
+    )
+  )
 
 ;;;###autoload
-(defun matrix-client-login ()
+(defmethod matrix-client-login ((con matrix-client-connection) &optional username)
   "Get a token form the Matrix homeserver.
 
 If [`matrix-client-use-auth-source'] is non-nil, attempt to log in
 using data from auth-source.  Otherwise, the user will be prompted
 for a username and password."
-  (interactive)
   (let* ((auth-source-creation-prompts
           '((username . "Matrix identity: ")
             (secret . "Matrix password for %u (homeserver: %h): ")))
          (found (nth 0 (auth-source-search :max 1
-                                           :host matrix-homeserver-base-url
+                                           :host (oref con :base-url)
+                                           :user username
                                            :require '(:user :secret)
                                            :create t))))
     (when (and
            found
-           (matrix-login-with-password (plist-get found :user)
+           (matrix-login-with-password con
+                                       (plist-get found :user)
                                        (let ((secret (plist-get found :secret)))
                                          (if (functionp secret)
                                              (funcall secret)
                                            secret)))
-           (setq matrix-username (plist-get found :user))
+           (oset con :username (plist-get found :user))
            (let ((save-func (plist-get found :save-function)))
              (when save-func (funcall save-func)))))))
 
@@ -276,9 +304,10 @@ connect, clearing all room data."
 
 (defun matrix-client-window-change-hook ()
   "Send a read receipt if necessary."
-  (when (and matrix-client-room-id matrix-client-room-end-token)
-    (message "%s as read from %s" matrix-client-room-end-token matrix-client-room-id)
-    (matrix-mark-as-read matrix-client-room-id matrix-client-room-end-token)))
+  ;; (when (and matrix-client-room-id matrix-client-room-end-token)
+  ;;   (message "%s as read from %s" matrix-client-room-end-token matrix-client-room-id)
+  ;;   (matrix-mark-as-read matrix-client-room-id matrix-client-room-end-token))
+  )
 
 (defun matrix-client-start-event-listener (end-tok)
   "Start the event listener if it is not already running, from the END-TOK end token."
@@ -325,11 +354,13 @@ object with a single argument, DATA."
       (funcall hook data)))
   (matrix-client-start-event-listener (matrix-get 'end data)))
 
-(defun matrix-client-inject-event-listeners ()
+(defmethod matrix-client-inject-event-listeners ((con matrix-client-connection))
   "Inject the standard event listeners."
-  (add-to-list 'matrix-client-new-event-hook 'matrix-client-debug-event-maybe)
-  (add-to-list 'matrix-client-new-event-hook 'matrix-client-render-events-to-room)
-  (add-to-list 'matrix-client-new-event-hook 'matrix-client-set-room-end-token))
+  (unless (slot-boundp con :event-hook)
+    (oset con :event-hook
+          '(matrix-client-debug-event-maybe
+            matrix-client-render-events-to-room
+            matrix-client-set-room-end-token))))
 
 (defun matrix-client-debug-event-maybe (data)
   "Debug DATA to *matrix-events* if `matrix-client-debug-events' is non-nil."

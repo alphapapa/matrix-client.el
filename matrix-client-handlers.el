@@ -31,30 +31,31 @@
 
 ;;; Code:
 
-(defun matrix-client-handlers-init ()
+(defmethod matrix-client-handlers-init ((con matrix-client-connection))
   "Set up all the matrix-client event type handlers.
-
 
 Each matrix-client-event-handler is an alist of matrix message type and
 the function that handles them.  Currently only a single handler
 for each event is supported.  The handler takes a single argument,
 DATA, which is a `json-read' object from the Event stream.  See
 the Matrix spec for more information about its format."
-  (setq matrix-client-event-handlers nil)
-  (setq matrix-client-input-filters nil)
   (add-to-list 'window-configuration-change-hook 'matrix-client-window-change-hook)
-  (add-to-list 'matrix-client-event-handlers '("m.room.message" . matrix-client-handler-m.room.message))
-  (add-to-list 'matrix-client-event-handlers '("m.lightrix.pattern" . matrix-client-handler-m.lightrix.pattern))
-  (add-to-list 'matrix-client-event-handlers '("m.room.topic" . matrix-client-handler-m.room.topic))
-  (add-to-list 'matrix-client-event-handlers '("m.room.name" . matrix-client-handler-m.room.name))
-  (add-to-list 'matrix-client-event-handlers '("m.room.member" . matrix-client-handler-m.room.member))
-  (add-to-list 'matrix-client-event-handlers '("m.room.aliases" . matrix-client-handler-m.room.aliases))
-  (add-to-list 'matrix-client-event-handlers '("m.presence" . matrix-client-handler-m.presence))
-  (add-to-list 'matrix-client-event-handlers '("m.typing" . matrix-client-handler-m.typing))
-  (add-to-list 'matrix-client-input-filters 'matrix-client-send-to-current-room)
-  (add-to-list 'matrix-client-input-filters 'matrix-client-input-filter-emote)
-  (add-to-list 'matrix-client-input-filters 'matrix-client-input-filter-join)
-  (add-to-list 'matrix-client-input-filters 'matrix-client-input-filter-leave))
+  (unless (slot-boundp con :event-handlers)
+    (oset con :event-hook
+          '(("m.room.message" . matrix-client-handler-m.room.message)
+            ("m.lightrix.pattern" . matrix-client-handler-m.lightrix.pattern)
+            ("m.room.topic" . matrix-client-handler-m.room.topic)
+            ("m.room.name" . matrix-client-handler-m.room.name)
+            ("m.room.member" . matrix-client-handler-m.room.member)
+            ("m.room.aliases" . matrix-client-handler-m.room.aliases)
+            ("m.presence" . matrix-client-handler-m.presence)
+            ("m.typing" . matrix-client-handler-m.typing))))
+  (unless (slot-boundp con :input-filters)
+    (oset con :input-filters
+          '(matrix-client-send-to-current-room
+            matrix-client-input-filter-emote
+            matrix-client-input-filter-join
+            matrix-client-input-filter-leave))))
 
 (defmacro defmatrix-client-handler (msgtype varlist body)
   "Create an matrix-client-handler.

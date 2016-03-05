@@ -40,10 +40,12 @@
 (defvar matrix-error-hook nil
   "This is a list of functions to pass Matrix errors to.")
 
+(defcustom matrix-homeserver-base-url "https://matrix.org"
+  "URI to your Matrix homeserver, defaults to the official homeserver.")
+
 (defclass matrix-connection ()
   ((base-url :initarg :base-url
              :type string
-             :initform "https://matrix.org"
              :documentation "URI to your Matrix homeserver, defaults to the official homeserver.")
    (token :initarg :token
           :type string
@@ -51,6 +53,7 @@
           :documentation "Matrix access_token")
    (txn-id :initarg :txn-id
            :type string)))
+(oset-default matrix-connection base-url matrix-homeserver-base-url)
 
 (defmethod matrix-login ((con matrix-connection) login-type arg-list)
   "Attempt to log in to the Matrix homeserver.
@@ -58,7 +61,7 @@
 LOGIN-TYPE is the value for the `type' key.
 ARG-LIST is an alist of additional key/values to add to the submitted JSON."
   (let ((resp (matrix-send con "POST" "/login" (add-to-list 'arg-list (cons "type" login-type)))))
-    (oset con 'token (cdr (assoc 'access_token resp)))
+    (oset con token (cdr (assoc 'access_token resp)))
     resp))
 
 (defmethod matrix-login-with-password ((con matrix-connection) username password)
@@ -75,7 +78,7 @@ optional alist of URL parameters.  HEADERS is optional HTTP
 headers to add to the request.
 
 The return value is the `json-read' response from homeserver."
-  (let* ((token (oref con token))
+  (let* ((token (and (slot-boundp con :token) (oref con :token)))
          (query-params (when token
                          (add-to-list 'query-params (cons "access_token" token))))
          (url-request-data (when content (json-encode content)))
@@ -131,7 +134,7 @@ call completes"
       (dolist (handler matrix-error-hook)
         (funcall handler con symbol-status error-thrown))
     (when cb
-      (funcall cb con data))))
+      (funcall cb data))))
 
 (defmethod matrix-send-event ((con matrix-connection) room-id event-type content)
   "Send a raw event to the room ROOM-ID.
@@ -152,6 +155,20 @@ CONTENT is a `json-encode' compatible list to include in the event."
                      (list (cons "msgtype" "m.text")
                            (cons "body" message))))
 
+(defmethod matrix-sync ((con matrix-connection) since full-state timeout cb)
+  "Start an event poller starting from END-TOKEN.
+
+It will wait at least TIMEOUT seconds before calling the
+CALLBACK.  After receiving any events it will call CALLBACK with
+those events as its argument."
+  (matrix-send-async con "GET" "/sync"
+                     `((full_state . ,full-state)
+                       (timeout . ,timeout)
+                       (since . ,since))
+                     nil nil
+                     cb
+                     "r0"))
+
 (defmethod matrix-event-poll ((con matrix-connection) end-token timeout callback)
   "Start an event poller starting from END-TOKEN.
 
@@ -166,7 +183,7 @@ those events as its argument."
 (defmethod matrix-mark-as-read ((con matrix-connection) room-id event-id)
   "In room ROOM-ID mark a given event EVENT-ID as read."
   (let ((path (format "/rooms/%s/receipt/m.read/%s" room-id event-id)))
-    (matrix-send-async con "POST" path nil nil nil (lambda (status)) "v2_alpha")))
+    (matrix-send-async con "POST" path nil nil nil (lambda (status)) "api/v2_alpha")))
 
 (defmethod matrix-join-room ((con matrix-connection) room-id)
   "Join the room ROOM-ID."
