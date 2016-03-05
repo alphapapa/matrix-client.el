@@ -41,7 +41,7 @@ DATA, which is a `json-read' object from the Event stream.  See
 the Matrix spec for more information about its format."
   (add-to-list 'window-configuration-change-hook 'matrix-client-window-change-hook)
   (unless (slot-boundp con :event-handlers)
-    (oset con :event-hook
+    (oset con :event-handlers
           '(("m.room.message" . matrix-client-handler-m.room.message)
             ("m.lightrix.pattern" . matrix-client-handler-m.lightrix.pattern)
             ("m.room.topic" . matrix-client-handler-m.room.topic)
