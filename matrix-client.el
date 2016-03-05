@@ -114,7 +114,6 @@ connection basis.")
           :initform nil
           :documentation "List of matrix-room objects")
    (event-handlers :initarg :event-handlers
-                   :initform matrix-client-event-handlers
                    :documentation "An alist of (type . function) handler definitions for various matrix types.
 
 Each of these receives the raw event as a single DATA argument.
@@ -134,6 +133,7 @@ it, or they can return nil to prevent further processing of it."))
 
 To build a UI on top of `matrix-api' start here, wire up
 event-handlers and input-filters.")
+(oset-default matrix-client-connection event-handlers matrix-client-event-handlers)
 
 ;; (defvar matrix-username nil
 ;;   "Your Matrix username.")

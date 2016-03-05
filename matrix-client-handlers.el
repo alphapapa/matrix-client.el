@@ -69,6 +69,7 @@ MSGTYPE is the type of the message to handle.
 
 Provided Variables:
 
+- `room': the `matrix-client-room' object that represents the room.
 - `room-id': the Matrix room id the message is intended for
 - `room-buf': the buffer tied to the Matrix room which the
   message is intended for.
