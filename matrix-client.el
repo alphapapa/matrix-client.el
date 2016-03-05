@@ -220,16 +220,27 @@ Used in the watchdog timer to fire a reconnect attempt.")
     ))
 
 (defmethod matrix-client-sync-handler ((con matrix-client-connection) data)
-  (dolist (room-data (matrix-get 'leave (matrix-get 'rooms data)))
-    (debug)
-    )
-  (dolist (room-data (matrix-get 'join (matrix-get 'rooms data)))
-    (debug)
-    )
-  (dolist (room-data (matrix-get 'invite (matrix-get 'rooms data)))
-    (debug)
-    )
-  )
+  (mapc
+   (lambda (room-data)
+     (matrix-client-leave-room con room-data))
+   (matrix-get 'leave (matrix-get 'rooms data)))
+  (mapc
+   (lambda (room-data)
+     (let ((room-id (car room-data))
+           (room-events (cdr room-data)))
+       (mapc
+        (lambda (event)
+          (matrix-client-state-event con room-id event))
+        (matrix-get 'events (matrix-get 'state room-events)))
+       (mapc
+        (lambda (event)
+          (matrix-client-room-event con room-id event))
+        (matrix-get 'events (matrix-get 'timeline room-events)))))
+   (matrix-get 'join (matrix-get 'rooms data)))
+  (mapc
+   (lambda (room-data)
+     (matrix-client-invite-room con data))
+   (matrix-get 'invite (matrix-get 'rooms data))))
 
 ;;;###autoload
 (defmethod matrix-client-login ((con matrix-client-connection) &optional username)
@@ -279,12 +290,31 @@ connect, clearing all room data."
         (matrix-client))
     (matrix-client-stream-from-end-token)))
 
+(defmethod matrix-client-state-event ((con matrix-client-connection) room-id event)
+  "Handle state events from a sync."
+  (debug)
+  (let* ((room (or (matrix-get room-id (oref con :rooms))
+                   (matrix-client-setup-room con room-id))))
+    (matrix-client-render-event-to-room con room event)))
+
+(defmethod matrix-client-setup-room ((con matrix-client-connection) room-id)
+  (let* ((room-buf (get-buffer-create room-id))
+         (room-obj (matrix-client-room room-id :buffer room-buf))
+         (new-room-list (append (oref con :rooms) (cons room-id room-obj))))
+    (oset con :rooms new-room-list)))
+
+(defmethod matrix-client-render-event-to-room ((con matrix-client-connection) room item)
+  "Feed ITEM in to its proper `matrix-client-event-handlers' handler."
+  (let* ((type (matrix-get 'type item))
+         (handler (matrix-get type matrix-client-event-handlers)))
+    (when handler
+      (funcall handler con room item))))
+
 (defun matrix-client-set-up-room (roomdata)
   "Set up a room from its initialSync ROOMDATA."
   (let* ((room-id (matrix-get 'room_id roomdata))
          (room-state (matrix-get 'state roomdata))
          (room-messages (matrix-get 'chunk (matrix-get 'messages roomdata)))
-         (room-buf (get-buffer-create room-id))
          (room-cons (cons room-id room-buf))
          (render-membership matrix-client-render-membership)
          (render-presence matrix-client-render-presence))
@@ -296,8 +326,9 @@ connect, clearing all room data."
       (erase-buffer)
       (set (make-local-variable 'matrix-client-room-id) room-id)
       (matrix-client-render-message-line)
-      (mapc 'matrix-client-render-event-to-room room-state)
-      (mapc 'matrix-client-render-event-to-room room-messages))
+      (mapc 'matrix-client-render-event-to-room room-messages)
+
+      )
     (setq matrix-client-render-membership render-membership)
     (setq matrix-client-render-presence render-presence)
     (switch-to-buffer room-buf)))
@@ -375,13 +406,6 @@ object with a single argument, DATA."
   "Given a chunk of data from an /initialSyc, render each element from DATA in to its room."
   (let ((chunk (matrix-get 'chunk data)))
     (mapc 'matrix-client-render-event-to-room chunk)))
-
-(defun matrix-client-render-event-to-room (item)
-  "Feed ITEM in to its proper `matrix-client-event-handlers' handler."
-  (let* ((type (matrix-get 'type item))
-         (handler (matrix-get type matrix-client-event-handlers)))
-    (when handler
-      (funcall handler item))))
 
 (defun matrix-client-update-header-line ()
   "Update the header line of the current buffer."

@@ -78,10 +78,10 @@ BODY is the function itself.  See, for example,
 [`matrix-client-handler-m.presence'] for an example of what this looks
 like."
   (let ((fname (intern (format "matrix-client-handler-%s" msgtype))))
-    `(defun ,fname (data)
+    `(defmethod ,fname ((con matrix-client-connection) room data)
        (let* ((inhibit-read-only t)
-              (room-id (matrix-get 'room_id data))
-              (room-buf (matrix-get room-id matrix-client-active-rooms))
+              (room-id (oref room :id))
+              (room-buf (oref room :buffer))
               ,@varlist)
          (with-current-buffer room-buf
            (save-excursion
