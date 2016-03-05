@@ -165,21 +165,17 @@ event-handlers and input-filters.")
 
 ;; (defvar-local matrix-client-room-aliases nil
 ;;   )
-
 ;; (defvar-local matrix-client-room-topic nil
 ;;   )
-
 ;; (defvar-local matrix-client-room-id nil
 ;;   )
-
 ;; (defvar-local matrix-client-room-membership nil
+;;   )
+;; (defvar-local matrix-client-room-end-token nil
 ;;   )
 
 (defvar-local matrix-client-room-typers nil
   "The list of members of the buffer's room who are currently typing.")
-
-;; (defvar-local matrix-client-room-end-token nil
-;;   )
 
 (defvar matrix-client-connections '()
   "Alist of (username . connection)")
@@ -269,28 +265,9 @@ for a username and password."
            (let ((save-func (plist-get found :save-function)))
              (when save-func (funcall save-func)))))))
 
-(defun matrix-client-disconnect ()
-  "Disconnect from Matrix and kill all active room buffers."
-  (interactive)
-  (dolist (room-cons matrix-client-active-rooms)
-    (kill-buffer (cdr room-cons)))
-  (setq matrix-client-active-rooms nil)
-  (setq matrix-client-event-listener-running nil))
-
-(defun matrix-client-reconnect (arg)
-  "Reconnect to Matrix.
-
-Without a `prefix-arg' ARG it will simply restart the
-matrix-client-stream poller, but with a prefix it will disconnect and
-connect, clearing all room data."
-  (interactive "P")
-  (if (or arg (not matrix-client-event-stream-end-token))
-      (progn
-        (matrix-client-disconnect)
-        (matrix-client))
-    (matrix-client-stream-from-end-token)))
-
 (defmethod matrix-client-setup-room ((con matrix-client-connection) room-id)
+  (when (get-buffer room-id)
+    (kill-buffer room-id))
   (let* ((room-buf (get-buffer-create room-id))
          (room-obj (matrix-client-room room-id :buffer room-buf))
          (new-room-list (append (oref con :rooms) (list (cons room-id room-obj)))))
@@ -299,7 +276,8 @@ connect, clearing all room data."
       (erase-buffer)
       (matrix-client-render-message-line))
     (switch-to-buffer room-buf)
-    (oset con :rooms new-room-list)))
+    (oset con :rooms new-room-list)
+    room-obj))
 
 (defmethod matrix-client-room-event ((con matrix-client-connection) room-id event)
   "Handle state events from a sync."
@@ -313,58 +291,6 @@ connect, clearing all room data."
          (handler (matrix-get type matrix-client-event-handlers)))
     (when handler
       (funcall handler con room item))))
-
-(defun matrix-client-window-change-hook ()
-  "Send a read receipt if necessary."
-  ;; (when (and matrix-client-room-id matrix-client-room-end-token)
-  ;;   (message "%s as read from %s" matrix-client-room-end-token matrix-client-room-id)
-  ;;   (matrix-mark-as-read matrix-client-room-id matrix-client-room-end-token))
-  )
-
-(defun matrix-client-start-event-listener (end-tok)
-  "Start the event listener if it is not already running, from the END-TOK end token."
-  (when matrix-client-event-listener-running
-    (matrix-event-poll
-     end-tok
-     matrix-client-event-poll-timeout
-     'matrix-client-event-listener-callback)
-    (setq matrix-client-event-stream-end-token end-tok)))
-
-(defun matrix-client-setup-watchdog-timer ()
-  "Start a watchdog timer to fire after twice the client timeout.
-
-I have yet to find a sane way to handle timeouts from request.el
-reliably yet, so this watchdog will ensure there is a reconnect
-if you go offline. It works by setting a timer to run after the
-client should definitely have called the callback. If it hasn't,
-it triggers a re-stream and then sets the timer to wait for the
-next event to come in."
-  (let* ((epoch-now (time-to-seconds))
-         (diff-should (/ (* 2 matrix-client-event-poll-timeout) 1000)))
-    (when matrix-client-watchdog-timer
-      (let* ((epoch-last matrix-client-watchdog-last-message-ts))
-        (when (< diff-should (- epoch-now epoch-last))
-          ;; we hit our timeout.
-          (matrix-client-stream-from-end-token)
-          (message "Detected timeout of Matrix Client; restarting. Last message seen was %s seconds ago."
-                   epoch-now epoch-last diff-should
-                   (- epoch-now epoch-last)))
-        (cancel-timer matrix-client-watchdog-timer)))
-    ;; restart the timer
-    (setq matrix-client-watchdog-timer
-          (run-with-timer diff-should nil 'matrix-client-setup-watchdog-timer))))
-
-(defun matrix-client-event-listener-callback (data)
-  "The callback which `matrix-event-poll' pushes its data in to.
-
-This calls each function in matrix-client-new-event-hook with the data
-object with a single argument, DATA."
-  (setq matrix-client-watchdog-last-message-ts
-        (time-to-seconds))
-  (unless (eq (car data) 'error)
-    (dolist (hook matrix-client-new-event-hook)
-      (funcall hook data)))
-  (matrix-client-start-event-listener (matrix-get 'end data)))
 
 (defmethod matrix-client-inject-event-listeners ((con matrix-client-connection))
   "Inject the standard event listeners."
@@ -383,11 +309,6 @@ object with a single argument, DATA."
         (insert "\n")
         (insert (prin1-to-string data))))))
 
-(defun matrix-client-render-events-to-room (data)
-  "Given a chunk of data from an /initialSyc, render each element from DATA in to its room."
-  (let ((chunk (matrix-get 'chunk data)))
-    (mapc 'matrix-client-render-event-to-room chunk)))
-
 (defun matrix-client-update-header-line ()
   "Update the header line of the current buffer."
   (if (> 0 (length matrix-client-room-typers))
@@ -395,13 +316,6 @@ object with a single argument, DATA."
         (setq header-line-format (format "(%d typing...) %s: %s" (length matrix-client-room-typers)
                                          matrix-client-room-name matrix-client-room-topic)))
     (setq header-line-format (format "%s: %s" matrix-client-room-name matrix-client-room-topic))))
-
-(defun matrix-client-filter (condp lst)
-  "A standard filter, feed it a function CONDP and a LST."
-  (delq nil
-        (mapcar (lambda (x)
-                  (and (funcall condp x) x))
-                lst)))
 
 ;;;###autoload
 (defmacro insert-read-only (text &rest extra-props)
@@ -418,61 +332,6 @@ object with a single argument, DATA."
   (let ((inhibit-read-only t))
     (insert "\n")
     (insert-read-only (format "🔥 [%s] ▶ " matrix-client-room-id) rear-nonsticky t)))
-
-(defun matrix-client-send-active-line ()
-  "Send the current message-line text after running it through input-filters."
-  (interactive)
-  (end-of-buffer)
-  (beginning-of-line)
-  (re-search-forward "▶")
-  (forward-char)
-  (kill-line)
-  (reduce 'matrix-client-run-through-input-filter
-          matrix-client-input-filters
-          :initial-value (pop kill-ring)))
-
-(defun matrix-client-run-through-input-filter (text filter)
-  "Run each TEXT through a single FILTER.  Used by `matrix-client-send-active-line'."
-  (when text
-    (funcall filter text)))
-
-(defun matrix-client-send-to-current-room (text)
-  "Send a string TEXT to the current buffer's room."
-  (matrix-send-message matrix-client-room-id text))
-
-(defun matrix-client-set-room-end-token (data)
-  "When an event DATA comes in, file it in to the room so that we can mark a cursor when visiting the buffer."
-  (mapc (lambda (data)
-          (let* ((room-id (matrix-get 'room_id data))
-                 (room-buf (matrix-get room-id matrix-client-active-rooms)))
-            (when room-buf
-              (with-current-buffer room-buf
-                (setq matrix-client-room-end-token (matrix-get 'event_id data)))))
-          ) (matrix-get 'chunk data)))
-
-(defun matrix-client-restart-listener-maybe (sym error-thrown)
-  "The error handler for matrix-client's event-poll.
-
-SYM and ERROR-THROWN come from Request and are used to decide whether to connect."
-  (cond ((or (string-match "code 6" (cdr error-thrown))
-             (eq sym 'parse-error)
-             (eq sym 'timeout)
-             (string-match "interrupt" (cdr error-thrown))
-             (string-match "code 7" (cdr error-thrown)))
-         (message "Lost connection with matrix, will re-attempt in %s ms"
-                  (/ matrix-client-event-poll-timeout 2))
-         (matrix-client-restart-later))
-        ((string-match "code 60" (cdr error-thrown))
-         (message "curl couldn't validate CA, not advising --insecure? File bug pls."))))
-
-(defun matrix-client-stream-from-end-token ()
-  "Restart the matrix-client stream from the saved end-token."
-  (matrix-client-start-event-listener matrix-client-event-stream-end-token))
-
-(defun matrix-client-restart-later ()
-  "Try to restart the Matrix poller later, maybe."
-  (run-with-timer (/ matrix-client-event-poll-timeout 1000) nil
-                  'matrix-client-stream-from-end-token))
 
 (provide 'matrix-client)
 ;;; matrix-client.el ends here
