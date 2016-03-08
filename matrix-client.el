@@ -111,6 +111,7 @@ connection basis.")
    (rooms :initarg :rooms
           :initform nil
           :documentation "List of matrix-room objects")
+   (end-token :initarg :end-token)
    (event-handlers :initarg :event-handlers
                    :documentation "An alist of (type . function) handler definitions for various matrix types.
 
@@ -132,6 +133,12 @@ it, or they can return nil to prevent further processing of it."))
 To build a UI on top of `matrix-api' start here, wire up
 event-handlers and input-filters.")
 (oset-default matrix-client-connection event-handlers matrix-client-event-handlers)
+
+(defvar-local matrix-client-room-connection nil
+  "`matrix-client-connection' object for the current buffer")
+
+(defvar-local matrix-client-room-object nil
+  "`matrix-client-room' object for the current buffer")
 
 ;; (defvar matrix-username nil
 ;;   "Your Matrix username.")
@@ -209,6 +216,7 @@ Used in the watchdog timer to fire a reconnect attempt.")
     (message "You're jacked in, welcome to Matrix. Your messages will arrive momentarily.")
     (matrix-sync con nil t matrix-client-event-poll-timeout
                  (apply-partially #'matrix-client-sync-handler con))
+    (oset con :running t)
     ;; (let* ((initial-data (matrix-initial-sync con 25)))
     ;;   (mapc 'matrix-client-set-up-room (matrix-get 'rooms initial-data))
     ;;   
@@ -217,29 +225,6 @@ Used in the watchdog timer to fire a reconnect attempt.")
     ;;   (setq matrix-client-event-listener-running t)
     ;;   (matrix-client-start-event-listener (matrix-get 'end initial-data)))
     ))
-
-(defmethod matrix-client-sync-handler ((con matrix-client-connection) data)
-  (mapc
-   (lambda (room-data)
-     (matrix-client-leave-room con room-data))
-   (matrix-get 'leave (matrix-get 'rooms data)))
-  (mapc
-   (lambda (room-data)
-     (let ((room-id (symbol-name (car room-data)))
-           (room-events (cdr room-data)))
-       (mapc
-        (lambda (event)
-          (matrix-client-room-event con room-id event))
-        (matrix-get 'events (matrix-get 'state room-events)))
-       (mapc
-        (lambda (event)
-          (matrix-client-room-event con room-id event))
-        (matrix-get 'events (matrix-get 'timeline room-events)))))
-   (matrix-get 'join (matrix-get 'rooms data)))
-  (mapc
-   (lambda (room-data)
-     (matrix-client-invite-room con data))
-   (matrix-get 'invite (matrix-get 'rooms data))))
 
 ;;;###autoload
 (defmethod matrix-client-login ((con matrix-client-connection) &optional username)
@@ -277,17 +262,48 @@ for a username and password."
     (with-current-buffer room-buf
       (matrix-client-mode)
       (erase-buffer)
-      (matrix-client-render-message-line))
+      (matrix-client-render-message-line room-obj))
     (switch-to-buffer room-buf)
+    (set (make-local-variable 'matrix-client-room-connection) con)
+    (set (make-local-variable 'matrix-client-room-object) room-obj)
     (oset con :rooms new-room-list)
     (oset room-obj :id room-id)
     (oset room-obj :buffer room-buf)
     room-obj))
 
-(defmethod matrix-client-room-event ((con matrix-client-connection) room-id event)
+(defmethod matrix-client-sync-handler ((con matrix-client-connection) data)
+  (when (oref con :running)
+    (mapc
+     (lambda (room-data)
+       (matrix-client-leave-room con room-data))
+     (matrix-get 'leave (matrix-get 'rooms data)))
+    (mapc
+     (lambda (room-data)
+       (let* ((room-id (symbol-name (car room-data)))
+              (room (or (matrix-get room-id (oref con :rooms))
+                        (matrix-client-setup-room con room-id)))
+              (room-events (cdr room-data)))
+         (mapc
+          (lambda (event)
+            (matrix-client-room-event room event))
+          (matrix-get 'events (matrix-get 'state room-events)))
+         (mapc
+          (lambda (event)
+            (matrix-client-room-event room event))
+          (matrix-get 'events (matrix-get 'timeline room-events)))))
+     (matrix-get 'join (matrix-get 'rooms data)))
+    (mapc
+     (lambda (room-data)
+       (matrix-client-invite-room con data))
+     (matrix-get 'invite (matrix-get 'rooms data)))
+    (let ((next (matrix-get 'next_batch data)))
+      (oset con :end-token next)
+      (matrix-sync con next nil matrix-client-event-poll-timeout
+                   (apply-partially #'matrix-client-sync-handler con)))))
+
+(defmethod matrix-client-room-event ((room matrix-client-room) event)
   "Handle state events from a sync."
-  (let* ((room (or (matrix-get room-id (oref con :rooms))
-                   (matrix-client-setup-room con room-id))))
+  (let* ((con (oref room :con) ))
     (matrix-client-render-event-to-room con room event)))
 
 (defmethod matrix-client-render-event-to-room ((con matrix-client-connection) room item)
@@ -336,12 +352,53 @@ for a username and password."
               (point))
     '(read-only t ,@extra-props)))
 
-(defun matrix-client-render-message-line ()
+(defmethod matrix-client-render-message-line ((room matrix-client-room room))
   "Insert a message input at the end of the buffer."
   (end-of-buffer)
   (let ((inhibit-read-only t))
     (insert "\n")
-    (insert-read-only (format "🔥 [%s] ▶ " matrix-client-room-id) rear-nonsticky t)))
+    (insert-read-only "[::] ▶ " rear-nonsticky t)))
+
+(defun matrix-client-send-active-line ()
+  "Send the current message-line text after running it through input-filters."
+  (interactive)
+  (end-of-buffer)
+  (beginning-of-line)
+  (re-search-forward "▶")
+  (forward-char)
+  (kill-line)
+  (let* ((room matrix-client-room-object)
+         (con (and (slot-boundp room :con)
+                   (oref room :con)))
+         (input-filters (and (slot-boundp con :input-filters)
+                             (oref con :input-filters))))
+    (reduce 'matrix-client-run-through-input-filter
+            input-filters
+            :initial-value (pop kill-ring))))
+
+(defun matrix-client-run-through-input-filter (text filter)
+  "Run each TEXT through a single FILTER.  Used by `matrix-client-send-active-line'."
+  (when text
+    (funcall filter text)))
+
+(defun matrix-client-send-to-current-room (text)
+  "Send a string TEXT to the current buffer's room."
+  (let ((room matrix-client-room-object)
+        (con (and room
+                  (slot-boundp room :con)
+                  (oref room :con)))
+        (id (and room
+                 (slot-boundp room :id)
+                 (oref room :id))))
+    (matrix-send-message con id text)))
+
+(defun matrix-client-window-change-hook ()
+  "Send a read receipt if necessary."
+  ;; (when (and matrix-client-room-id matrix-client-room-end-token)
+  ;;   (message "%s as read from %s" matrix-client-room-end-token matrix-client-room-id)
+  ;;   (matrix-mark-as-read matrix-client-room-id matrix-client-room-end-token))
+  )
 
 (provide 'matrix-client)
 ;;; matrix-client.el ends here
+
