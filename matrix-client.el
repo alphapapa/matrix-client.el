@@ -144,23 +144,23 @@ event-handlers and input-filters.")
 ;; (defvar-local matrix-client-room-name nil
 ;;   )
 
-(udefclass matrix-client-room ()
-           ((con :initarg :con)
-            (buffer :initarg :buffer
-                    :documentation "The buffer that contains the room's chat session")
-            (name :initarg :room-name
-                  :documentation "The name of the buffer's room.")
-            (aliases :initarg :aliases
-                     :documentation "The alises of the buffer's room.") 
-            (topic :initarg :topic
-                   :documentation "The topic of the buffer's room.")
-            (id :initarg :id
-                :documentation "The Matrix ID of the buffer's room.")
-            (typers :initarg :typers)
-            (membership :initarg :membership
-                        :documentation "The list of members of the buffer's room.")
-            (end-token :init-arg :end-token
-                       :documentation "The most recent event-id in a room, used to push read-receipts to the server.")))
+(defclass matrix-client-room ()
+  ((con :initarg :con)
+   (buffer :initarg :buffer
+           :documentation "The buffer that contains the room's chat session")
+   (name :initarg :room-name
+         :documentation "The name of the buffer's room.")
+   (aliases :initarg :aliases
+            :documentation "The alises of the buffer's room.") 
+   (topic :initarg :topic
+          :documentation "The topic of the buffer's room.")
+   (id :initarg :id
+       :documentation "The Matrix ID of the buffer's room.")
+   (typers :initarg :typers)
+   (membership :initarg :membership
+               :documentation "The list of members of the buffer's room.")
+   (end-token :init-arg :end-token
+              :documentation "The most recent event-id in a room, used to push read-receipts to the server.")))
 
 ;; (defvar-local matrix-client-room-aliases nil
 ;;   )
