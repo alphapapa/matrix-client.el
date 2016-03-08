@@ -96,7 +96,7 @@ like."
    (msg-type (matrix-get 'msgtype content))
    (format (matrix-get 'format content)))
   ((insert-read-only "\n")
-   (insert-read-only (format "📩 %s %s> "
+   (insert-read-only (format "[::] %s %s> "
                              (format-time-string
                               "[%T]" (seconds-to-time (/ (matrix-get 'origin_server_ts data) 1000)))
                              (matrix-client-displayname-from-user-id
@@ -185,14 +185,14 @@ like."
       (when matrix-client-render-presence
         (end-of-buffer)
         (insert-read-only "\n")
-        (insert-read-only (format "🚚 %s (%s) --> %s" display-name user-id presence) face matrix-client-metadata)))))
+        (insert-read-only (format "%s (%s) --> %s" display-name user-id presence) face matrix-client-metadata)))))
 
 (defmatrix-client-handler "m.room.name"
   ()
   ((oset room :room-name (matrix-get 'name (matrix-get 'content data)))
    (matrix-update-room-name room)
    (insert-read-only "\n")
-   (insert-read-only (format "📝 Room name changed --> %s" (oref room :room-name)) face matrix-client-metadata)
+   (insert-read-only (format "Room name changed --> %s" (oref room :room-name)) face matrix-client-metadata)
    (matrix-client-update-header-line room)))
 
 (defmatrix-client-handler "m.room.aliases"
@@ -204,14 +204,14 @@ like."
   ((oset room :aliases new-alias-list)
    (matrix-update-room-name room)
    (insert-read-only "\n")
-   (insert-read-only (format "📝 Room alias changed --> %s" new-alias-list) face matrix-client-metadata)
+   (insert-read-only (format "Room alias changed --> %s" new-alias-list) face matrix-client-metadata)
    (matrix-client-update-header-line room)))
 
 (defmatrix-client-handler "m.room.topic"
   ()
   ((set (make-local-variable 'matrix-client-room-topic) (matrix-get 'topic (matrix-get 'content data)))
    (insert-read-only "\n")
-   (insert-read-only (format "✏ Room topic changed --> %s" matrix-client-room-topic) face matrix-client-metadata)
+   (insert-read-only (format "Room topic changed --> %s" matrix-client-room-topic) face matrix-client-metadata)
    (matrix-client-update-header-line room)))
 
 (defun matrix-client-handler-m.typing (data)
@@ -225,7 +225,6 @@ like."
                           (oref room :membership)))
          (userdata (cdr (assoc user-id membership)))
          (displayname (matrix-get 'displayname userdata)))
-    (message "%s %s" user-id displayname)
     (or displayname
         user-id)))
 
