@@ -52,7 +52,8 @@
           :custom string
           :documentation "Matrix access_token")
    (txn-id :initarg :txn-id
-           :type string)))
+           :initform 1
+           :type integer)))
 (oset-default matrix-connection base-url matrix-homeserver-base-url)
 
 (defmethod matrix-login ((con matrix-connection) login-type arg-list)
