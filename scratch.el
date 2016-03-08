@@ -11,14 +11,6 @@ connect, clearing all room data."
         (matrix-client))
     (matrix-client-stream-from-end-token)))
 
-(defun matrix-client-disconnect ()
-  "Disconnect from Matrix and kill all active room buffers."
-  (interactive)
-  (dolist (room-cons matrix-client-active-rooms)
-    (kill-buffer (cdr room-cons)))
-  (setq matrix-client-active-rooms nil)
-  (setq matrix-client-event-listener-running nil))
-
 (defun matrix-client-event-listener-callback (data)
   "The callback which `matrix-event-poll' pushes its data in to.
 

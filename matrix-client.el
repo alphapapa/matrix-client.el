@@ -195,7 +195,6 @@ Used in the watchdog timer to fire a reconnect attempt.")
 (require 'matrix-client-handlers)
 (require 'matrix-client-modes)
 
-
 ;;;###autoload
 (defun matrix-client (username)
   "Connect to Matrix."
@@ -251,6 +250,15 @@ for a username and password."
            (oset con :username (plist-get found :user))
            (let ((save-func (plist-get found :save-function)))
              (when save-func (funcall save-func)))))))
+
+(defun matrix-client-disconnect ()
+  "Disconnect from Matrix and kill all active room buffers."
+  (interactive)
+  (dolist (con matrix-client-connections)
+    (dolist (room (oref (cdr con) :rooms))
+      (kill-buffer (oref (cdr room) :buffer)))
+    (oset (cdr con) :rdelete-minibuffer-contentsing nil)
+    (delete (cdr con) matrix-client-connections)))
 
 (defmethod matrix-client-setup-room ((con matrix-client-connection) room-id)
   (when (get-buffer room-id)
