@@ -43,8 +43,6 @@
 ;;; Code:
 
 (require 'matrix-api)
-(require 'matrix-client-handlers)
-(require 'matrix-client-modes)
 
 ;;;###autoload
 (defcustom matrix-client-debug-events nil
@@ -187,6 +185,10 @@ event-handlers and input-filters.")
 Used in the watchdog timer to fire a reconnect attempt.")
 
 (defvar matrix-client-watchdog-timer nil)
+
+(require 'matrix-client-handlers)
+(require 'matrix-client-modes)
+
 
 ;;;###autoload
 (defun matrix-client (username)
