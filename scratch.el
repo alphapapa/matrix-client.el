@@ -19,13 +19,6 @@ connect, clearing all room data."
   (setq matrix-client-active-rooms nil)
   (setq matrix-client-event-listener-running nil))
 
-(defun matrix-client-window-change-hook ()
-  "Send a read receipt if necessary."
-  ;; (when (and matrix-client-room-id matrix-client-room-end-token)
-  ;;   (message "%s as read from %s" matrix-client-room-end-token matrix-client-room-id)
-  ;;   (matrix-mark-as-read matrix-client-room-id matrix-client-room-end-token))
-  )
-
 (defun matrix-client-event-listener-callback (data)
   "The callback which `matrix-event-poll' pushes its data in to.
 
@@ -49,27 +42,6 @@ object with a single argument, DATA."
         (mapcar (lambda (x)
                   (and (funcall condp x) x))
                 lst)))
-
-(defun matrix-client-send-active-line ()
-  "Send the current message-line text after running it through input-filters."
-  (interactive)
-  (end-of-buffer)
-  (beginning-of-line)
-  (re-search-forward "▶")
-  (forward-char)
-  (kill-line)
-  (reduce 'matrix-client-run-through-input-filter
-          matrix-client-input-filters
-          :initial-value (pop kill-ring)))
-
-(defun matrix-client-run-through-input-filter (text filter)
-  "Run each TEXT through a single FILTER.  Used by `matrix-client-send-active-line'."
-  (when text
-    (funcall filter text)))
-
-(defun matrix-client-send-to-current-room (text)
-  "Send a string TEXT to the current buffer's room."
-  (matrix-send-message matrix-client-room-id text))
 
 (defun matrix-client-set-room-end-token (data)
   "When an event DATA comes in, file it in to the room so that we can mark a cursor when visiting the buffer."

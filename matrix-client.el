@@ -121,7 +121,6 @@ See `defmatrix-client-handler'.")
                :documentation "A lists of functions that are evaluated when a new event comes in.")
    (username :initarg :username
              :documentation "Your Matrix username.")
-   (end-token)
    (input-filters :initarg :input-filters
                   :documentation "List of functions to run input through.
 
@@ -303,7 +302,7 @@ for a username and password."
 
 (defmethod matrix-client-room-event ((room matrix-client-room) event)
   "Handle state events from a sync."
-  (let* ((con (oref room :con) ))
+  (let* ((con (oref room :con)))
     (matrix-client-render-event-to-room con room event)))
 
 (defmethod matrix-client-render-event-to-room ((con matrix-client-connection) room item)
@@ -390,7 +389,8 @@ for a username and password."
         (id (and room
                  (slot-boundp room :id)
                  (oref room :id))))
-    (matrix-send-message con id text)))
+    (matrix-send-message con id text))
+  text)
 
 (defun matrix-client-window-change-hook ()
   "Send a read receipt if necessary."

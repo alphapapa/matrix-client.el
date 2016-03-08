@@ -146,7 +146,7 @@ CONTENT is a `json-encode' compatible list to include in the event."
          (path (format "/rooms/%s/send/%s/%s"
                        (url-encode-url room-id)
                        (url-encode-url event-type)
-                       matrix-txn-id)))
+                       txn-id)))
     (oset con :txn-id (+ 1 (or txn-id 0)))
     (matrix-send con "PUT" path content)))
 

@@ -141,13 +141,17 @@ like."
                          (oref room :membership)))
    (display-name (matrix-get 'displayname content)))
   ((assq-delete-all user-id room-membership)
-   (when (string-equal "join" membership)
-     (add-to-list 'room-membership (cons user-id content)))
+   (if (string-equal "join" membership)
+       (progn
+         (when matrix-client-render-membership
+           (insert-read-only "\n")
+           (insert-read-only (format "Joined: %s (%s) --> %s" display-name user-id membership) face matrix-client-metadata))
+         (add-to-list 'room-membership (cons user-id content)))
+     (when matrix-client-render-membership
+       (insert-read-only "\n")
+       (insert-read-only (format "Left: %s (%s) --> %s" display-name user-id membership) face matrix-client-metadata)))
    (oset room :membership room-membership)
-   (matrix-update-room-name room)
-   (when matrix-client-render-membership
-     (insert-read-only "\n")
-     (insert-read-only (format "🚪 %s (%s) --> %s" display-name user-id membership) face matrix-client-metadata))))
+   (matrix-update-room-name room)))
 
 (defun matrix-update-room-name (room)
   "If a room has a name, rename the buffer; if a room has only two
