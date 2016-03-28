@@ -52,10 +52,10 @@ the Matrix spec for more information about its format."
             ("m.typing" . matrix-client-handler-m.typing))))
   (unless (slot-boundp con :input-filters)
     (oset con :input-filters
-          '(matrix-client-send-to-current-room
-            matrix-client-input-filter-emote
+          '(matrix-client-input-filter-emote
             matrix-client-input-filter-join
-            matrix-client-input-filter-leave))))
+            matrix-client-input-filter-leave
+            matrix-client-send-to-current-room))))
 
 (defmacro defmatrix-client-handler (msgtype varlist body)
   "Create an matrix-client-handler.
