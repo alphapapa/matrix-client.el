@@ -207,15 +207,15 @@ Used in the watchdog timer to fire a reconnect attempt.")
                  matrix-homeserver-base-url
                  :base-url matrix-homeserver-base-url))))
     (unless (and (slot-boundp con :token) (oref con :token))
-      (matrix-client-login con))
+      (matrix-client-login con username))
     (unless (oref con :running)
       (matrix-client-inject-event-listeners con)
       (matrix-client-handlers-init con)
       (matrix-sync con nil t matrix-client-event-poll-timeout
                    (apply-partially #'matrix-client-sync-handler con)))
     (add-to-list 'matrix-client-connections (list (oref con :username) con))
-    (message "You're jacked in, welcome to Matrix. Your messages will arrive momentarily.")
     (oset con :running t)
+    (message "You're jacked in, welcome to Matrix. Your messages will arrive momentarily.")
     ;; (let* ((initial-data (matrix-initial-sync con 25)))
     ;;   (mapc 'matrix-client-set-up-room (matrix-get 'rooms initial-data))
     ;;   
