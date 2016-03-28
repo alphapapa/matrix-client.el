@@ -28,13 +28,6 @@ object with a single argument, DATA."
   (let ((chunk (matrix-get 'chunk data)))
     (mapc 'matrix-client-render-event-to-room chunk)))
 
-(defun matrix-client-filter (condp lst)
-  "A standard filter, feed it a function CONDP and a LST."
-  (delq nil
-        (mapcar (lambda (x)
-                  (and (funcall condp x) x))
-                lst)))
-
 (defun matrix-client-set-room-end-token (data)
   "When an event DATA comes in, file it in to the room so that we can mark a cursor when visiting the buffer."
   (mapc (lambda (data)

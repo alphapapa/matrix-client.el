@@ -131,7 +131,6 @@ it, or they can return nil to prevent further processing of it."))
 
 To build a UI on top of `matrix-api' start here, wire up
 event-handlers and input-filters.")
-(oset-default matrix-client-connection event-handlers matrix-client-event-handlers)
 
 (defvar-local matrix-client-room-connection nil
   "`matrix-client-connection' object for the current buffer")
@@ -229,7 +228,7 @@ Used in the watchdog timer to fire a reconnect attempt.")
   "Get a token form the Matrix homeserver.
 
 If [`matrix-client-use-auth-source'] is non-nil, attempt to log in
-using data from auth-source.  Otherwise, the user will be prompted
+using data from auth-source. Otherwise, the user will be prompted
 for a username and password."
   (let* ((auth-source-creation-prompts
           '((username . "Matrix identity: ")
@@ -257,7 +256,7 @@ for a username and password."
   (dolist (con matrix-client-connections)
     (dolist (room (oref (cdr con) :rooms))
       (kill-buffer (oref (cdr room) :buffer)))
-    (oset (cdr con) :rdelete-minibuffer-contentsing nil)
+    (oset (cdr con) :running nil)
     (delete (cdr con) matrix-client-connections)))
 
 (defmethod matrix-client-setup-room ((con matrix-client-connection) room-id)
@@ -311,7 +310,10 @@ for a username and password."
 (defmethod matrix-client-room-event ((room matrix-client-room) event)
   "Handle state events from a sync."
   (let* ((con (oref room :con)))
-    (matrix-client-render-event-to-room con room event)))
+    (when (slot-boundp con :event-hook) 
+      (mapc (lambda (hook)
+              (funcall hook con room event))
+            (oref con :event-hook)))))
 
 (defmethod matrix-client-render-event-to-room ((con matrix-client-connection) room item)
   "Feed ITEM in to its proper `matrix-client-event-handlers' handler."
@@ -325,10 +327,9 @@ for a username and password."
   (unless (slot-boundp con :event-hook)
     (oset con :event-hook
           '(matrix-client-debug-event-maybe
-            matrix-client-render-events-to-room
-            matrix-client-set-room-end-token))))
+            matrix-client-render-event-to-room))))
 
-(defun matrix-client-debug-event-maybe (data)
+(defmethod matrix-client-debug-event-maybe ((con matrix-client-connection) room data)
   "Debug DATA to *matrix-events* if `matrix-client-debug-events' is non-nil."
   (with-current-buffer (get-buffer-create "*matrix-events*")
     (let ((inhibit-read-only t))

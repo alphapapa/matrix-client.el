@@ -46,5 +46,12 @@
             (elt components 2)
             (elt components 3))))
 
+(defun matrix-client-filter (condp lst)
+  "A standard filter, feed it a function CONDP and a LST."
+  (delq nil
+        (mapcar (lambda (x)
+                  (and (funcall condp x) x))
+                lst)))
+
 (provide 'matrix-helpers)
 ;;; matrix-helpers.el ends here
