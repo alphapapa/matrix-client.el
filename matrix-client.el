@@ -199,8 +199,10 @@ Used in the watchdog timer to fire a reconnect attempt.")
   "Connect to Matrix."
   (interactive "i")
   (let* ((base-url matrix-homeserver-base-url)
-         (con (if username ;; Pass a username in to get an existing connection
-                  (matrix-get username matrix-client-connections)
+         ;; Pass a username in to get an existing connection
+         (con (when username
+                (matrix-get username matrix-client-connections)))
+         (con (unless con
                 (matrix-client-connection
                  matrix-homeserver-base-url
                  :base-url matrix-homeserver-base-url))))
@@ -208,11 +210,11 @@ Used in the watchdog timer to fire a reconnect attempt.")
       (matrix-client-login con))
     (unless (oref con :running)
       (matrix-client-inject-event-listeners con)
-      (matrix-client-handlers-init con))
-    (add-to-list 'matrix-client-connections (cons (oref con :username) con))
+      (matrix-client-handlers-init con)
+      (matrix-sync con nil t matrix-client-event-poll-timeout
+                   (apply-partially #'matrix-client-sync-handler con)))
+    (add-to-list 'matrix-client-connections (list (oref con :username) con))
     (message "You're jacked in, welcome to Matrix. Your messages will arrive momentarily.")
-    (matrix-sync con nil t matrix-client-event-poll-timeout
-                 (apply-partially #'matrix-client-sync-handler con))
     (oset con :running t)
     ;; (let* ((initial-data (matrix-initial-sync con 25)))
     ;;   (mapc 'matrix-client-set-up-room (matrix-get 'rooms initial-data))
