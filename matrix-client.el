@@ -254,10 +254,13 @@ for a username and password."
   "Disconnect from Matrix and kill all active room buffers."
   (interactive)
   (dolist (con matrix-client-connections)
-    (dolist (room (oref (cdr con) :rooms))
+    (dolist (room (oref (cadr con) :rooms))
       (kill-buffer (oref (cdr room) :buffer)))
-    (oset (cdr con) :running nil)
-    (delete (cdr con) matrix-client-connections)))
+    (oset (cadr con) :running nil)
+    (setq matrix-client-connections (remove* (car con)
+                                             matrix-client-connections
+                                             :test 'equal
+                                             :key 'car))))
 
 (defmethod matrix-client-setup-room ((con matrix-client-connection) room-id)
   (when (get-buffer room-id)
