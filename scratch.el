@@ -28,16 +28,6 @@ object with a single argument, DATA."
   (let ((chunk (matrix-get 'chunk data)))
     (mapc 'matrix-client-render-event-to-room chunk)))
 
-(defun matrix-client-set-room-end-token (data)
-  "When an event DATA comes in, file it in to the room so that we can mark a cursor when visiting the buffer."
-  (mapc (lambda (data)
-          (let* ((room-id (matrix-get 'room_id data))
-                 (room-buf (matrix-get room-id matrix-client-active-rooms)))
-            (when room-buf
-              (with-current-buffer room-buf
-                (setq matrix-client-room-end-token (matrix-get 'event_id data)))))
-          ) (matrix-get 'chunk data)))
-
 (defun matrix-client-restart-listener-maybe (sym error-thrown)
   "The error handler for matrix-client's event-poll.
 

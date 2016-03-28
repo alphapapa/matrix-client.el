@@ -212,16 +212,18 @@ like."
    (matrix-client-update-header-line room)))
 
 (defmatrix-client-handler "m.room.topic"
-  ()
-  ((set (make-local-variable 'matrix-client-room-topic) (matrix-get 'topic (matrix-get 'content data)))
+  ((topic (matrix-get 'topic (matrix-get 'content data))))
+  ((oset room :topic topic)
    (insert-read-only "\n")
-   (insert-read-only (format "Room topic changed --> %s" matrix-client-room-topic) face matrix-client-metadata)
+   (insert-read-only (format "Room topic changed --> %s" topic) face matrix-client-metadata)
    (matrix-client-update-header-line room)))
 
-(defun matrix-client-handler-m.typing (data)
-  (with-current-buffer (matrix-get (matrix-get 'room_id data) matrix-client-active-rooms)
-    (set (make-local-variable 'matrix-client-room-typers) (matrix-get 'user_ids (matrix-get 'content data)))
-    (matrix-client-update-header-line room)))
+(defun matrix-client-handler-m.typing (con room data)
+  (let ((room-buf (and (slot-boundp room :buffer)
+                       (oref room :buffer))))
+    (with-current-buffer room-buf
+      (set (make-local-variable 'matrix-client-room-typers) (matrix-get 'user_ids (matrix-get 'content data)))
+      (matrix-client-update-header-line room))))
 
 (defun matrix-client-displayname-from-user-id (room user-id)
   "Get the Display name for a USER-ID."
@@ -245,29 +247,43 @@ like."
 
 (defun matrix-client-input-filter-leave (text)
   "Input filter to handle LEAVEs.  Filters TEXT."
-  (if (and (string-match "^/leave.*" text)
-           (matrix-leave-room matrix-client-room-id))
-      (progn
-        (kill-buffer)
-        nil)
-    text))
+  (let ((room-id (and (slot-boundp matrix-client-room-object :id)
+                      (oref matrix-client-room-object :id)))
+        (con (and (slot-boundp matrix-client-room-object :con)
+                  (oref matrix-client-room-object :con))))
+    (if (and (string-match "^/leave.*" text)
+             (matrix-leave-room con room-id))
+        (progn
+          (kill-buffer)
+          nil)
+      text)))
 
 (defun matrix-client-input-filter-part (text)
   "Input filter to handle PARTs.  Filters TEXT."
-  (if (string-match "^/part.*" text)
-      (progn
-        (matrix-leave-room matrix-client-room-id)
-        nil)
-    text))
+  (let ((room-id (and (slot-boundp matrix-client-room-object :id)
+                      (oref matrix-client-room-object :id)))
+        (con (and (slot-boundp matrix-client-room-object :con)
+                  (oref matrix-client-room-object :con))))
+    (if (and (string-match "^/part.*" text)
+             (matrix-part-room con room-id))
+        (progn
+          (kill-buffer)
+          nil)
+      text)))
 
 (defun matrix-client-input-filter-emote (text)
   "Input filter to handle emotes.  Filters TEXT."
   (if (string-match "^/me +\\(.*\\)" text)
-      (let ((emote (substring text (match-beginning 1) (match-end 1))))
-        (matrix-send-event matrix-client-room-id "m.room.message"
-                           `(("msgtype" . "m.emote")
-                             ("body" . ,emote)))
-        nil)
+      (let ((emote (substring text (match-beginning 1) (match-end 1)))
+            (room-id (and (slot-boundp matrix-client-room-object :id)
+                          (oref matrix-client-room-object :id)))
+            (con (and (slot-boundp matrix-client-room-object :con)
+                      (oref matrix-client-room-object :con))))
+        (when (and con room-id)
+          (matrix-send-event con room-id "m.room.message"
+                             `(("msgtype" . "m.emote")
+                               ("body" . ,emote)))
+          nil))
     text))
 
 (provide 'matrix-client-handlers)

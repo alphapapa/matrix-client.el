@@ -138,16 +138,7 @@ event-handlers and input-filters.")
 (defvar-local matrix-client-room-object nil
   "`matrix-client-room' object for the current buffer")
 
-;; (defvar matrix-username nil
-;;   "Your Matrix username.")
-
 ;; (defvar matrix-client-event-stream-end-token nil)
-
-;; (defvar matrix-client-input-filters nil
-;;   )
-
-;; (defvar-local matrix-client-room-name nil
-;;   )
 
 (defclass matrix-client-room ()
   ((con :initarg :con)
@@ -166,17 +157,6 @@ event-handlers and input-filters.")
                :documentation "The list of members of the buffer's room.")
    (end-token :init-arg :end-token
               :documentation "The most recent event-id in a room, used to push read-receipts to the server.")))
-
-;; (defvar-local matrix-client-room-aliases nil
-;;   )
-;; (defvar-local matrix-client-room-topic nil
-;;   )
-;; (defvar-local matrix-client-room-id nil
-;;   )
-;; (defvar-local matrix-client-room-membership nil
-;;   )
-;; (defvar-local matrix-client-room-end-token nil
-;;   )
 
 (defvar-local matrix-client-room-typers nil
   "The list of members of the buffer's room who are currently typing.")
