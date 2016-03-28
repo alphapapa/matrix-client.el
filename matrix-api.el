@@ -162,13 +162,17 @@ CONTENT is a `json-encode' compatible list to include in the event."
 It will wait at least TIMEOUT seconds before calling the
 CALLBACK.  After receiving any events it will call CALLBACK with
 those events as its argument."
-  (matrix-send-async con "GET" "/sync"
-                     `((full_state . ,full-state)
-                       (timeout . ,timeout)
-                       (since . ,since))
-                     nil nil
-                     cb
-                     "r0"))
+  (let ((qparms `(("timeout" . ,(int-to-string timeout)))))
+    (add-to-list 'qparms `("full_state" . ,(if full-state
+                                               "true"
+                                             "false")))
+    (when since
+      (add-to-list 'qparms `("since" . ,since)))
+    (matrix-send-async con "GET" "/sync" nil
+                       qparms
+                       nil
+                       cb
+                       "r0")))
 
 (defmethod matrix-event-poll ((con matrix-connection) end-token timeout callback)
   "Start an event poller starting from END-TOKEN.
