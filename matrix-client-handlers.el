@@ -89,7 +89,8 @@ like."
              (goto-char (point-max))
              (forward-line -1)
              (end-of-line)
-             ,@body))))))
+             ,@body
+             (setq buffer-undo-list nil)))))))
 
 (defmatrix-client-handler "m.room.message"
   ((content (matrix-get 'content data))

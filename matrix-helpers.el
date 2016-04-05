@@ -53,5 +53,9 @@
                   (and (funcall condp x) x))
                 lst)))
 
+(defun matrix-client-room-for-id (con room-id)
+  (let ((room (matrix-get room-id (oref con :rooms))))
+    room))
+
 (provide 'matrix-helpers)
 ;;; matrix-helpers.el ends here

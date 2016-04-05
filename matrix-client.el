@@ -126,7 +126,9 @@ See `defmatrix-client-handler'.")
 
 Each of these functions take a single argument, the TEXT the user
 inputs.  They can modify that text and return a new version of
-it, or they can return nil to prevent further processing of it."))
+it, or they can return nil to prevent further processing of it.")
+   (watchdog-timer :initarg :watchdog-timer)
+   (last-event-ts :initarg :last-event-ts))
   :documentation "This is the basic UI encapsulation of a Matrix connection.
 
 To build a UI on top of `matrix-api' start here, wire up
@@ -155,7 +157,7 @@ event-handlers and input-filters.")
    (typers :initarg :typers)
    (membership :initarg :membership
                :documentation "The list of members of the buffer's room.")
-   (end-token :init-arg :end-token
+   (end-token :initarg :end-token
               :documentation "The most recent event-id in a room, used to push read-receipts to the server.")))
 
 (defvar-local matrix-client-room-typers nil
@@ -163,13 +165,6 @@ event-handlers and input-filters.")
 
 (defvar matrix-client-connections '()
   "Alist of (username . connection)")
-
-(defvar matrix-client-watchdog-last-message-ts nil
-  "Number of seconds since epoch of the last message.
-
-Used in the watchdog timer to fire a reconnect attempt.")
-
-(defvar matrix-client-watchdog-timer nil)
 
 (require 'matrix-client-handlers)
 (require 'matrix-client-modes)
@@ -189,21 +184,14 @@ Used in the watchdog timer to fire a reconnect attempt.")
     (unless (and (slot-boundp con :token) (oref con :token))
       (matrix-client-login con username))
     (unless (oref con :running)
+      (matrix-client-start-watchdog con)
       (matrix-client-inject-event-listeners con)
       (matrix-client-handlers-init con)
       (matrix-sync con nil t matrix-client-event-poll-timeout
                    (apply-partially #'matrix-client-sync-handler con)))
     (add-to-list 'matrix-client-connections (list (oref con :username) con))
     (oset con :running t)
-    (message "You're jacked in, welcome to Matrix. Your messages will arrive momentarily.")
-    ;; (let* ((initial-data (matrix-initial-sync con 25)))
-    ;;   (mapc 'matrix-client-set-up-room (matrix-get 'rooms initial-data))
-    ;;   
-    ;;   (when matrix-client-enable-watchdog
-    ;;     (matrix-client-setup-watchdog-timer))
-    ;;   (setq matrix-client-event-listener-running t)
-    ;;   (matrix-client-start-event-listener (matrix-get 'end initial-data)))
-    ))
+    (message "You're jacked in, welcome to Matrix. Your messages will arrive momentarily.")))
 
 ;;;###autoload
 (defmethod matrix-client-login ((con matrix-client-connection) &optional username)
@@ -244,6 +232,28 @@ for a username and password."
                                              :test 'equal
                                              :key 'car))))
 
+(defmethod matrix-client-start-watchdog ((con matrix-client-connection))
+  (when matrix-client-enable-watchdog
+    (let ((last-ts (and (slot-boundp con :last-event-ts)
+                        (oref con :last-event-ts)))
+          (next (and (slot-boundp con :end-token)
+                     (oref con :end-token)))
+          (timer (and (slot-boundp con :watchdog-timer)
+                      (oref con :watchdog-timer))))
+      (if (and (slot-boundp con :watchdog-timer) ;; start timer if not running
+               (oref con :watchdog-timer))
+          (if (> (* 1000 (- (truncate (float-time)) last-ts)) ;; If we've timed out, re-sync
+                 matrix-client-event-poll-timeout)
+              (progn
+                (message "Reconnecting you to Matrix, one monent please.")
+                (matrix-sync con next nil matrix-client-event-poll-timeout
+                             (apply-partially #'matrix-client-sync-handler con)))
+            (cancel-timer timer)))
+      (oset con :watchdog-timer
+            (run-with-timer (/ (* 2 matrix-client-event-poll-timeout) 1000)
+                            (/ (* 2 matrix-client-event-poll-timeout) 1000)
+                            (apply-partially #'matrix-client-start-watchdog con))))))
+
 (defmethod matrix-client-setup-room ((con matrix-client-connection) room-id)
   (when (get-buffer room-id)
     (kill-buffer room-id))
@@ -266,7 +276,10 @@ for a username and password."
   (when (oref con :running)
     (mapc
      (lambda (room-data)
-       (matrix-client-leave-room con room-data))
+       (let* ((room-id (symbol-name (car room-data)))
+              (room (matrix-client-room-for-id con room-id)))
+         (when (and room (slot-boundp room :buffer))
+           (kill-buffer (oref room :buffer)))))
      (matrix-get 'leave (matrix-get 'rooms data)))
     (mapc
      (lambda (room-data)
@@ -289,6 +302,8 @@ for a username and password."
      (matrix-get 'invite (matrix-get 'rooms data)))
     (let ((next (matrix-get 'next_batch data)))
       (oset con :end-token next)
+      (oset con :last-event-ts (truncate (float-time)))
+      (matrix-client-start-watchdog con)
       (matrix-sync con next nil matrix-client-event-poll-timeout
                    (apply-partially #'matrix-client-sync-handler con)))))
 
@@ -350,24 +365,26 @@ for a username and password."
   (end-of-buffer)
   (let ((inhibit-read-only t))
     (insert "\n")
-    (insert-read-only "[::] ▶ " rear-nonsticky t)))
+    (insert-read-only "[::] ▶ " rear-nonsticky t)
+    (setq buffer-undo-list nil)))
 
 (defun matrix-client-send-active-line ()
   "Send the current message-line text after running it through input-filters."
   (interactive)
-  (end-of-buffer)
-  (beginning-of-line)
-  (re-search-forward "▶")
-  (forward-char)
-  (kill-line)
-  (let* ((room matrix-client-room-object)
-         (con (and (slot-boundp room :con)
-                   (oref room :con)))
-         (input-filters (and (slot-boundp con :input-filters)
-                             (oref con :input-filters))))
-    (reduce 'matrix-client-run-through-input-filter
-            input-filters
-            :initial-value (pop kill-ring))))
+  (let ((buffer-undo-list t))
+    (end-of-buffer)
+    (beginning-of-line)
+    (re-search-forward "▶")
+    (forward-char)
+    (kill-line)
+    (let* ((room matrix-client-room-object)
+           (con (and (slot-boundp room :con)
+                     (oref room :con)))
+           (input-filters (and (slot-boundp con :input-filters)
+                               (oref con :input-filters))))
+      (reduce 'matrix-client-run-through-input-filter
+              input-filters
+              :initial-value (pop kill-ring)))))
 
 (defun matrix-client-run-through-input-filter (text filter)
   "Run each TEXT through a single FILTER.  Used by `matrix-client-send-active-line'."
