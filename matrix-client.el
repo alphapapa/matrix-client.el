@@ -220,20 +220,24 @@ for a username and password."
            (let ((save-func (plist-get found :save-function)))
              (when save-func (funcall save-func)))))))
 
-(defun matrix-client-disconnect ()
+(defun matrix-client-disconnect (&optional con)
   "Disconnect from Matrix and kill all active room buffers."
   (interactive)
-  (dolist (con matrix-client-connections)
-    (dolist (room (oref (cadr con) :rooms))
-      (kill-buffer (oref (cdr room) :buffer)))
-    (oset (cadr con) :running nil)
-    (setq matrix-client-connections (remove* (car con)
-                                             matrix-client-connections
-                                             :test 'equal
-                                             :key 'car))))
+  (let ((discon (lambda (con)
+                  (dolist (room (oref (cadr con) :rooms))
+                    (kill-buffer (oref (cdr room) :buffer)))
+                  (oset (cadr con) :running nil)
+                  (setq matrix-client-connections (remove* (car con)
+                                                           matrix-client-connections
+                                                           :test 'equal
+                                                           :key 'car)))))
+    (if con
+        (funcall discon con)
+      (dolist (con matrix-client-connections)
+        (funcall discon con)))))
 
-(defmethod matrix-client-start-watchdog ((con matrix-client-connection))
-  (when matrix-client-enable-watchdog
+(defmethod matrix-client-start-watchdog ((con matrix-client-connection) &optional force)
+  (when (or force matrix-client-enable-watchdog)
     (let ((last-ts (and (slot-boundp con :last-event-ts)
                         (oref con :last-event-ts)))
           (next (and (slot-boundp con :end-token)
@@ -246,6 +250,8 @@ for a username and password."
                  matrix-client-event-poll-timeout)
               (progn
                 (message "Reconnecting you to Matrix, one monent please.")
+                (cancel-timer timer)
+                ;; XXX Pull these fucking syncs out and bar them on (oref con :running)
                 (matrix-sync con next nil matrix-client-event-poll-timeout
                              (apply-partially #'matrix-client-sync-handler con)))
             (cancel-timer timer)))
