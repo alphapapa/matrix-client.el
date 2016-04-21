@@ -201,11 +201,7 @@ like."
    (matrix-client-update-header-line room)))
 
 (defmatrix-client-handler "m.room.aliases"
-  ((new-alias (matrix-get 'name (matrix-get 'content data)))
-   (old-aliases (and (slot-boundp room :aliases)
-                     (oref room :aliases)))
-   (new-alias-list (append old-aliases
-                           (list new-alias))))
+  ((new-alias-list (matrix-get 'aliases (matrix-get 'content data))))
   ((oset room :aliases new-alias-list)
    (matrix-update-room-name room)
    (insert-read-only "\n")
