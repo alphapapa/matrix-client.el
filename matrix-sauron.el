@@ -85,10 +85,34 @@
 
 (defun matrix-sauron-process-event-with-pushrules (me prio room-id membership content username)
   ;; Process each pushrule type-break
-  (let* ((rules (matrix-get me matrix-sauron-pushrules))
+  (let* ((rules (car (matrix-get me matrix-sauron-pushrules)))
          (final-prio
           (+ prio
              ;; Underride
+             (reduce
+              #'+
+              (map 'list
+                   (lambda (rule)
+                     (if (matrix-get 'enabled rule)
+                         (let* ((actions (matrix-get 'actions rule))
+                                (rule-id (matrix-get 'rule_id rule))
+                                (conditions (matrix-get 'conditions rule))
+                                (score-mod (if (matrix-sfind "dont_notify" actions)
+                                               -5 1)))
+                           ;; Add match conditiopn here.
+                           (reduce (lambda (last cond)
+                                     (let ((kind (matrix-get 'kind cond)))
+                                       (cond ((equal kind "room_member_count")
+                                              (let ((is (matrix-get 'is cond)))
+                                                (message "fir %s" is)
+                                                (if (eq membership
+                                                        (string-to-number is))
+                                                    (+ last score-mod))))
+                                             ;; put shit here.
+                                             (t last))))
+                                   conditions :initial-value 0))
+                       0))
+                   (matrix-get 'underride rules)))
              ;; Rooms
              (reduce
               #'+
