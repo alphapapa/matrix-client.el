@@ -62,7 +62,7 @@
 LOGIN-TYPE is the value for the `type' key.
 ARG-LIST is an alist of additional key/values to add to the submitted JSON."
   (let ((resp (matrix-send con "POST" "/login" (add-to-list 'arg-list (cons "type" login-type)))))
-    (oset con token (cdr (assoc 'access_token resp)))
+    (oset con :token (cdr (assoc 'access_token resp)))
     resp))
 
 (defmethod matrix-login-with-password ((con matrix-connection) username password)
