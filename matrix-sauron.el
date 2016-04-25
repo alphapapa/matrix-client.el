@@ -95,7 +95,8 @@
           (+ prio
              ;; Underride
              (reduce
-              #'+
+              (lambda (rest next)
+                (+ rest (or next 0)))
               (map 'list
                    (lambda (rule)
                      (if (matrix-get 'enabled rule)
