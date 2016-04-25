@@ -163,7 +163,7 @@
 ;; Does it make sense to annotate the callback with the connection it came from? Is it actually even
 ;; feasible to support more than one simultaneous connection?
 (defmethod matrix-add-sauron-event ((con matrix-client-connection) room event)
-  (let* ((room-id (matrix-get 'room_id event))
+  (let* ((room-id (oref room :id))
          (room-obj room)
          (room-buf (oref room :buffer))
          (membership (if (slot-boundp room :membership)
