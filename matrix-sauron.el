@@ -52,19 +52,17 @@
       (progn
         (when sauron-matrix-running
           (error "matrix-sauron is already running. Call sauron-matrix-stop first."))
-        (mapc (lambda (con)
-                (let* ((real-con (cadr con))
-                       (hooks (and (slot-boundp real-con :event-hook)
-                                   (oref real-con :event-hook))))
-                  (matrix-sauron-fetch-rules real-con)
-                  (oset real-con :event-hook (append hooks '(matrix-add-sauron-event)))))
-              matrix-client-connections)
+        (add-to-list 'matrix-client-after-connect-hooks
+                     #'matrix-sauron-after-connect-handler)
         (setq sauron-matrix-running t))
     (message "matrix-client not loadable, so matrix-sauron could not start.")))
 
 (defun matrix-sauron-stop ()
   "Stops and cleans up matrix-sauron."
   (when sauron-matrix-running
+    (setq matrix-client-after-connect-hooks
+          (remove #'matrix-sauron-after-connect-handler
+                  matrix-client-after-connect-hooks))
     (mapc (lambda (con)
             (let* ((real-con (cadr con))
                    (hooks (and (slot-boundp real-con :event-hook)
@@ -72,6 +70,13 @@
               (oset real-con :event-hook (delq #'matrix-add-sauron-event hooks))))
           matrix-client-connections)
     (setq sauron-matrix-running nil)))
+
+(defun matrix-sauron-after-connect-handler (con)
+  (let ((hooks (and (slot-boundp con :event-hook)
+                    (oref con :event-hook))))
+    (matrix-sauron-fetch-rules con)
+    (oset con :event-hook
+          (append hooks '(matrix-add-sauron-event)))))
 
 (defmethod matrix-sauron-fetch-rules  ((con matrix-client-connection))
   "Fetch and parse the push rules from the server."

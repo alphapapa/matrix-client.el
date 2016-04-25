@@ -166,6 +166,9 @@ event-handlers and input-filters.")
 (defvar matrix-client-connections '()
   "Alist of (username . connection)")
 
+(defvar matrix-client-after-connect-hooks nil
+  "A list of functions to run when a new Matrix Client connection occurs.")
+
 (require 'matrix-client-handlers)
 (require 'matrix-client-modes)
 
@@ -188,7 +191,9 @@ event-handlers and input-filters.")
       (matrix-client-inject-event-listeners con)
       (matrix-client-handlers-init con)
       (matrix-sync con nil t matrix-client-event-poll-timeout
-                   (apply-partially #'matrix-client-sync-handler con)))
+                   (apply-partially #'matrix-client-sync-handler con))
+      (dolist (hook matrix-client-after-connect-hooks)
+        (funcall hook con)))
     (add-to-list 'matrix-client-connections (list (oref con :username) con))
     (oset con :running t)
     (message "You're jacked in, welcome to Matrix. Your messages will arrive momentarily.")))
