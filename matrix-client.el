@@ -254,11 +254,14 @@ for a username and password."
           (if (> (* 1000 (- (truncate (float-time)) last-ts)) ;; If we've timed out, re-sync
                  matrix-client-event-poll-timeout)
               (progn
-                (message "Reconnecting you to Matrix, one monent please.")
                 (cancel-timer timer)
                 ;; XXX Pull these fucking syncs out and bar them on (oref con :running)
-                (matrix-sync con next nil matrix-client-event-poll-timeout
-                             (apply-partially #'matrix-client-sync-handler con)))
+                (when (and (slot-boundp con :running)
+                           (oref con :running))
+                  (message "Reconnecting you to Matrix, one monent please.")
+                  (cancel-timer timer)
+                  (matrix-sync con next nil matrix-client-event-poll-timeout
+                               (apply-partially #'matrix-client-sync-handler con))))
             (cancel-timer timer)))
       (oset con :watchdog-timer
             (run-with-timer (/ (* 2 matrix-client-event-poll-timeout) 1000)
