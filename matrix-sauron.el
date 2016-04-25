@@ -109,7 +109,6 @@
                                      (let ((kind (matrix-get 'kind cond)))
                                        (cond ((equal kind "room_member_count")
                                               (let ((is (matrix-get 'is cond)))
-                                                (message "fir %s" is)
                                                 (if (eq membership
                                                         (string-to-number is))
                                                     (+ last score-mod))))
@@ -130,7 +129,6 @@
                                              -5 1)))
                          (if (string-equal room-id rule-id)
                              (progn
-                               (message "%d %s" score-mod rule-id)
                                score-mod)
                            0))))
                    (matrix-get 'room rules)))
@@ -147,9 +145,7 @@
                               (score-mod (if (matrix-sfind "dont_notify" actions)
                                              -5 1)))
                          (if (and body (string-match pattern body))
-                             (progn
-                               (message "%d %s" score-mod rule-id)
-                               score-mod)
+                             score-mod
                            0))))
                    (matrix-get 'content rules)))
              ;; Sender
