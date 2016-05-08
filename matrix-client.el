@@ -187,7 +187,7 @@ event-handlers and input-filters.")
     (unless (and (slot-boundp con :token) (oref con :token))
       (matrix-client-login con username))
     (unless (oref con :running)
-      (matrix-client-start-watchdog con)
+      (matrix-client-start-watchdog con nil 120)
       (matrix-client-inject-event-listeners con)
       (matrix-client-handlers-init con)
       (matrix-sync con nil t matrix-client-event-poll-timeout
@@ -241,7 +241,7 @@ for a username and password."
       (dolist (con matrix-client-connections)
         (funcall discon con)))))
 
-(defmethod matrix-client-start-watchdog ((con matrix-client-connection) &optional force)
+(defmethod matrix-client-start-watchdog ((con matrix-client-connection) &optional force timer-secs)
   (when (or force matrix-client-enable-watchdog)
     (let ((last-ts (and (slot-boundp con :last-event-ts)
                         (oref con :last-event-ts)))
@@ -264,8 +264,8 @@ for a username and password."
                                (apply-partially #'matrix-client-sync-handler con))))
             (cancel-timer timer)))
       (oset con :watchdog-timer
-            (run-with-timer (/ (* 2 matrix-client-event-poll-timeout) 1000)
-                            (/ (* 2 matrix-client-event-poll-timeout) 1000)
+            (run-with-timer (or timer-secs (/ (* 2 matrix-client-event-poll-timeout) 1000))
+                            (or timer-secs (/ (* 2 matrix-client-event-poll-timeout) 1000))
                             (apply-partially #'matrix-client-start-watchdog con))))))
 
 (defmethod matrix-client-setup-room ((con matrix-client-connection) room-id)
