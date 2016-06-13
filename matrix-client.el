@@ -251,8 +251,9 @@ for a username and password."
                       (oref con :watchdog-timer))))
       (if (and (slot-boundp con :watchdog-timer) ;; start timer if not running
                (oref con :watchdog-timer))
-          (if (> (* 1000 (- (truncate (float-time)) last-ts)) ;; If we've timed out, re-sync
-                 matrix-client-event-poll-timeout)
+          (if (and last-ts
+                   (> (* 1000 (- (truncate (float-time)) last-ts)) ;; If we've timed out, re-sync
+                      matrix-client-event-poll-timeout))
               (progn
                 (cancel-timer timer)
                 ;; XXX Pull these fucking syncs out and bar them on (oref con :running)
