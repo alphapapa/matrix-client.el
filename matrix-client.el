@@ -104,6 +104,7 @@ connection basis.")
 ;; (defvar matrix-client-new-event-hook nil
 ;;   )
 
+;;;###autoload
 (defclass matrix-client-connection (matrix-connection)
   ((running :initarg :running
             :initform nil
