@@ -199,7 +199,6 @@ event-handlers and input-filters.")
     (oset con :running t)
     (message "You're jacked in, welcome to Matrix. Your messages will arrive momentarily.")))
 
-;;;###autoload
 (defmethod matrix-client-login ((con matrix-client-connection) &optional username)
   "Get a token form the Matrix homeserver.
 
