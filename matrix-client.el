@@ -43,6 +43,7 @@
 ;;; Code:
 
 (require 'matrix-api)
+(require 'cl-seq)
 
 ;;;###autoload
 (defcustom matrix-client-debug-events nil
@@ -232,10 +233,11 @@ for a username and password."
                   (dolist (room (oref (cadr con) :rooms))
                     (kill-buffer (oref (cdr room) :buffer)))
                   (oset (cadr con) :running nil)
-                  (setq matrix-client-connections (remove* (car con)
-                                                           matrix-client-connections
-                                                           :test 'equal
-                                                           :key 'car)))))
+                  (setq matrix-client-connections
+                        (cl-remove (car con)
+                                   matrix-client-connections
+                                   :test 'equal
+                                   :key 'car)))))
     (if con
         (funcall discon con)
       (dolist (con matrix-client-connections)
@@ -349,7 +351,7 @@ for a username and password."
   (with-current-buffer (get-buffer-create "*matrix-events*")
     (let ((inhibit-read-only t))
       (when matrix-client-debug-events
-        (end-of-buffer)
+        (goto-char (point-max))
         (insert "\n")
         (insert (prin1-to-string data))))))
 
@@ -377,7 +379,7 @@ for a username and password."
 
 (defmethod matrix-client-render-message-line ((room matrix-client-room room))
   "Insert a message input at the end of the buffer."
-  (end-of-buffer)
+  (goto-char (point-max))
   (let ((inhibit-read-only t))
     (insert "\n")
     (insert-read-only "[::] ▶ " rear-nonsticky t)
@@ -387,7 +389,7 @@ for a username and password."
   "Send the current message-line text after running it through input-filters."
   (interactive)
   (let ((buffer-undo-list t))
-    (end-of-buffer)
+    (goto-char (point-max))
     (beginning-of-line)
     (re-search-forward "▶")
     (forward-char)
@@ -397,9 +399,9 @@ for a username and password."
                      (oref room :con)))
            (input-filters (and (slot-boundp con :input-filters)
                                (oref con :input-filters))))
-      (reduce 'matrix-client-run-through-input-filter
-              input-filters
-              :initial-value (pop kill-ring)))))
+      (cl-reduce 'matrix-client-run-through-input-filter
+                 input-filters
+                 :initial-value (pop kill-ring)))))
 
 (defun matrix-client-run-through-input-filter (text filter)
   "Run each TEXT through a single FILTER.  Used by `matrix-client-send-active-line'."
