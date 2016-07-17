@@ -41,7 +41,9 @@
   "This is a list of functions to pass Matrix errors to.")
 
 (defcustom matrix-homeserver-base-url "https://matrix.org"
-  "URI to your Matrix homeserver, defaults to the official homeserver.")
+  "URI to your Matrix homeserver, defaults to the official homeserver."
+  :type 'string
+  :group 'matrix-client)
 
 (defclass matrix-connection ()
   ((base-url :initarg :base-url
@@ -54,7 +56,7 @@
    (txn-id :initarg :txn-id
            :initform 1
            :type integer)))
-(oset-default matrix-connection base-url matrix-homeserver-base-url)
+(oset-default 'matrix-connection base-url matrix-homeserver-base-url)
 
 (defmethod matrix-login ((con matrix-connection) login-type arg-list)
   "Attempt to log in to the Matrix homeserver.

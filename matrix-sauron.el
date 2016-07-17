@@ -35,6 +35,7 @@
 ;;; Code:
 
 (require 'sauron nil 'noerror)
+(require 'cl-lib)
 
 (defvar sauron-prio-matrix-new-messages 2
   "Priority for incoming Matrix events.")
@@ -94,7 +95,7 @@
          (final-prio
           (+ prio
              ;; Underride
-             (reduce
+             (cl-reduce
               (lambda (rest next)
                 (+ rest (or next 0)))
               (map 'list
@@ -106,20 +107,20 @@
                                 (score-mod (if (matrix-sfind "dont_notify" actions)
                                                -5 1)))
                            ;; Add match conditiopn here.
-                           (reduce (lambda (last cond)
-                                     (let ((kind (matrix-get 'kind cond)))
-                                       (cond ((equal kind "room_member_count")
-                                              (let ((is (matrix-get 'is cond)))
-                                                (if (eq membership
-                                                        (string-to-number is))
-                                                    (+ last score-mod))))
-                                             ;; put shit here.
-                                             (t last))))
-                                   conditions :initial-value 0))
+                           (cl-reduce (lambda (last cond)
+                                        (let ((kind (matrix-get 'kind cond)))
+                                          (cond ((equal kind "room_member_count")
+                                                 (let ((is (matrix-get 'is cond)))
+                                                   (if (eq membership
+                                                           (string-to-number is))
+                                                       (+ last score-mod))))
+                                                ;; put shit here.
+                                                (t last))))
+                                      conditions :initial-value 0))
                        0))
                    (matrix-get 'underride rules)))
              ;; Rooms
-             (reduce
+             (cl-reduce
               #'+
               (map 'list
                    (lambda (rule)
@@ -134,7 +135,7 @@
                            0))))
                    (matrix-get 'room rules)))
              ;; Content
-             (reduce
+             (cl-reduce
               #'+
               (map 'list
                    (lambda (rule) 
@@ -175,8 +176,8 @@
          (target (if (buffer-live-p room-buf)
                      (save-excursion
                        (with-current-buffer room-buf
-                         (end-of-buffer)
-                         (previous-line)
+                         (goto-char (point-max))
+                         (forward-line -1)
                          (point-marker))))))
     (when (not (and username (string-match my-username username)))
       (sauron-add-event 'matrix prio

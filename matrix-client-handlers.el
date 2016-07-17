@@ -109,14 +109,14 @@ like."
            ((and matrix-client-render-html (string-equal "org.matrix.custom.html" format))
             (let* ((bufferstring (with-temp-buffer
                                    (insert (matrix-get 'formatted_body content))
-                                   (beginning-of-buffer)
+                                   (goto-char (point-min))
                                    (while (re-search-forward "\\(<br />\\)+" nil t)
                                      (replace-match "<br />"))
-                                   (beginning-of-buffer)
+                                   (goto-char (point-min))
                                    (let* ((document (libxml-parse-html-region (point) (point-max))))
                                      (with-temp-buffer
                                        (shr-insert-document document)
-                                       (beginning-of-buffer)
+                                       (goto-char (point-min))
                                        (delete-blank-lines)
                                        (buffer-string))))))
               (insert-read-only bufferstring)))
@@ -188,7 +188,7 @@ like."
          (display-name (matrix-get 'displayname content)))
     (with-current-buffer (get-buffer-create "*matrix-events*")
       (when matrix-client-render-presence
-        (end-of-buffer)
+        (goto-char (point-max))
         (insert-read-only "\n")
         (insert-read-only (format "%s (%s) --> %s" display-name user-id presence) face matrix-client-metadata)))))
 
