@@ -146,7 +146,7 @@
                               (pattern (matrix-get 'pattern rule))
                               (score-mod (if (matrix-sfind "dont_notify" actions)
                                              -5 1)))
-                         (if (and body (string-match pattern body))
+                         (if (and body (string-match (format "\\b%s\\b" pattern) body))
                              score-mod
                            0))))
                    (matrix-get 'content rules)))
