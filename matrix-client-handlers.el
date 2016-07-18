@@ -123,7 +123,8 @@ like."
            ((string-equal "m.image" msg-type)
             (insert-read-only (matrix-get 'body content))
             (insert-read-only ": ")
-            (insert-read-only (matrix-transform-mxc-uri (matrix-get 'url content))))
+            (insert-read-only (matrix-transform-mxc-uri (or (matrix-get 'url content)
+                                                            (matrix-get 'thumbnail_url content)))))
            (t
             (insert-read-only (matrix-get 'body content)))))))
 
