@@ -245,17 +245,17 @@ for a username and password."
 
 (defmethod matrix-client-start-watchdog ((con matrix-client-connection) &optional force timer-secs)
   (when (or force matrix-client-enable-watchdog)
-    (let ((last-ts (and (slot-boundp con :last-event-ts)
-                        (oref con :last-event-ts)))
+    (let ((last-ts (or (and (slot-boundp con :last-event-ts)
+                            (oref con :last-event-ts))
+                       0))
           (next (and (slot-boundp con :end-token)
                      (oref con :end-token)))
           (timer (and (slot-boundp con :watchdog-timer)
                       (oref con :watchdog-timer))))
       (if (and (slot-boundp con :watchdog-timer) ;; start timer if not running
                (oref con :watchdog-timer))
-          (if (and last-ts
-                   (> (* 1000 (- (truncate (float-time)) last-ts)) ;; If we've timed out, re-sync
-                      matrix-client-event-poll-timeout))
+          (if (> (* 1000 (- (truncate (float-time)) last-ts)) ;; If we've timed out, re-sync
+                 matrix-client-event-poll-timeout)
               (progn
                 (cancel-timer timer)
                 ;; XXX Pull these fucking syncs out and bar them on (oref con :running)
