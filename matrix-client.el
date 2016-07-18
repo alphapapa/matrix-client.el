@@ -43,7 +43,7 @@
 ;;; Code:
 
 (require 'matrix-api)
-(require 'cl-seq)
+(require 'cl-lib)
 
 ;;;###autoload
 (defcustom matrix-client-debug-events nil
