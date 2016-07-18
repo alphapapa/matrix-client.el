@@ -45,8 +45,14 @@
   :type 'string
   :group 'matrix-client)
 
+(defcustom matrix-insecure-connection nil
+  "Whether to use insecure HTTPS connection when connecting to the homeserver."
+  :type 'boolean
+  :group 'matrix-client)
+
 (defclass matrix-connection ()
   ((base-url :initarg :base-url
+             :initform  "https://matrix.org"
              :type string
              :documentation "URI to your Matrix homeserver, defaults to the official homeserver.")
    (token :initarg :token
@@ -56,7 +62,6 @@
    (txn-id :initarg :txn-id
            :initform 1
            :type integer)))
-(oset-default 'matrix-connection base-url matrix-homeserver-base-url)
 
 (defmethod matrix-login ((con matrix-connection) login-type arg-list)
   "Attempt to log in to the Matrix homeserver.
@@ -107,7 +112,8 @@ The return value is the `json-read' response from homeserver."
 
 (defadvice request--curl-command (around matrix-api-request--with-insecure activate)
   "Advise function to add -k to curl call for `matrix-send-event'."
-  (setq ad-return-value (append ad-do-it '("--insecure"))))
+  (when matrix-insecure-connection
+    (setq ad-return-value (append ad-do-it '("--insecure")))))
 
 (defmethod matrix-send-async ((con matrix-connection) method path &optional content query-params headers cb api-version)
   "Perform an asynchronous Matrix API call.
