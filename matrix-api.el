@@ -32,6 +32,7 @@
 
 ;;; Code:
 
+(require 'cl-lib)
 (require 'json)
 (require 'request)
 (require 'matrix-helpers)
@@ -76,7 +77,28 @@ ARG-LIST is an alist of additional key/values to add to the submitted JSON."
   "Given a USERNAME and PASSWORD log in to the homeserver and save the token."
   (matrix-login con "m.login.password" (list (cons "user" username) (cons "password" password))))
 
-(defmethod matrix-send ((con matrix-connection) method path &optional content query-params headers api-version)
+(cl-defmethod matrix-request-error-handler
+    ((con matrix-connection) &rest args &key error-thrown symbol-status
+     &allow-other-keys)
+  ;; Call err handler functions
+  (dolist (handler matrix-error-hook)
+    (funcall handler con symbol-status error-thrown))
+  ;; Message some warnings if we know what it is
+  (let ((exit-code (matrix-parse-curl-exit-code (cdr error-thrown))))
+    (cond ((or (eq exit-code 51)
+               (eq exit-code 60))
+           (message
+            "Error sending request to matrix homeserver, SSL certificate is invalid"))
+          ((eq nil exit-code)
+           (message
+            "Unknown error occurred sending request to matrix homeserver: %S"
+            error-thrown))
+          (t
+           (message "Matrix request exited with exit code %d" exit-code)))))
+
+(defmethod matrix-send
+  ((con matrix-connection) method path &optional content
+   query-params headers api-version)
   "Send an event to the matrix homeserver.
 
 METHOD is the HTTP method the given API endpoint PATH uses.
@@ -88,32 +110,41 @@ headers to add to the request.
 The return value is the `json-read' response from homeserver."
   (let* ((token (and (slot-boundp con :token) (oref con :token)))
          (query-params (when token
-                         (add-to-list 'query-params (cons "access_token" token))))
+                         (add-to-list 'query-params
+                                      (cons "access_token" token))))
          (url-request-data (when content (json-encode content)))
          (endpoint (concat (matrix-homeserver-api-url api-version) path)))
     (ad-activate 'request--curl-command)
-    (let ((response (cond ((string-equal "GET" (upcase method))
-                           (request endpoint
-                                    :type (upcase method)
-                                    :params query-params
-                                    :sync t
-                                    :parser 'json-read))
-                          ((or (string-equal "POST" (upcase method))
-                               (string-equal "PUT" (upcase method)))
-                           (request endpoint
-                                    :type (upcase method)
-                                    :params query-params
-                                    :sync t
-                                    :data (json-encode content)
-                                    :headers (add-to-list 'headers '("Content-Type" . "application/json"))
-                                    :parser 'json-read)))))
+    (let ((response
+           (cond ((string-equal "GET" (upcase method))
+                  (request endpoint
+                           :type (upcase method)
+                           :params query-params
+                           :sync t
+                           :error
+                           (apply-partially #'matrix-request-error-handler con)
+                           :parser 'json-read))
+                 ((or (string-equal "POST" (upcase method))
+                      (string-equal "PUT" (upcase method)))
+                  (request endpoint
+                           :type (upcase method)
+                           :params query-params
+                           :sync t
+                           :error
+                           (apply-partially #'matrix-request-error-handler con)
+                           :data (json-encode content)
+                           :headers
+                           (add-to-list 'headers
+                                        '("Content-Type" . "application/json"))
+                           :parser 'json-read)))))
       (ad-deactivate 'request--curl-command)
       (request-response-data response))))
 
 (defadvice request--curl-command (around matrix-api-request--with-insecure activate)
   "Advise function to add -k to curl call for `matrix-send-event'."
-  (when matrix-insecure-connection
-    (setq ad-return-value (append ad-do-it '("--insecure")))))
+  (if matrix-insecure-connection
+      (setq ad-return-value (append ad-do-it '("--insecure")))
+    ad-do-it))
 
 (defmethod matrix-send-async ((con matrix-connection) method path &optional content query-params headers cb api-version)
   "Perform an asynchronous Matrix API call.
@@ -134,6 +165,7 @@ call completes"
                        (add-to-list 'query-params (cons "access_token" token)))
              :parser 'json-read
              :data (json-encode content)
+             :error (apply-partially #'matrix-request-error-handler con)
              :headers (add-to-list 'headers '("Content-Type" . "application/json"))
              :complete (apply-partially #'matrix-async-cb-router cb con))
     (ad-deactivate 'request--curl-command)))
