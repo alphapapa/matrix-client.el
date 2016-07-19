@@ -1,1 +1,3 @@
 *.elc
+.ert-runner
+.cask
