@@ -57,5 +57,16 @@
   (let ((room (matrix-get room-id (oref con :rooms))))
     room))
 
+(defun matrix-parse-curl-exit-code (str)
+  "Parse the CURL exit code from the response text passed from
+request. Returns `nil' if no exit code is found."
+  (let (exit-code)
+    (condition-case ex
+        (progn
+          (string-match "exited abnormally with code \\([[:digit:]]+\\).*" str)
+          (setq exit-code (string-to-int (match-string-no-properties 1 str))))
+      ('error (setq exit-code nil)))
+    exit-code))
+
 (provide 'matrix-helpers)
 ;;; matrix-helpers.el ends here
