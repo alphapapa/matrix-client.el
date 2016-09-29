@@ -232,18 +232,17 @@ like."
     (or displayname
         user-id)))
 
-(defun matrix-client-input-filter-join (text)
+(defun matrix-client-input-filter-join (con text)
   "Input filter to handle JOINs.  Filters TEXT."
   (if (string-match "^/j\\(oin\\)? +\\(.*\\)" text)
       (progn
         (let ((room (substring text (match-beginning 2) (match-end 2))))
-          (matrix-client-set-up-room
-           (matrix-sync-room
-            (matrix-join-room room))))
+          (matrix-join-room con room)
+          (matrix-client-setup-room con room))
         nil)
     text))
 
-(defun matrix-client-input-filter-leave (text)
+(defun matrix-client-input-filter-leave (con text)
   "Input filter to handle LEAVEs.  Filters TEXT."
   (let ((room-id (and (slot-boundp matrix-client-room-object :id)
                       (oref matrix-client-room-object :id)))
@@ -256,7 +255,7 @@ like."
           nil)
       text)))
 
-(defun matrix-client-input-filter-part (text)
+(defun matrix-client-input-filter-part (con text)
   "Input filter to handle PARTs.  Filters TEXT."
   (let ((room-id (and (slot-boundp matrix-client-room-object :id)
                       (oref matrix-client-room-object :id)))
@@ -269,7 +268,7 @@ like."
           nil)
       text)))
 
-(defun matrix-client-input-filter-emote (text)
+(defun matrix-client-input-filter-emote (con text)
   "Input filter to handle emotes.  Filters TEXT."
   (if (string-match "^/me +\\(.*\\)" text)
       (let ((emote (substring text (match-beginning 1) (match-end 1)))

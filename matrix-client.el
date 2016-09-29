@@ -151,7 +151,7 @@ event-handlers and input-filters.")
    (name :initarg :room-name
          :documentation "The name of the buffer's room.")
    (aliases :initarg :aliases
-            :documentation "The alises of the buffer's room.") 
+            :documentation "The alises of the buffer's room.")
    (topic :initarg :topic
           :documentation "The topic of the buffer's room.")
    (id :initarg :id
@@ -327,7 +327,7 @@ for a username and password."
 (defmethod matrix-client-room-event ((room matrix-client-room) event)
   "Handle state events from a sync."
   (let* ((con (oref room :con)))
-    (when (slot-boundp con :event-hook) 
+    (when (slot-boundp con :event-hook)
       (mapc (lambda (hook)
               (funcall hook con room event))
             (oref con :event-hook)))))
@@ -405,10 +405,11 @@ for a username and password."
 
 (defun matrix-client-run-through-input-filter (text filter)
   "Run each TEXT through a single FILTER.  Used by `matrix-client-send-active-line'."
-  (when text
-    (funcall filter text)))
+  (let ((con (oref matrix-client-room-object :con)))
+    (when text
+      (funcall filter con text))))
 
-(defun matrix-client-send-to-current-room (text)
+(defun matrix-client-send-to-current-room (con text)
   "Send a string TEXT to the current buffer's room."
   (let ((room matrix-client-room-object)
         (con (and room
@@ -429,4 +430,3 @@ for a username and password."
 
 (provide 'matrix-client)
 ;;; matrix-client.el ends here
-
