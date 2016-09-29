@@ -160,17 +160,17 @@ like."
   people in it use the membership for the buffer name."
   (let* ((username (and (slot-boundp (oref room :con) :username)
                         (oref (oref room :con) :username)))
-         (name (cond ((and (slot-boundp room :room-name)
+         (name (cond ((and (slot-boundp room :room-name) ;; explicit room-name set
                            (> (length (oref room :room-name)) 0))
                       (oref room :room-name))
-                     ((and (slot-boundp room :aliases)
+                     ((and (slot-boundp room :aliases) ;; explicit alias set
                            (> (length (oref room :aliases)) 0))
                       (elt (oref room :aliases) 0))
-                     ((and (slot-boundp room :membership)
+                     ((and (slot-boundp room :membership) ;; 1/1 chat
                            (eq (length (oref room :membership)) 2))
                       (let* ((user (elt (matrix-client-filter
                                          (lambda (member)
-                                           (not (eq username (first member))))
+                                           (not (equal username (first member))))
                                          (oref room :membership))
                                         0))
                              (buf (or (matrix-get 'displayname user)
