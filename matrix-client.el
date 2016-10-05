@@ -254,7 +254,7 @@ for a username and password."
                       (oref con :watchdog-timer))))
       (if (and (slot-boundp con :watchdog-timer) ;; start timer if not running
                (oref con :watchdog-timer))
-          (if (> (* 1000 (- (truncate (float-time)) last-ts)) ;; If we've timed out, re-sync
+          (if (> (* 1000 (- (float-time) last-ts)) ;; If we've timed out, re-sync
                  matrix-client-event-poll-timeout)
               (progn
                 (cancel-timer timer)
@@ -319,7 +319,7 @@ for a username and password."
      (matrix-get 'invite (matrix-get 'rooms data)))
     (let ((next (matrix-get 'next_batch data)))
       (oset con :end-token next)
-      (oset con :last-event-ts (truncate (float-time)))
+      (oset con :last-event-ts  (float-time))
       (matrix-client-start-watchdog con)
       (matrix-sync con next nil matrix-client-event-poll-timeout
                    (apply-partially #'matrix-client-sync-handler con)))))
