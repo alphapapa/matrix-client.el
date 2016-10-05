@@ -77,9 +77,9 @@ ARG-LIST is an alist of additional key/values to add to the submitted JSON."
   "Given a USERNAME and PASSWORD log in to the homeserver and save the token."
   (matrix-login con "m.login.password" (list (cons "user" username) (cons "password" password))))
 
-(cl-defmethod matrix-request-error-handler
-    ((con matrix-connection) &rest args &key error-thrown symbol-status
-     &allow-other-keys)
+(cl-defun matrix-request-error-handler
+    (con &rest args &key error-thrown symbol-status
+         &allow-other-keys)
   ;; Call err handler functions
   (dolist (handler matrix-error-hook)
     (funcall handler con symbol-status error-thrown))
