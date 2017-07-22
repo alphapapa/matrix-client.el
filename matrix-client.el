@@ -357,16 +357,18 @@ for a username and password."
 
 (defun matrix-client-update-header-line (room)
   "Update the header line of the current buffer."
-  (let ((typers (and (slot-boundp room :typers)
-                     (oref room :typers)))
-        (name (and (slot-boundp room :room-name)
+	;; Disable when tabbar mode is on
+	(unless (and (boundp 'tabbar-mode) tabbar-mode)
+		(let ((typers (and (slot-boundp room :typers)
+										(oref room :typers)))
+					 (name (and (slot-boundp room :room-name)
                    (oref room :room-name)))
-        (topic (and (slot-boundp room :topic)
+					 (topic (and (slot-boundp room :topic)
                     (oref room :topic))))
-    (if (> 0 (length typers))
+			(if (> 0 (length typers))
         (progn
           (setq header-line-format (format "(%d typing...) %s: %s" (length typers) name topic)))
-      (setq header-line-format (format "%s: %s" name topic)))))
+				(setq header-line-format (format "%s: %s" name topic))))))
 
 ;;;###autoload
 (defmacro insert-read-only (text &rest extra-props)
