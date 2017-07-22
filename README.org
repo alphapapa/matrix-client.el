@@ -1,4 +1,17 @@
-#+TITLE: Matrix.el - Emacs-Lisp interface to the Matrix Distributed Chat
+#+TITLE: [LEGACY] Matrix.el
+
+* Preface
+
+This is a fork of the [[https://home.rix.si/git/rrix/matrix-client][original matrix.el client]], to attempt to resurrect
+it. It's probably not going to succeed though.
+
+Most of the additions I'm going to be adding are going to be for myself only, so
+they'll probably break other people's usage of it.
+
+Ideally, I'll make a *new* matrix.el on the python sdk, but that will have to
+wait for another day.
+
+Below is the original README. Hopefully this helps someone, but it's unlikely.
 
 * Installation
 
