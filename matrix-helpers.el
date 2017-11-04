@@ -29,6 +29,29 @@
 
 ;;; Code:
 
+;;;; Macros
+
+(defmacro oref* (&rest slots)
+  "Access SLOTS of nested EIEIO objects.
+The first of SLOTS should be an object, while the rest should be
+slot symbols.  Accessing each slot should return an object for
+which the next slot is valid, except for the last slot, which may
+return any value."
+  (cl-labels ((rec (slots)
+                   `(oref ,(if (and (consp (cdr slots))
+                                    (cddr slots))
+                               (rec (cdr slots))
+                             (cadr slots))
+                          ,(car slots))))
+    (rec (nreverse slots))))
+
+(defmacro stringq++ (target new)
+  "Concat NEW string onto the end of TARGET string.
+TARGET is modified in-place.  Symbols should not be quoted."
+  `(setq ,target (concat ,target ,new)))
+
+;;;; Functions
+
 (defun matrix-homeserver-api-url (&optional version)
   "Message `matrix-homeserver-base-url' in to a fully-qualified API endpoint URL."
   (let ((version (or version "api/v1")))

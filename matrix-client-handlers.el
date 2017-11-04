@@ -95,38 +95,62 @@ like."
 (defmatrix-client-handler "m.room.message"
   ((content (matrix-get 'content data))
    (msg-type (matrix-get 'msgtype content))
-   (format (matrix-get 'format content)))
-  ((insert-read-only "\n")
-   (insert-read-only (format "[::] %s %s> "
-                             (format-time-string
-                              "[%T]" (seconds-to-time (/ (matrix-get 'origin_server_ts data) 1000)))
-                             (matrix-client-displayname-from-user-id
-                              room (matrix-get 'sender data))) face matrix-client-metadata)
-   (when content
-     (cond ((string-equal "m.emote" msg-type)
-            (insert-read-only "* ")
-            (insert-read-only (matrix-get 'body content)))
-           ((and matrix-client-render-html (string-equal "org.matrix.custom.html" format))
-            (let* ((bufferstring (with-temp-buffer
-                                   (insert (matrix-get 'formatted_body content))
-                                   (goto-char (point-min))
-                                   (while (re-search-forward "\\(<br />\\)+" nil t)
-                                     (replace-match "<br />"))
-                                   (goto-char (point-min))
-                                   (let* ((document (libxml-parse-html-region (point) (point-max))))
-                                     (with-temp-buffer
-                                       (shr-insert-document document)
-                                       (goto-char (point-min))
-                                       (delete-blank-lines)
-                                       (buffer-string))))))
-              (insert-read-only bufferstring)))
-           ((string-equal "m.image" msg-type)
-            (insert-read-only (matrix-get 'body content))
-            (insert-read-only ": ")
-            (insert-read-only (matrix-transform-mxc-uri (or (matrix-get 'url content)
-                                                            (matrix-get 'thumbnail_url content)))))
-           (t
-            (insert-read-only (matrix-get 'body content)))))))
+   (format (matrix-get 'format content))
+   (timestamp (/ (matrix-get 'origin_server_ts data) 1000))
+   (sender (matrix-get 'sender data))
+   (display-name (matrix-client-displayname-from-user-id room (matrix-get 'sender data)))
+   (own-display-name (oref* room :con :username)))
+
+  ((let (metadata output)
+     (setq metadata (format "%s %s> "
+                            (format-time-string
+                             "[%T]" (seconds-to-time timestamp))
+                            display-name))
+     (when content
+       (cond ((string-equal "m.emote" msg-type)
+              (stringq++ output "* ")
+              (stringq++ output (matrix-get 'body content)))
+             ((and matrix-client-render-html (string-equal "org.matrix.custom.html" format))
+              (let* ((bufferstring (with-temp-buffer
+                                     (insert (matrix-get 'formatted_body content))
+                                     (goto-char (point-min))
+                                     (while (re-search-forward "\\(<br />\\)+" nil t)
+                                       (replace-match "<br />"))
+                                     (goto-char (point-min))
+                                     (let* ((document (libxml-parse-html-region (point) (point-max))))
+                                       (with-temp-buffer
+                                         (shr-insert-document document)
+                                         (goto-char (point-min))
+                                         (delete-blank-lines)
+                                         (buffer-string))))))
+                (stringq++ output bufferstring)))
+             ((string-equal "m.image" msg-type)
+              (stringq++ output (matrix-get 'body content))
+              (stringq++ output ": ")
+              (stringq++ output (matrix-transform-mxc-uri (or (matrix-get 'url content)
+                                                              (matrix-get 'thumbnail_url content)))))
+             (t
+              (stringq++ output (matrix-get 'body content)))))
+
+     ;; Apply face for own messages
+     (let (metadata-face message-face)
+       (if (string= display-name own-display-name)
+           (setq metadata-face 'matrix-client-own-metadata
+                 message-face 'matrix-client-own-messages)
+         (setq metadata-face 'matrix-client-metadata
+               message-face 'default))
+       (add-face-text-property 0 (length metadata) metadata-face nil metadata)
+       (add-face-text-property 0 (length output) message-face nil output))
+     ;; Add metadata to output
+     (setq output (concat metadata output))
+     ;; Add text properties
+     (setq output (propertize output
+                              'timestamp timestamp
+                              'display-name display-name
+                              'sender sender))
+     ;; Actually insert text
+     (insert-read-only "\n")
+     (insert-read-only output))))
 
 (defmatrix-client-handler "m.lightrix.pattern"
   ((content (matrix-get 'content data)))
