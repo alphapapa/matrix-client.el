@@ -51,5 +51,19 @@
   "Face for chat metadata properties."
   :group 'matrix-client-faces)
 
+(defface matrix-client-own-metadata
+  '((((class color) (background light)) (:foreground "#268bd2" :weight bold))
+    (((class color) (background dark)) (:foreground "#268bd2" :weight bold))
+    (t (:weight bold)))
+  "Face for user's own chat metadata properties."
+  :group 'matrix-client-faces)
+
+(defface matrix-client-own-messages
+  '((((class color) (background light)) (:foreground "#586e75" :weight bold :slant italic))
+    (((class color) (background dark)) (:foreground "#586e75" :weight bold :slant italic))
+    (t (:weight bold :slant italic)))
+  "Face for user's own chat messages."
+  :group 'matrix-client-faces)
+
 (provide 'matrix-client-modes)
 ;;; matrix-client-modes.el ends here
