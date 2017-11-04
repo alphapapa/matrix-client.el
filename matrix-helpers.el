@@ -45,11 +45,6 @@ return any value."
                           ,(car slots))))
     (rec (nreverse slots))))
 
-(defmacro stringq++ (target new)
-  "Concat NEW string onto the end of TARGET string.
-TARGET is modified in-place.  Symbols should not be quoted."
-  `(setq ,target (concat ,target ,new)))
-
 ;;;; Functions
 
 (defun matrix-homeserver-api-url (&optional version)

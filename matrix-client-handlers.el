@@ -107,30 +107,28 @@ like."
                              "[%T]" (seconds-to-time timestamp))
                             display-name))
      (when content
-       (cond ((string-equal "m.emote" msg-type)
-              (stringq++ output "* ")
-              (stringq++ output (matrix-get 'body content)))
-             ((and matrix-client-render-html (string-equal "org.matrix.custom.html" format))
-              (let* ((bufferstring (with-temp-buffer
-                                     (insert (matrix-get 'formatted_body content))
-                                     (goto-char (point-min))
-                                     (while (re-search-forward "\\(<br />\\)+" nil t)
-                                       (replace-match "<br />"))
-                                     (goto-char (point-min))
-                                     (let* ((document (libxml-parse-html-region (point) (point-max))))
-                                       (with-temp-buffer
-                                         (shr-insert-document document)
-                                         (goto-char (point-min))
-                                         (delete-blank-lines)
-                                         (buffer-string))))))
-                (stringq++ output bufferstring)))
-             ((string-equal "m.image" msg-type)
-              (stringq++ output (matrix-get 'body content))
-              (stringq++ output ": ")
-              (stringq++ output (matrix-transform-mxc-uri (or (matrix-get 'url content)
-                                                              (matrix-get 'thumbnail_url content)))))
-             (t
-              (stringq++ output (matrix-get 'body content)))))
+       (setq output (pcase msg-type
+                      ("m.emote"
+                       (concat "* " (matrix-get 'body content)))
+                      ((guard (and matrix-client-render-html (string= "org.matrix.custom.html" format)))
+                       (with-temp-buffer
+                         (insert (matrix-get 'formatted_body content))
+                         (goto-char (point-min))
+                         (while (re-search-forward "\\(<br />\\)+" nil t)
+                           (replace-match "<br />"))
+                         (let ((document (libxml-parse-html-region (point) (point-max))))
+                           (erase-buffer)
+                           (shr-insert-document document)
+                           (goto-char (point-min))
+                           (delete-blank-lines)
+                           (buffer-string))))
+                      ("m.image"
+                       (concat (matrix-get 'body content)
+                               ": "
+                               (matrix-transform-mxc-uri (or (matrix-get 'url content)
+                                                             (matrix-get 'thumbnail_url content)))))
+                      (t
+                       (matrix-get 'body content)))))
 
      ;; Apply face for own messages
      (let (metadata-face message-face)
