@@ -54,13 +54,6 @@
   :type 'boolean
   :group 'matrix-client)
 
-(defadvice request--curl-command (around matrix-api-request--with-insecure activate)
-  "Advise function to add -k to curl call for `matrix-send-event'."
-  ;; TODO: bind `request-curl-options' around call instead of using advice
-  (if matrix-insecure-connection
-      (setq ad-return-value (append ad-do-it '("--insecure")))
-    ad-do-it))
-
 (defclass matrix-connection ()
   ((base-url :initarg :base-url
              :initform  "https://matrix.org"
@@ -120,27 +113,27 @@ The return value is the `json-read' response from homeserver."
          (method (upcase method)))
     (when token
       (map-put query-params "access_token" token))
-    ;; TODO: bind `request-curl-options' around call instead of using advice
-    (ad-activate 'request--curl-command)
-    (let ((response (pcase method
-                      ("GET"
-                       (request endpoint
-                                :type method
-                                :params query-params
-                                :sync t
-                                :error (apply-partially #'matrix-request-error-handler con)
-                                :parser 'json-read))
-                      ((or "POST" "PUT")
-                       (request endpoint
-                                :type method
-                                :params query-params
-                                :sync t
-                                :error (apply-partially #'matrix-request-error-handler con)
-                                :data (json-encode content)
-                                :headers (map-put headers "Content-Type" "application/json")
-                                :parser 'json-read)))))
-      (ad-deactivate 'request--curl-command)
-      (request-response-data response))))
+    (let ((request-curl-options request-curl-options))
+      (when matrix-insecure-connection
+        (push "--insecure" request-curl-options))
+      (request-response-data
+       (pcase method
+         ("GET"
+          (request endpoint
+                   :type method
+                   :params query-params
+                   :sync t
+                   :error (apply-partially #'matrix-request-error-handler con)
+                   :parser 'json-read))
+         ((or "POST" "PUT")
+          (request endpoint
+                   :type method
+                   :params query-params
+                   :sync t
+                   :error (apply-partially #'matrix-request-error-handler con)
+                   :data (json-encode content)
+                   :headers (map-put headers "Content-Type" "application/json")
+                   :parser 'json-read)))))))
 
 (cl-defmethod matrix-send-async ((con matrix-connection) method path
                                  &optional content query-params headers callback api-version)
@@ -153,11 +146,12 @@ optional alist of URL parameters.  HEADERS is optional HTTP
 headers to add to the request.  CALLBACK is the callback which
 will be called by `request' when the call completes"
   (let* ((token (oref con token))
-         (endpoint (concat (matrix-homeserver-api-url api-version) path)))
+         (endpoint (concat (matrix-homeserver-api-url api-version) path))
+         (request-curl-options request-curl-options))
+    (when matrix-insecure-connection
+      (push "--insecure" request-curl-options))
     (when token
       (map-put query-params "access_token" token))
-    ;; TODO: bind `request-curl-options' around call instead of using advice
-    (ad-activate 'request--curl-command)
     (request endpoint
              :type (upcase method)
              :params query-params
@@ -165,8 +159,7 @@ will be called by `request' when the call completes"
              :data (json-encode content)
              :error (apply-partially #'matrix-request-error-handler con)
              :headers (map-put headers "Content-Type" "application/json")
-             :complete (apply-partially #'matrix-async-cb-router callback con))
-    (ad-deactivate 'request--curl-command)))
+             :complete (apply-partially #'matrix-async-cb-router callback con))))
 
 (cl-defun matrix-async-cb-router (callback con &key data error-thrown symbol-status &allow-other-keys)
   (if (or error-thrown
