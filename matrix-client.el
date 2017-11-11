@@ -180,12 +180,10 @@ event-handlers and input-filters.")
   (interactive "i")
   (let* ((base-url matrix-homeserver-base-url)
          ;; Pass a username in to get an existing connection
-         (con (when username
-                (matrix-get username matrix-client-connections)))
-         (con (unless con
-                (matrix-client-connection
-                 matrix-homeserver-base-url
-                 :base-url matrix-homeserver-base-url))))
+         (con (if username
+                  (map-elt matrix-client-connections username)
+                (matrix-client-connection matrix-homeserver-base-url
+                                          :base-url matrix-homeserver-base-url))))
     (unless (and (slot-boundp con :token) (oref con :token))
       (matrix-client-login con username))
     (unless (oref con :running)
