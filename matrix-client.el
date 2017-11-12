@@ -192,9 +192,8 @@ event-handlers and input-filters.")
       (matrix-client-handlers-init con)
       (matrix-sync con nil t matrix-client-event-poll-timeout
                    (apply-partially #'matrix-client-sync-handler con))
-      (dolist (hook matrix-client-after-connect-hooks)
-        (funcall hook con)))
-    (add-to-list 'matrix-client-connections (list (oref con :username) con))
+      (run-hook-with-args 'matrix-client-after-connect-hooks con))
+    (map-put matrix-client-connections (oref con :username) con)
     (oset con :running t)
     (message "You're jacked in, welcome to Matrix. Your messages will arrive momentarily.")))
 
