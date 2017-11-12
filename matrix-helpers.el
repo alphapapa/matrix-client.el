@@ -45,6 +45,24 @@ return any value."
                           ,(car slots))))
     (rec (nreverse slots))))
 
+(defmacro oset-multi (object &rest pairs)
+  "Set slot values for OBJECT.
+PAIRS should be of the form (SLOT VALUE SLOT VALUE...)."
+  (declare (indent defun))
+  `(progn
+     ,@(cl-loop for (slot value) on pairs by #'cddr
+                collect (list 'oset object slot value))))
+
+(defmacro a-get* (&rest keys)
+  ;; See https://github.com/plexus/a.el/issues/7
+  (cl-labels ((rec (keys)
+                   `(a-get ,(if (and (consp (cdr keys))
+                                     (cddr keys))
+                                (rec (cdr keys))
+                              (cadr keys))
+                           ,(car keys))))
+    (rec (nreverse keys))))
+
 ;;;; Functions
 
 (defun matrix-homeserver-api-url (&optional version)
