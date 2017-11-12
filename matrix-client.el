@@ -7,7 +7,7 @@
 ;; Keywords: web
 ;; Homepage: http://doc.rix.si/matrix.html
 ;; Package-Version: 0.1.2
-;; Package-Requires: ((emacs "25.1") (json "1.4") (request "0.2.0") (a "0.1.0"))
+;; Package-Requires: ((emacs "25.1") (dash "2.13.0") (json "1.4") (request "0.2.0") (a "0.1.0"))
 
 ;; This file is not part of GNU Emacs.
 
@@ -44,6 +44,9 @@
 
 (require 'matrix-api)
 (require 'cl-lib)
+(require 'seq)
+
+(require 'dash)
 
 ;;;###autoload
 (defcustom matrix-client-debug-events nil
@@ -219,22 +222,23 @@ and password."
       (when-let ((save-func (plist-get found :save-function)))
         (funcall save-func)))))
 
-(defun matrix-client-disconnect (&optional con)
-  "Disconnect from Matrix and kill all active room buffers."
+(defun matrix-client-disconnect (&optional connection)
+  "Disconnect from CONNECTION or all Matrix connections, killing room buffers."
   (interactive)
-  (let ((discon (lambda (con)
-                  (dolist (room (oref (cadr con) :rooms))
-                    (kill-buffer (oref (cdr room) :buffer)))
-                  (oset (cadr con) :running nil)
-                  (setq matrix-client-connections
-                        (cl-remove (car con)
-                                   matrix-client-connections
-                                   :test 'equal
-                                   :key 'car)))))
-    (if con
-        (funcall discon con)
-      (dolist (con matrix-client-connections)
-        (funcall discon con)))))
+  (let ((connections (if connection
+                         (list (cons nil connection))
+                       matrix-client-connections)))
+    (cl-loop for (_ . con) in connections
+             do (progn
+                  ;; TODO: Improve the structure of these lists.  It
+                  ;; feels inconsistent and confusing.
+                  (cl-loop for (_ . room) in (oref con :rooms)
+                           do (kill-buffer (oref room :buffer)))
+                  (oset con :running nil)))
+    (setq matrix-client-connections (seq-difference matrix-client-connections
+                                                    connections
+                                                    (-lambda ((_ . a-con) (_ . b-con))
+                                                      (equal (oref a-con :token) (oref b-con :token)))))))
 
 (defmethod matrix-client-start-watchdog ((con matrix-client-connection) &optional force timer-secs)
   (when (or force matrix-client-enable-watchdog)
