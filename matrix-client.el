@@ -197,31 +197,27 @@ event-handlers and input-filters.")
     (oset con :running t)
     (message "You're jacked in, welcome to Matrix. Your messages will arrive momentarily.")))
 
-(defmethod matrix-client-login ((con matrix-client-connection) &optional username)
-  "Get a token form the Matrix homeserver.
-
-If [`matrix-client-use-auth-source'] is non-nil, attempt to log in
-using data from auth-source. Otherwise, the user will be prompted
-for a username and password."
-  (let* ((auth-source-creation-prompts
-          '((username . "Matrix identity: ")
-            (secret . "Matrix password for %u (homeserver: %h): ")))
+(cl-defmethod matrix-client-login ((con matrix-client-connection) &optional username)
+  "Login to Matrix connection CON and get a token.
+If [`matrix-client-use-auth-source'] is non-nil, attempt to log
+in using data from auth-source.  Otherwise, prompt for username
+and password."
+  (let* ((auth-source-creation-prompts (a-list 'username "Matrix identity: "
+                                               'secret "Matrix password for %u (homeserver: %h): "))
          (found (nth 0 (auth-source-search :max 1
                                            :host (oref con :base-url)
                                            :user username
                                            :require '(:user :secret)
                                            :create t))))
-    (when (and
-           found
-           (matrix-login-with-password con
-                                       (plist-get found :user)
-                                       (let ((secret (plist-get found :secret)))
-                                         (if (functionp secret)
-                                             (funcall secret)
-                                           secret)))
-           (oset con :username (plist-get found :user))
-           (let ((save-func (plist-get found :save-function)))
-             (when save-func (funcall save-func)))))))
+    (when (and found
+               (matrix-login-with-password con (plist-get found :user)
+                                           (let ((secret (plist-get found :secret)))
+                                             (if (functionp secret)
+                                                 (funcall secret)
+                                               secret))))
+      (oset con :username (plist-get found :user))
+      (when-let ((save-func (plist-get found :save-function)))
+        (funcall save-func)))))
 
 (defun matrix-client-disconnect (&optional con)
   "Disconnect from Matrix and kill all active room buffers."
