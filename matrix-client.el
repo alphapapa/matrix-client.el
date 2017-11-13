@@ -340,14 +340,13 @@ and password."
     (oset con :event-hook '(matrix-client-debug-event-maybe
                             matrix-client-render-event-to-room))))
 
-(defmethod matrix-client-debug-event-maybe ((con matrix-client-connection) room data)
+(cl-defmethod matrix-client-debug-event-maybe ((con matrix-client-connection) room data)
   "Debug DATA to *matrix-events* if `matrix-client-debug-events' is non-nil."
-  (with-current-buffer (get-buffer-create "*matrix-events*")
-    (let ((inhibit-read-only t))
-      (when matrix-client-debug-events
+  (when matrix-client-debug-events
+    (with-current-buffer (get-buffer-create "*matrix-events*")
+      (let ((inhibit-read-only t))
         (goto-char (point-max))
-        (insert "\n")
-        (insert (prin1-to-string data))))))
+        (insert "\n" (prin1-to-string data))))))
 
 (defun matrix-client-update-header-line (room)
   "Update the header line of the current buffer."
