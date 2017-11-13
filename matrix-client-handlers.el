@@ -268,19 +268,6 @@ Return nil if room is left, otherwise TEXT."
           nil))
     text))
 
-(defun matrix-client-input-filter-part (con text)
-  "Input filter to handle PARTs.  Filters TEXT."
-  (let ((room-id (and (slot-boundp matrix-client-room-object :id)
-                      (oref matrix-client-room-object :id)))
-        (con (and (slot-boundp matrix-client-room-object :con)
-                  (oref matrix-client-room-object :con))))
-    (if (and (string-match "^/part.*" text)
-             (matrix-part-room con room-id))
-        (progn
-          (kill-buffer)
-          nil)
-      text)))
-
 (defun matrix-client-input-filter-emote (con text)
   "Input filter to handle emotes.  Filters TEXT."
   (if (string-match "^/me +\\(.*\\)" text)
