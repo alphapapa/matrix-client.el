@@ -165,6 +165,7 @@ event-handlers and input-filters.")
    (topic :initarg :topic
           :documentation "The topic of the buffer's room.")
    (id :initarg :id
+       :initform nil
        :documentation "The Matrix ID of the buffer's room.")
    (typers :initarg :typers)
    (membership :initarg :membership
@@ -419,9 +420,8 @@ and password."
   (let ((room matrix-client-room-object)
         (con (when room
                (oref room :con)))
-        (id (and room
-                 (slot-boundp room :id)
-                 (oref room :id))))
+        (id (when room
+              (oref room :id))))
     (matrix-send-message con id text)))
 
 (defun matrix-client-window-change-hook ()
