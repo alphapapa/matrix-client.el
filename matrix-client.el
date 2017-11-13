@@ -159,10 +159,13 @@ event-handlers and input-filters.")
            :initform nil
            :documentation "The buffer that contains the room's chat session")
    (name :initarg :room-name
+         :initform nil
          :documentation "The name of the buffer's room.")
    (aliases :initarg :aliases
+            :initform nil
             :documentation "The alises of the buffer's room.")
    (topic :initarg :topic
+          :initform nil
           :documentation "The topic of the buffer's room.")
    (id :initarg :id
        :initform nil
@@ -363,8 +366,8 @@ and password."
   ;; Disable when tabbar mode is on
   (unless (and (boundp 'tabbar-mode) tabbar-mode)
     (let ((typers (oref room :typers))
-          (name (and (slot-boundp room :room-name) (oref room :room-name)))
-          (topic (and (slot-boundp room :topic) (oref room :topic))))
+          (name (oref room :room-name))
+          (topic (oref room :topic)))
       (setq header-line-format (if (> 0 (length typers))
                                    (format "(%d typing...) %s: %s" (length typers) name topic)
                                  (format "%s: %s" name topic))))))
