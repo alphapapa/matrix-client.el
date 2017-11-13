@@ -69,6 +69,7 @@ MSGTYPE is the type of the message to handle.
 
 Provided Variables:
 
+- `data': data from the event.
 - `room': the `matrix-client-room' object that represents the room.
 - `room-id': the Matrix room id the message is intended for
 - `room-buf': the buffer tied to the Matrix room which the
@@ -89,8 +90,7 @@ like."
              (goto-char (point-max))
              (forward-line -1)
              (end-of-line)
-             ,@body
-             (setq buffer-undo-list nil)))))))
+             ,@body))))))
 
 (defmatrix-client-handler "m.room.message"
   ((content (matrix-get 'content data))
