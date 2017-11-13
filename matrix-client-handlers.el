@@ -220,7 +220,7 @@ Otherwise, use the room name or alias."
    (matrix-client-update-header-line room)))
 
 (defmatrix-client-handler "m.room.aliases"
-  ((new-alias-list (matrix-get 'aliases (matrix-get 'content data))))
+  ((new-alias-list (a-get* data 'content 'aliases)))
   ((oset room :aliases new-alias-list)
    (matrix-update-room-name room)
    (insert-read-only "\n")
