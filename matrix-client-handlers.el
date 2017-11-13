@@ -33,6 +33,8 @@
 
 (require 'browse-url)
 
+(require 'matrix-notifications)
+
 (cl-defmethod matrix-client-handlers-init ((con matrix-client-connection))
   "Set up all the matrix-client event type handlers.
 
@@ -118,34 +120,36 @@ like."
    (display-name (matrix-client-displayname-from-user-id room (map-elt data 'sender)))
    (own-display-name (oref* room :con :username)))
 
-  ((let (metadata output)
+  ((pcase-let (((map event_id) data)
+               (metadata)
+               (output))
      (setq metadata (format "%s %s> "
                             (format-time-string "[%T]" (seconds-to-time timestamp))
                             display-name))
      (when content
-       (setq output (pcase msg-type
-                      ("m.emote"
-                       (concat "* " (map-elt content 'body)))
-                      ((guard (and matrix-client-render-html (string= "org.matrix.custom.html" format)))
-                       (with-temp-buffer
-                         (insert (map-elt content 'formatted_body))
-                         (goto-char (point-min))
-                         (while (re-search-forward "\\(<br />\\)+" nil t)
-                           (replace-match "<br />"))
-                         (let ((document (libxml-parse-html-region (point) (point-max))))
-                           (erase-buffer)
-                           (shr-insert-document document)
-                           (goto-char (point-min))
-                           (delete-blank-lines)
-                           (buffer-string))))
-                      ("m.image"
-                       (concat (map-elt content 'body)
-                               ": "
-                               (matrix-client-linkify-urls
-                                (matrix-transform-mxc-uri (or (map-elt content 'url)
-                                                              (map-elt content 'thumbnail_url))))))
-                      (t
-                       (matrix-client-linkify-urls (map-elt content 'body))))))
+       (setq message (pcase msg-type
+                       ("m.emote"
+                        (concat "* " (map-elt content 'body)))
+                       ((guard (and matrix-client-render-html (string= "org.matrix.custom.html" format)))
+                        (with-temp-buffer
+                          (insert (map-elt content 'formatted_body))
+                          (goto-char (point-min))
+                          (while (re-search-forward "\\(<br />\\)+" nil t)
+                            (replace-match "<br />"))
+                          (let ((document (libxml-parse-html-region (point) (point-max))))
+                            (erase-buffer)
+                            (shr-insert-document document)
+                            (goto-char (point-min))
+                            (delete-blank-lines)
+                            (buffer-string))))
+                       ("m.image"
+                        (concat (map-elt content 'body)
+                                ": "
+                                (matrix-client-linkify-urls
+                                 (matrix-transform-mxc-uri (or (map-elt content 'url)
+                                                               (map-elt content 'thumbnail_url))))))
+                       (t
+                        (matrix-client-linkify-urls (map-elt content 'body))))))
 
      ;; Apply face for own messages
      (let (metadata-face message-face)
@@ -158,15 +162,21 @@ like."
        (add-face-text-property 0 (length metadata) metadata-face 'append metadata)
        (add-face-text-property 0 (length output) message-face 'append output))
      ;; Add metadata to output
-     (setq output (concat metadata output))
+     (setq output (concat metadata message))
      ;; Add text properties
      (setq output (propertize output
                               'timestamp timestamp
                               'display-name display-name
-                              'sender sender))
+                              'sender sender
+                              'event_id event_id))
      ;; Actually insert text
      (insert-read-only "\n")
-     (insert-read-only output))))
+     (insert-read-only output)
+
+     ;; Notification
+     (unless (equal own-display-name display-name)
+       (run-hook-with-args 'matrix-client-notify-hook "m.room.message" data
+                           :room room)))))
 
 (defmatrix-client-handler "m.lightrix.pattern"
   ;; FIXME: Move this to separate file for Ryan.  :)
