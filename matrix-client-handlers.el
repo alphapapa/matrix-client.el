@@ -50,7 +50,7 @@ the Matrix spec for more information about its format."
             ("m.room.aliases" . matrix-client-handler-m.room.aliases)
             ("m.presence" . matrix-client-handler-m.presence)
             ("m.typing" . matrix-client-handler-m.typing))))
-  (unless (slot-boundp con :input-filters)
+  (unless (oref con :input-filters)
     (oset con :input-filters
           '(matrix-client-input-filter-emote
             matrix-client-input-filter-join
