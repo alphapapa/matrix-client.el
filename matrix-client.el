@@ -258,7 +258,7 @@ and password."
                 (cancel-timer timer)
                 ;; XXX Pull these fucking syncs out and bar them on (oref con :running)
                 (when (oref con :running)
-                  (message "Reconnecting you to Matrix, one monent please.")
+                  (message "Reconnecting you to Matrix, one moment please...")
                   (cancel-timer timer)
                   (matrix-sync con next nil matrix-client-event-poll-timeout
                                (apply-partially #'matrix-client-sync-handler con))))
