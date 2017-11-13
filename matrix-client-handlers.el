@@ -240,11 +240,10 @@ Otherwise, use the room name or alias."
     (matrix-client-update-header-line room)))
 
 (defun matrix-client-displayname-from-user-id (room user-id)
-  "Get the Display name for a USER-ID."
-  (let* ((membership (and (slot-boundp room :membership)
-                          (oref room :membership)))
-         (userdata (cdr (assoc user-id membership)))
-         (displayname (matrix-get 'displayname userdata)))
+  "Return display name for USER-ID in ROOM."
+  (let* ((membership (oref room :membership))
+         (user (a-get membership user-id))
+         (displayname (a-get user 'displayname)))
     (or displayname
         user-id)))
 
