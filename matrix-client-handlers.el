@@ -177,30 +177,26 @@ like."
    (matrix-update-room-name room)))
 
 (defun matrix-update-room-name (room)
-  "If a room has a name, rename the buffer; if a room has only two
-  people in it use the membership for the buffer name."
-  (let* ((username (and (slot-boundp (oref room :con) :username)
-                        (oref (oref room :con) :username)))
-         (name (cond ((and (slot-boundp room :room-name) ;; explicit room-name set
-                           (> (length (oref room :room-name)) 0))
-                      (oref room :room-name))
-                     ((and (slot-boundp room :aliases) ;; explicit alias set
-                           (> (length (oref room :aliases)) 0))
-                      (elt (oref room :aliases) 0))
-                     ((and (slot-boundp room :membership) ;; 1/1 chat
-                           (eq (length (oref room :membership)) 2))
-                      (let* ((user (elt (matrix-client-filter
-                                         (lambda (member)
-                                           (not (equal username (first member))))
-                                         (oref room :membership))
-                                        0))
-                             (buf (or (matrix-get 'displayname user)
-                                      (elt user 0))))
-                        (if buf
-                            (if (eq (current-buffer) (get-buffer buf))
-                                buf
-                              (generate-new-buffer-name buf))))))))
-    (when name (rename-buffer name))))
+  "Update ROOM's buffer's name.
+If it only has two members, use the name of the other member.
+Otherwise, use the room name or alias."
+  (when-let ((username (oref* room :con :username))
+             ;; TODO: Make this a preference.  Some users might want
+             ;; 1-1 chats always named after the other user, while
+             ;; others might want them named with the room name.
+             (buffer-name (cond ((when (oref room :membership)
+                                   (eq 2 (length (oref room :membership))))
+                                 ;; 1-1 chat
+                                 (when-let ((username (cl-loop for member in (oref room :membership)
+                                                               when (not (equal username (map-elt member 'displayname)))
+                                                               return (or (map-elt member 'displayname)
+                                                                          (car member)))))
+                                   (if (eq (current-buffer) (get-buffer username))
+                                       username
+                                     (generate-new-buffer-name username))))
+                                ((oref room :room-name))
+                                ((car (oref room :aliases))))))
+    (rename-buffer buffer-name)))
 
 (defun matrix-client-handler-m.presence (data)
   (let* ((inhibit-read-only t)
