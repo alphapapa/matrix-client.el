@@ -127,6 +127,7 @@ See `defmatrix-client-handler'.")
                :initform nil
                :documentation "A lists of functions that are evaluated when a new event comes in.")
    (username :initarg :username
+             :initform nil
              :documentation "Your Matrix username.")
    (input-filters :initarg :input-filters
                   :initform nil
