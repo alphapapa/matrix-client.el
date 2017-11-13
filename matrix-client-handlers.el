@@ -258,18 +258,15 @@ Return nil if room is joined, otherwise TEXT."
         nil)
     text))
 
-(defun matrix-client-input-filter-leave (con text)
-  "Input filter to handle LEAVEs.  Filters TEXT."
-  (let ((room-id (and (slot-boundp matrix-client-room-object :id)
-                      (oref matrix-client-room-object :id)))
-        (con (and (slot-boundp matrix-client-room-object :con)
-                  (oref matrix-client-room-object :con))))
-    (if (and (string-match "^/leave.*" text)
-             (matrix-leave-room con room-id))
-        (progn
+(defun matrix-client-input-filter-leave (_ text)
+  "Filter /leave from input TEXT.
+Return nil if room is left, otherwise TEXT."
+  (if (string-match (rx bos "/leave" (or space eos)) text)
+      (pcase-let (((eieio id con) matrix-client-room-object))
+        (when (matrix-leave-room con id)
           (kill-buffer)
-          nil)
-      text)))
+          nil))
+    text))
 
 (defun matrix-client-input-filter-part (con text)
   "Input filter to handle PARTs.  Filters TEXT."
