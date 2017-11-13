@@ -255,9 +255,9 @@ and password."
 
 (cl-defmethod matrix-client-start-watchdog ((con matrix-client-connection) &optional force timer-secs)
   (when (or force matrix-client-enable-watchdog)
-    (let ((last-ts (and (slot-boundp con :last-event-ts) (oref con :last-event-ts)))
-          (next (and (slot-boundp con :end-token) (oref con :end-token)))
-          (timer (and (slot-boundp con :watchdog-timer) (oref con :watchdog-timer))))
+    (let ((last-ts (oref con :last-event-ts))
+          (next (oref con :end-token))
+          (timer (oref con :watchdog-timer)))
       (if timer
           (if (> (* 1000 (- (float-time) last-ts))
                  matrix-client-event-poll-timeout)
