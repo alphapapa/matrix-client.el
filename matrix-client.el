@@ -263,22 +263,24 @@ and password."
         (oset con :watchdog-timer (run-with-timer timer-secs timer-secs
                                                   (apply-partially #'matrix-client-start-watchdog con)))))))
 
-(defmethod matrix-client-setup-room ((con matrix-client-connection) room-id)
+(cl-defmethod matrix-client-setup-room ((con matrix-client-connection) room-id)
+  "Prepare and switch to buffer for ROOM-ID, and return room object."
   (when (get-buffer room-id)
     (kill-buffer room-id))
   (let* ((room-buf (get-buffer-create room-id))
-         (room-obj (matrix-client-room room-id :buffer room-buf :con con))
-         (new-room-list (append (oref con :rooms) (list (cons room-id room-obj)))))
+         (room-obj (matrix-client-room room-id :buffer room-buf :con con)))
     (with-current-buffer room-buf
       (matrix-client-mode)
+      (setq buffer-undo-list t)
       (erase-buffer)
       (matrix-client-render-message-line room-obj))
     (switch-to-buffer room-buf)
     (set (make-local-variable 'matrix-client-room-connection) con)
     (set (make-local-variable 'matrix-client-room-object) room-obj)
-    (oset con :rooms new-room-list)
-    (oset room-obj :id room-id)
-    (oset room-obj :buffer room-buf)
+    (push (cons room-id room-obj) (oref con :rooms))
+    (oset-multi room-obj
+      :id room-id
+      :buffer room-buf)
     room-obj))
 
 (defmethod matrix-client-sync-handler ((con matrix-client-connection) data)
