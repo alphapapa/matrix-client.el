@@ -119,6 +119,7 @@ connection basis.")
    (end-token :initarg :end-token
               :initform nil)
    (event-handlers :initarg :event-handlers
+                   :initform nil
                    :documentation "An alist of (type . function) handler definitions for various matrix types.
 
 Each of these receives the raw event as a single DATA argument.
