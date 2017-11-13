@@ -82,9 +82,9 @@ PAIRS should be of the form (SLOT VALUE SLOT VALUE...)."
             (elt components 2)
             (elt components 3))))
 
-(defun matrix-client-room-for-id (con room-id)
-  (let ((room (matrix-get room-id (oref con :rooms))))
-    room))
+(defun matrix-client-room-for-id (connection room-id)
+  "Return room for ROOM-ID on CONNECTION."
+  (a-get (oref connection :rooms) room-id))
 
 (defun matrix-parse-curl-exit-code (str)
   "Parse the CURL exit code from the response text passed from
