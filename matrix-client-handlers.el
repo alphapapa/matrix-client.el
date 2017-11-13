@@ -228,7 +228,7 @@ Otherwise, use the room name or alias."
    (matrix-client-update-header-line room)))
 
 (defmatrix-client-handler "m.room.topic"
-  ((topic (matrix-get 'topic (matrix-get 'content data))))
+  ((topic (a-get* data 'content 'topic)))
   ((oset room :topic topic)
    (insert-read-only "\n")
    (insert-read-only (format "Room topic changed --> %s" topic) face matrix-client-metadata)
