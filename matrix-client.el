@@ -368,9 +368,7 @@ and password."
   "Update the header line of the current buffer for ROOM."
   ;; Disable when tabbar mode is on
   (unless (and (boundp 'tabbar-mode) tabbar-mode)
-    (let ((typers (oref room :typers))
-          (name (oref room :room-name))
-          (topic (oref room :topic)))
+    (pcase-let (((eieio typers name topic) room))
       (setq header-line-format (if (> 0 (length typers))
                                    (format "(%d typing...) %s: %s" (length typers) name topic)
                                  (format "%s: %s" name topic))))))
