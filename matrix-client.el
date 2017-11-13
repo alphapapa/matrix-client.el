@@ -299,37 +299,38 @@ and password."
       :buffer room-buf)
     room-obj))
 
-(defmethod matrix-client-sync-handler ((con matrix-client-connection) data)
+(cl-defmethod matrix-client-sync-handler ((con matrix-client-connection) data)
   (when (oref con :running)
-    (mapc
-     (lambda (room-data)
-       (let* ((room-id (symbol-name (car room-data)))
-              (room (matrix-client-room-for-id con room-id)))
-         (when (and room (oref room :buffer))
-           (kill-buffer (oref room :buffer)))))
-     (matrix-get 'leave (matrix-get 'rooms data)))
-    (mapc
-     (lambda (room-data)
-       (let* ((room-id (symbol-name (car room-data)))
-              (room (or (matrix-get room-id (oref con :rooms))
-                        (matrix-client-setup-room con room-id)))
-              (room-events (cdr room-data)))
-         (mapc
-          (lambda (event)
-            (matrix-client-room-event room event))
-          (matrix-get 'events (matrix-get 'state room-events)))
-         (mapc
-          (lambda (event)
-            (matrix-client-room-event room event))
-          (matrix-get 'events (matrix-get 'timeline room-events)))))
-     (matrix-get 'join (matrix-get 'rooms data)))
-    (mapc
-     (lambda (room-data)
-       (matrix-client-invite-room con data))
-     (matrix-get 'invite (matrix-get 'rooms data)))
-    (let ((next (matrix-get 'next_batch data)))
-      (oset con :end-token next)
-      (oset con :last-event-ts  (float-time))
+
+    (--each (a-get* data 'rooms 'leave)
+      ;; Kill buffers for left rooms
+      (let* ((room-id (symbol-name (car it)))
+             (room (matrix-client-room-for-id con room-id)))
+        (when (and room (oref room :buffer))
+          (kill-buffer (oref room :buffer)))))
+
+    (--each (a-get* data 'rooms 'join)
+      ;; Join joined rooms
+      (let* ((room-id (symbol-name (car it)))
+             (room (or (a-get (oref con :rooms) room-id)
+                       (matrix-client-setup-room con room-id)))
+             (room-events (cdr it)))
+        (--each (a-get* room-events 'state 'events)
+          ;; Process room state events
+          (matrix-client-room-event room it))
+        (--each (a-get* room-events 'timeline 'events)
+          ;; Process room timeline events
+          (matrix-client-room-event room it))))
+
+    (--each (a-get* data 'rooms 'invite)
+      ;; Process invitations
+      (matrix-client-invite-room con data))
+
+    ;; Process next batch
+    (let ((next (map-elt data 'next_batch)))
+      (oset-multi con
+        :end-token next
+        :last-event-ts (float-time))
       (matrix-client-start-watchdog con)
       (matrix-sync con next nil matrix-client-event-poll-timeout
                    (apply-partially #'matrix-client-sync-handler con)))))
