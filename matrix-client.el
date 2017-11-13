@@ -344,7 +344,7 @@ and password."
 
 (cl-defmethod matrix-client-inject-event-listeners ((con matrix-client-connection))
   "Inject the standard event listeners."
-  (unless (and (slot-boundp con :event-hook) (oref con :event-hook))
+  (unless (oref con :event-hook)
     (oset con :event-hook '(matrix-client-debug-event-maybe
                             matrix-client-render-event-to-room))))
 
