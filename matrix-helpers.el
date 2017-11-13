@@ -82,13 +82,6 @@ PAIRS should be of the form (SLOT VALUE SLOT VALUE...)."
             (elt components 2)
             (elt components 3))))
 
-(defun matrix-client-filter (condp lst)
-  "A standard filter, feed it a function CONDP and a LST."
-  (delq nil
-        (mapcar (lambda (x)
-                  (and (funcall condp x) x))
-                lst)))
-
 (defun matrix-client-room-for-id (con room-id)
   (let ((room (matrix-get room-id (oref con :rooms))))
     room))
