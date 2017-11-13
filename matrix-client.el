@@ -321,9 +321,11 @@ and password."
                   (cl-loop for event across (a-get* room-events 'timeline 'events)
                            do (matrix-client-room-event room event))))
 
+    ;; FIXME: `matrix-client-invite-room' is unimplemented.  Looking
+    ;; at the API <https://matrix.org/docs/spec/client_server/r0.2.0.html#post-matrix-client-r0-rooms-roomid-invite>,
+    ;; I'm not sure this is even necessary.
+    ;; Process invitations
     ;; (--each (a-get* data 'rooms 'invite)
-    ;; FIXME: Unimplemented.
-    ;;   ;; Process invitations
     ;;   (matrix-client-invite-room con data))
 
     ;; Process next batch
