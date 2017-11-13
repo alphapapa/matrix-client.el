@@ -213,7 +213,7 @@ Otherwise, use the room name or alias."
 
 (defmatrix-client-handler "m.room.name"
   ()
-  ((oset room :room-name (matrix-get 'name (matrix-get 'content data)))
+  ((oset room :room-name (a-get* data 'content 'name))
    (matrix-update-room-name room)
    (insert-read-only "\n")
    (insert-read-only (format "Room name changed --> %s" (oref room :room-name)) face matrix-client-metadata)
