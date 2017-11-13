@@ -349,19 +349,15 @@ and password."
         (insert "\n" (prin1-to-string data))))))
 
 (defun matrix-client-update-header-line (room)
-  "Update the header line of the current buffer."
-	;; Disable when tabbar mode is on
-	(unless (and (boundp 'tabbar-mode) tabbar-mode)
-		(let ((typers (and (slot-boundp room :typers)
-										(oref room :typers)))
-					 (name (and (slot-boundp room :room-name)
-                   (oref room :room-name)))
-					 (topic (and (slot-boundp room :topic)
-                    (oref room :topic))))
-			(if (> 0 (length typers))
-        (progn
-          (setq header-line-format (format "(%d typing...) %s: %s" (length typers) name topic)))
-				(setq header-line-format (format "%s: %s" name topic))))))
+  "Update the header line of the current buffer for ROOM."
+  ;; Disable when tabbar mode is on
+  (unless (and (boundp 'tabbar-mode) tabbar-mode)
+    (let ((typers (and (slot-boundp room :typers) (oref room :typers)))
+          (name (and (slot-boundp room :room-name) (oref room :room-name)))
+          (topic (and (slot-boundp room :topic) (oref room :topic))))
+      (setq header-line-format (if (> 0 (length typers))
+                                   (format "(%d typing...) %s: %s" (length typers) name topic)
+                                 (format "%s: %s" name topic))))))
 
 ;;;###autoload
 (defmacro insert-read-only (text &rest extra-props)
