@@ -235,11 +235,9 @@ Otherwise, use the room name or alias."
    (matrix-client-update-header-line room)))
 
 (defun matrix-client-handler-m.typing (con room data)
-  (let ((room-buf (and (slot-boundp room :buffer)
-                       (oref room :buffer))))
-    (with-current-buffer room-buf
-      (set (make-local-variable 'matrix-client-room-typers) (matrix-get 'user_ids (matrix-get 'content data)))
-      (matrix-client-update-header-line room))))
+  (with-current-buffer (oref room :buffer)
+    (set (make-local-variable 'matrix-client-room-typers) (a-get* data 'content 'user_ids))
+    (matrix-client-update-header-line room)))
 
 (defun matrix-client-displayname-from-user-id (room user-id)
   "Get the Display name for a USER-ID."
