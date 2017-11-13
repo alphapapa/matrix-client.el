@@ -93,26 +93,25 @@ like."
              ,@body))))))
 
 (defmatrix-client-handler "m.room.message"
-  ((content (matrix-get 'content data))
-   (msg-type (matrix-get 'msgtype content))
-   (format (matrix-get 'format content))
-   (timestamp (/ (matrix-get 'origin_server_ts data) 1000))
-   (sender (matrix-get 'sender data))
-   (display-name (matrix-client-displayname-from-user-id room (matrix-get 'sender data)))
+  ((content (map-elt data 'content))
+   (msg-type (map-elt content 'msgtype))
+   (format (map-elt content 'format))
+   (timestamp (/ (map-elt data 'origin_server_ts) 1000))
+   (sender (map-elt data 'sender))
+   (display-name (matrix-client-displayname-from-user-id room (map-elt data 'sender)))
    (own-display-name (oref* room :con :username)))
 
   ((let (metadata output)
      (setq metadata (format "%s %s> "
-                            (format-time-string
-                             "[%T]" (seconds-to-time timestamp))
+                            (format-time-string "[%T]" (seconds-to-time timestamp))
                             display-name))
      (when content
        (setq output (pcase msg-type
                       ("m.emote"
-                       (concat "* " (matrix-get 'body content)))
+                       (concat "* " (map-elt content 'body)))
                       ((guard (and matrix-client-render-html (string= "org.matrix.custom.html" format)))
                        (with-temp-buffer
-                         (insert (matrix-get 'formatted_body content))
+                         (insert (map-elt content 'formatted_body))
                          (goto-char (point-min))
                          (while (re-search-forward "\\(<br />\\)+" nil t)
                            (replace-match "<br />"))
@@ -123,12 +122,12 @@ like."
                            (delete-blank-lines)
                            (buffer-string))))
                       ("m.image"
-                       (concat (matrix-get 'body content)
+                       (concat (map-elt content 'body)
                                ": "
-                               (matrix-transform-mxc-uri (or (matrix-get 'url content)
-                                                             (matrix-get 'thumbnail_url content)))))
+                               (matrix-transform-mxc-uri (or (map-elt content 'url)
+                                                             (map-elt content 'thumbnail_url)))))
                       (t
-                       (matrix-get 'body content)))))
+                       (map-elt content 'body)))))
 
      ;; Apply face for own messages
      (let (metadata-face message-face)
