@@ -368,13 +368,14 @@ and password."
               (point))
     '(read-only t ,@extra-props)))
 
-(defmethod matrix-client-render-message-line ((room matrix-client-room room))
+(cl-defmethod matrix-client-render-message-line ((room matrix-client-room room))
+  ;; FIXME: Why is there an extra "room" the arg list?  EIEIO docs
+  ;; don't seem to mention this.
   "Insert a message input at the end of the buffer."
   (goto-char (point-max))
   (let ((inhibit-read-only t))
     (insert "\n")
-    (insert-read-only "[::] ▶ " rear-nonsticky t)
-    (setq buffer-undo-list nil)))
+    (insert-read-only "[::] ▶ " rear-nonsticky t)))
 
 (defun matrix-client-send-active-line ()
   "Send the current message-line text after running it through input-filters."
