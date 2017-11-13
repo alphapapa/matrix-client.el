@@ -247,13 +247,14 @@ Otherwise, use the room name or alias."
     (or displayname
         user-id)))
 
-(defun matrix-client-input-filter-join (con text)
-  "Input filter to handle JOINs.  Filters TEXT."
+(defun matrix-client-input-filter-join (connection text)
+  "Filter /join from input TEXT on CONNECTION.
+Return nil if room is joined, otherwise TEXT."
   (if (string-match "^/j\\(oin\\)? +\\(.*\\)" text)
       (progn
         (let ((room (substring text (match-beginning 2) (match-end 2))))
-          (matrix-join-room con room)
-          (matrix-client-setup-room con room))
+          (matrix-join-room connection room)
+          (matrix-client-setup-room connection room))
         nil)
     text))
 
