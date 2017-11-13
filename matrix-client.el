@@ -318,13 +318,12 @@ and password."
       (matrix-sync con next nil matrix-client-event-poll-timeout
                    (apply-partially #'matrix-client-sync-handler con)))))
 
-(defmethod matrix-client-room-event ((room matrix-client-room) event)
+(cl-defmethod matrix-client-room-event ((room matrix-client-room) event)
   "Handle state events from a sync."
-  (let* ((con (oref room :con)))
-    (when (slot-boundp con :event-hook)
-      (mapc (lambda (hook)
-              (funcall hook con room event))
-            (oref con :event-hook)))))
+  (when-let ((con (oref room :con))
+             (fns (oref con :event-hook)))
+    (--each fns
+      (funcall it con room event))))
 
 (defmethod matrix-client-render-event-to-room ((con matrix-client-connection) room item)
   "Feed ITEM in to its proper `matrix-client-event-handlers' handler."
