@@ -334,12 +334,11 @@ and password."
              (handler (a-get (oref con :event-handlers) type)))
     (funcall handler con room item)))
 
-(defmethod matrix-client-inject-event-listeners ((con matrix-client-connection))
+(cl-defmethod matrix-client-inject-event-listeners ((con matrix-client-connection))
   "Inject the standard event listeners."
-  (unless (slot-boundp con :event-hook)
-    (oset con :event-hook
-          '(matrix-client-debug-event-maybe
-            matrix-client-render-event-to-room))))
+  (unless (and (slot-boundp con :event-hook) (oref con :event-hook))
+    (oset con :event-hook '(matrix-client-debug-event-maybe
+                            matrix-client-render-event-to-room))))
 
 (defmethod matrix-client-debug-event-maybe ((con matrix-client-connection) room data)
   "Debug DATA to *matrix-events* if `matrix-client-debug-events' is non-nil."
