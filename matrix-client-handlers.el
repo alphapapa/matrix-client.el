@@ -31,7 +31,7 @@
 
 ;;; Code:
 
-(defmethod matrix-client-handlers-init ((con matrix-client-connection))
+(cl-defmethod matrix-client-handlers-init ((con matrix-client-connection))
   "Set up all the matrix-client event type handlers.
 
 Each matrix-client-event-handler is an alist of matrix message type and
@@ -39,23 +39,23 @@ the function that handles them.  Currently only a single handler
 for each event is supported.  The handler takes a single argument,
 DATA, which is a `json-read' object from the Event stream.  See
 the Matrix spec for more information about its format."
-  (add-to-list 'window-configuration-change-hook 'matrix-client-window-change-hook)
-  (unless (slot-boundp con :event-handlers)
-    (oset con :event-handlers
-          '(("m.room.message" . matrix-client-handler-m.room.message)
-            ("m.lightrix.pattern" . matrix-client-handler-m.lightrix.pattern)
-            ("m.room.topic" . matrix-client-handler-m.room.topic)
-            ("m.room.name" . matrix-client-handler-m.room.name)
-            ("m.room.member" . matrix-client-handler-m.room.member)
-            ("m.room.aliases" . matrix-client-handler-m.room.aliases)
-            ("m.presence" . matrix-client-handler-m.presence)
-            ("m.typing" . matrix-client-handler-m.typing))))
-  (unless (slot-boundp con :input-filters)
-    (oset con :input-filters
-          '(matrix-client-input-filter-emote
-            matrix-client-input-filter-join
-            matrix-client-input-filter-leave
-            matrix-client-send-to-current-room))))
+  ;; FIXME: `matrix-client-window-change-hook' should be renamed, and
+  ;; is currently unimplemented anyway.
+  (push 'matrix-client-window-change-hook window-configuration-change-hook)
+  (unless (oref con :event-handlers)
+    (oset con :event-handlers (a-list "m.room.message" 'matrix-client-handler-m.room.message
+                                      "m.lightrix.pattern" 'matrix-client-handler-m.lightrix.pattern
+                                      "m.room.topic" 'matrix-client-handler-m.room.topic
+                                      "m.room.name" 'matrix-client-handler-m.room.name
+                                      "m.room.member" 'matrix-client-handler-m.room.member
+                                      "m.room.aliases" 'matrix-client-handler-m.room.aliases
+                                      "m.presence" 'matrix-client-handler-m.presence
+                                      "m.typing" 'matrix-client-handler-m.typing)))
+  (unless (oref con :input-filters)
+    (oset con :input-filters '(matrix-client-input-filter-emote
+                               matrix-client-input-filter-join
+                               matrix-client-input-filter-leave
+                               matrix-client-send-to-current-room))))
 
 (defmacro defmatrix-client-handler (msgtype varlist body)
   "Create an matrix-client-handler.
@@ -69,6 +69,7 @@ MSGTYPE is the type of the message to handle.
 
 Provided Variables:
 
+- `data': data from the event.
 - `room': the `matrix-client-room' object that represents the room.
 - `room-id': the Matrix room id the message is intended for
 - `room-buf': the buffer tied to the Matrix room which the
@@ -89,30 +90,28 @@ like."
              (goto-char (point-max))
              (forward-line -1)
              (end-of-line)
-             ,@body
-             (setq buffer-undo-list nil)))))))
+             ,@body))))))
 
 (defmatrix-client-handler "m.room.message"
-  ((content (matrix-get 'content data))
-   (msg-type (matrix-get 'msgtype content))
-   (format (matrix-get 'format content))
-   (timestamp (/ (matrix-get 'origin_server_ts data) 1000))
-   (sender (matrix-get 'sender data))
-   (display-name (matrix-client-displayname-from-user-id room (matrix-get 'sender data)))
+  ((content (map-elt data 'content))
+   (msg-type (map-elt content 'msgtype))
+   (format (map-elt content 'format))
+   (timestamp (/ (map-elt data 'origin_server_ts) 1000))
+   (sender (map-elt data 'sender))
+   (display-name (matrix-client-displayname-from-user-id room (map-elt data 'sender)))
    (own-display-name (oref* room :con :username)))
 
   ((let (metadata output)
      (setq metadata (format "%s %s> "
-                            (format-time-string
-                             "[%T]" (seconds-to-time timestamp))
+                            (format-time-string "[%T]" (seconds-to-time timestamp))
                             display-name))
      (when content
        (setq output (pcase msg-type
                       ("m.emote"
-                       (concat "* " (matrix-get 'body content)))
+                       (concat "* " (map-elt content 'body)))
                       ((guard (and matrix-client-render-html (string= "org.matrix.custom.html" format)))
                        (with-temp-buffer
-                         (insert (matrix-get 'formatted_body content))
+                         (insert (map-elt content 'formatted_body))
                          (goto-char (point-min))
                          (while (re-search-forward "\\(<br />\\)+" nil t)
                            (replace-match "<br />"))
@@ -123,12 +122,12 @@ like."
                            (delete-blank-lines)
                            (buffer-string))))
                       ("m.image"
-                       (concat (matrix-get 'body content)
+                       (concat (map-elt content 'body)
                                ": "
-                               (matrix-transform-mxc-uri (or (matrix-get 'url content)
-                                                             (matrix-get 'thumbnail_url content)))))
+                               (matrix-transform-mxc-uri (or (map-elt content 'url)
+                                                             (map-elt content 'thumbnail_url)))))
                       (t
-                       (matrix-get 'body content)))))
+                       (map-elt content 'body)))))
 
      ;; Apply face for own messages
      (let (metadata-face message-face)
@@ -151,26 +150,26 @@ like."
      (insert-read-only output))))
 
 (defmatrix-client-handler "m.lightrix.pattern"
-  ((content (matrix-get 'content data)))
+  ;; FIXME: Move this to separate file for Ryan.  :)
+  ((content (map-elt data 'content)))
   ((insert "\n")
-   (insert-read-only (format "🌄 %s --> " (matrix-client-displayname-from-user-id room (matrix-get 'user_id data)))
+   (insert-read-only (format "🌄 %s --> " (matrix-client-displayname-from-user-id room (map-elt data 'user_id)))
                      face matrix-client-metadata)
-   (insert-read-only (matrix-get 'pattern content))))
+   (insert-read-only (map-elt content 'pattern))))
 
 (defmatrix-client-handler "m.room.member"
-  ((content (matrix-get 'content data))
-   (user-id (matrix-get 'sender data))
-   (membership (matrix-get 'membership content))
-   (room-membership (and (slot-boundp room :membership)
-                         (oref room :membership)))
-   (display-name (matrix-get 'displayname content)))
+  ((content (map-elt data 'content))
+   (user-id (map-elt data 'sender))
+   (membership (map-elt content 'membership))
+   (room-membership (oref room :membership))
+   (display-name (map-elt content 'displayname)))
   ((assq-delete-all user-id room-membership)
-   (if (string-equal "join" membership)
+   (if (string= "join" membership)
        (progn
          (when matrix-client-render-membership
            (insert-read-only "\n")
            (insert-read-only (format "Joined: %s (%s) --> %s" display-name user-id membership) face matrix-client-metadata))
-         (add-to-list 'room-membership (cons user-id content)))
+         (push (cons user-id content) room-membership))
      (when matrix-client-render-membership
        (insert-read-only "\n")
        (insert-read-only (format "Left: %s (%s) --> %s" display-name user-id membership) face matrix-client-metadata)))
@@ -178,53 +177,50 @@ like."
    (matrix-update-room-name room)))
 
 (defun matrix-update-room-name (room)
-  "If a room has a name, rename the buffer; if a room has only two
-  people in it use the membership for the buffer name."
-  (let* ((username (and (slot-boundp (oref room :con) :username)
-                        (oref (oref room :con) :username)))
-         (name (cond ((and (slot-boundp room :room-name) ;; explicit room-name set
-                           (> (length (oref room :room-name)) 0))
-                      (oref room :room-name))
-                     ((and (slot-boundp room :aliases) ;; explicit alias set
-                           (> (length (oref room :aliases)) 0))
-                      (elt (oref room :aliases) 0))
-                     ((and (slot-boundp room :membership) ;; 1/1 chat
-                           (eq (length (oref room :membership)) 2))
-                      (let* ((user (elt (matrix-client-filter
-                                         (lambda (member)
-                                           (not (equal username (first member))))
-                                         (oref room :membership))
-                                        0))
-                             (buf (or (matrix-get 'displayname user)
-                                      (elt user 0))))
-                        (if buf
-                            (if (eq (current-buffer) (get-buffer buf))
-                                buf
-                              (generate-new-buffer-name buf))))))))
-    (when name (rename-buffer name))))
+  "Update ROOM's buffer's name.
+If it only has two members, use the name of the other member.
+Otherwise, use the room name or alias."
+  (when-let ((username (oref* room :con :username))
+             ;; TODO: Make this a preference.  Some users might want
+             ;; 1-1 chats always named after the other user, while
+             ;; others might want them named with the room name.
+             (buffer-name (cond ((when (oref room :membership)
+                                   (eq 2 (length (oref room :membership))))
+                                 ;; 1-1 chat
+                                 (when-let ((username (cl-loop for member in (oref room :membership)
+                                                               when (not (equal username (map-elt member 'displayname)))
+                                                               return (or (map-elt member 'displayname)
+                                                                          (car member)))))
+                                   (if (eq (current-buffer) (get-buffer username))
+                                       username
+                                     (generate-new-buffer-name username))))
+                                ((oref room :room-name))
+                                ((car (oref room :aliases))))))
+    (rename-buffer buffer-name)))
 
 (defun matrix-client-handler-m.presence (data)
-  (let* ((inhibit-read-only t)
-         (content (matrix-get 'content data))
-         (user-id (matrix-get 'user_id content))
-         (presence (matrix-get 'presence content))
-         (display-name (matrix-get 'displayname content)))
-    (with-current-buffer (get-buffer-create "*matrix-events*")
-      (when matrix-client-render-presence
+  "Insert presence message into events buffer for DATA."
+  (when matrix-client-render-presence
+    (let* ((inhibit-read-only t)
+           (content (map-elt data 'content))
+           (user-id (map-elt content 'user_id))
+           (presence (map-elt content 'presence))
+           (display-name (map-elt content 'displayname)))
+      (with-current-buffer (get-buffer-create "*matrix-events*")
         (goto-char (point-max))
         (insert-read-only "\n")
         (insert-read-only (format "%s (%s) --> %s" display-name user-id presence) face matrix-client-metadata)))))
 
 (defmatrix-client-handler "m.room.name"
   ()
-  ((oset room :room-name (matrix-get 'name (matrix-get 'content data)))
+  ((oset room :room-name (a-get* data 'content 'name))
    (matrix-update-room-name room)
    (insert-read-only "\n")
    (insert-read-only (format "Room name changed --> %s" (oref room :room-name)) face matrix-client-metadata)
    (matrix-client-update-header-line room)))
 
 (defmatrix-client-handler "m.room.aliases"
-  ((new-alias-list (matrix-get 'aliases (matrix-get 'content data))))
+  ((new-alias-list (a-get* data 'content 'aliases)))
   ((oset room :aliases new-alias-list)
    (matrix-update-room-name room)
    (insert-read-only "\n")
@@ -232,76 +228,56 @@ like."
    (matrix-client-update-header-line room)))
 
 (defmatrix-client-handler "m.room.topic"
-  ((topic (matrix-get 'topic (matrix-get 'content data))))
+  ((topic (a-get* data 'content 'topic)))
   ((oset room :topic topic)
    (insert-read-only "\n")
    (insert-read-only (format "Room topic changed --> %s" topic) face matrix-client-metadata)
    (matrix-client-update-header-line room)))
 
 (defun matrix-client-handler-m.typing (con room data)
-  (let ((room-buf (and (slot-boundp room :buffer)
-                       (oref room :buffer))))
-    (with-current-buffer room-buf
-      (set (make-local-variable 'matrix-client-room-typers) (matrix-get 'user_ids (matrix-get 'content data)))
-      (matrix-client-update-header-line room))))
+  (with-current-buffer (oref room :buffer)
+    (set (make-local-variable 'matrix-client-room-typers) (a-get* data 'content 'user_ids))
+    (matrix-client-update-header-line room)))
 
 (defun matrix-client-displayname-from-user-id (room user-id)
-  "Get the Display name for a USER-ID."
-  (let* ((membership (and (slot-boundp room :membership)
-                          (oref room :membership)))
-         (userdata (cdr (assoc user-id membership)))
-         (displayname (matrix-get 'displayname userdata)))
+  "Return display name for USER-ID in ROOM."
+  (let* ((membership (oref room :membership))
+         (user (a-get membership user-id))
+         (displayname (a-get user 'displayname)))
     (or displayname
         user-id)))
 
-(defun matrix-client-input-filter-join (con text)
-  "Input filter to handle JOINs.  Filters TEXT."
+(defun matrix-client-input-filter-join (connection text)
+  "Filter /join from input TEXT on CONNECTION.
+Return nil if room is joined, otherwise TEXT."
   (if (string-match "^/j\\(oin\\)? +\\(.*\\)" text)
       (progn
         (let ((room (substring text (match-beginning 2) (match-end 2))))
-          (matrix-join-room con room)
-          (matrix-client-setup-room con room))
+          (matrix-join-room connection room)
+          (matrix-client-setup-room connection room))
         nil)
     text))
 
-(defun matrix-client-input-filter-leave (con text)
-  "Input filter to handle LEAVEs.  Filters TEXT."
-  (let ((room-id (and (slot-boundp matrix-client-room-object :id)
-                      (oref matrix-client-room-object :id)))
-        (con (and (slot-boundp matrix-client-room-object :con)
-                  (oref matrix-client-room-object :con))))
-    (if (and (string-match "^/leave.*" text)
-             (matrix-leave-room con room-id))
-        (progn
+(defun matrix-client-input-filter-leave (_ text)
+  "Filter /leave from input TEXT.
+Return nil if room is left, otherwise TEXT."
+  (if (string-match (rx bos "/leave" (or space eos)) text)
+      (pcase-let (((eieio id con) matrix-client-room-object))
+        (when (matrix-leave-room con id)
           (kill-buffer)
-          nil)
-      text)))
+          nil))
+    text))
 
-(defun matrix-client-input-filter-part (con text)
-  "Input filter to handle PARTs.  Filters TEXT."
-  (let ((room-id (and (slot-boundp matrix-client-room-object :id)
-                      (oref matrix-client-room-object :id)))
-        (con (and (slot-boundp matrix-client-room-object :con)
-                  (oref matrix-client-room-object :con))))
-    (if (and (string-match "^/part.*" text)
-             (matrix-part-room con room-id))
-        (progn
-          (kill-buffer)
-          nil)
-      text)))
-
-(defun matrix-client-input-filter-emote (con text)
-  "Input filter to handle emotes.  Filters TEXT."
+(defun matrix-client-input-filter-emote (_ text)
+  "Filter emotes from TEXT.
+Return nil if emote sent, otherwise TEXT."
   (if (string-match "^/me +\\(.*\\)" text)
-      (let ((emote (substring text (match-beginning 1) (match-end 1)))
-            (room-id (and (slot-boundp matrix-client-room-object :id)
-                          (oref matrix-client-room-object :id)))
-            (con (and (slot-boundp matrix-client-room-object :con)
-                      (oref matrix-client-room-object :con))))
-        (when (and con room-id)
-          (matrix-send-event con room-id "m.room.message"
-                             `(("msgtype" . "m.emote")
-                               ("body" . ,emote)))
+      (pcase-let ((emote (substring text (match-beginning 1) (match-end 1)))
+                  ((eieio id con) matrix-client-room-object))
+        (when (and con id)
+          (matrix-send-event con id "m.room.message"
+                             (a-list "msgtype" "m.emote"
+                                     "body" emote))
           nil))
     text))
 

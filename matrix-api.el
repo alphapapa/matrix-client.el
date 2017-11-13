@@ -60,8 +60,7 @@
              :type string
              :documentation "URI to your Matrix homeserver, defaults to the official homeserver.")
    (token :initarg :token
-          :type string
-          :custom string
+          :initform nil
           :documentation "Matrix access_token")
    (txn-id :initarg :txn-id
            :initform 1
@@ -105,8 +104,7 @@ optional alist of URL parameters.  HEADERS is optional HTTP
 headers to add to the request.
 
 The return value is the `json-read' response from homeserver."
-  (let* ((token (when (slot-boundp con :token)
-                  (oref con :token)))
+  (let* ((token (oref con :token))
          (url-request-data (when content
                              (json-encode content)))
          (endpoint (concat (matrix-homeserver-api-url api-version) path))
