@@ -173,6 +173,7 @@ event-handlers and input-filters.")
    (typers :initarg :typers
            :initform nil)
    (membership :initarg :membership
+               :initform nil
                :documentation "The list of members of the buffer's room.")
    (end-token :initarg :end-token
               :initform nil
