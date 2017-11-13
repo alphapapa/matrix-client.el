@@ -158,19 +158,18 @@ like."
    (insert-read-only (map-elt content 'pattern))))
 
 (defmatrix-client-handler "m.room.member"
-  ((content (matrix-get 'content data))
-   (user-id (matrix-get 'sender data))
-   (membership (matrix-get 'membership content))
-   (room-membership (and (slot-boundp room :membership)
-                         (oref room :membership)))
-   (display-name (matrix-get 'displayname content)))
+  ((content (map-elt data 'content))
+   (user-id (map-elt data 'sender))
+   (membership (map-elt content 'membership))
+   (room-membership (oref room :membership))
+   (display-name (map-elt content 'displayname)))
   ((assq-delete-all user-id room-membership)
-   (if (string-equal "join" membership)
+   (if (string= "join" membership)
        (progn
          (when matrix-client-render-membership
            (insert-read-only "\n")
            (insert-read-only (format "Joined: %s (%s) --> %s" display-name user-id membership) face matrix-client-metadata))
-         (add-to-list 'room-membership (cons user-id content)))
+         (push (cons user-id content) room-membership))
      (when matrix-client-render-membership
        (insert-read-only "\n")
        (insert-read-only (format "Left: %s (%s) --> %s" display-name user-id membership) face matrix-client-metadata)))
