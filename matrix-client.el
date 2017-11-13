@@ -192,7 +192,7 @@ event-handlers and input-filters.")
                   (map-elt matrix-client-connections username)
                 (matrix-client-connection matrix-homeserver-base-url
                                           :base-url matrix-homeserver-base-url))))
-    (unless (and (slot-boundp con :token) (oref con :token))
+    (unless (oref con :token)
       (matrix-client-login con username))
     (unless (oref con :running)
       (matrix-client-start-watchdog con nil 120)
