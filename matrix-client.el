@@ -361,6 +361,7 @@ and password."
 
 ;;;###autoload
 (defmacro insert-read-only (text &rest extra-props)
+  ;; TODO: Remove this function, and/or move it to matrix-helpers.el.
   "Insert a block of TEXT as read-only, with the ability to add EXTRA-PROPS such as face."
   `(add-text-properties
     (point) (progn
@@ -419,10 +420,12 @@ and password."
 
 (defun matrix-client-window-change-hook ()
   "Send a read receipt if necessary."
+  ;; FIXME: Unimplemented.
   ;; (when (and matrix-client-room-id matrix-client-room-end-token)
   ;;   (message "%s as read from %s" matrix-client-room-end-token matrix-client-room-id)
   ;;   (matrix-mark-as-read matrix-client-room-id matrix-client-room-end-token))
   )
 
 (provide 'matrix-client)
+
 ;;; matrix-client.el ends here
