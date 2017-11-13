@@ -156,6 +156,7 @@ event-handlers and input-filters.")
   ((con :initarg :con
         :initform nil)
    (buffer :initarg :buffer
+           :initform nil
            :documentation "The buffer that contains the room's chat session")
    (name :initarg :room-name
          :documentation "The name of the buffer's room.")
@@ -296,7 +297,7 @@ and password."
      (lambda (room-data)
        (let* ((room-id (symbol-name (car room-data)))
               (room (matrix-client-room-for-id con room-id)))
-         (when (and room (slot-boundp room :buffer))
+         (when (and room (oref room :buffer))
            (kill-buffer (oref room :buffer)))))
      (matrix-get 'leave (matrix-get 'rooms data)))
     (mapc
