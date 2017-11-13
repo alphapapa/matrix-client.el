@@ -86,16 +86,15 @@ PAIRS should be of the form (SLOT VALUE SLOT VALUE...)."
   "Return room for ROOM-ID on CONNECTION."
   (a-get (oref connection :rooms) room-id))
 
-(defun matrix-parse-curl-exit-code (str)
-  "Parse the CURL exit code from the response text passed from
-request. Returns `nil' if no exit code is found."
-  (let (exit-code)
-    (condition-case ex
-        (progn
-          (string-match "exited abnormally with code \\([[:digit:]]+\\).*" str)
-          (setq exit-code (string-to-int (match-string-no-properties 1 str))))
-      ('error (setq exit-code nil)))
-    exit-code))
+(defun matrix-parse-curl-exit-code (error-string)
+  "Return exit code from ERROR-STRING as a number, or nil if none found."
+  (when (string-match "exited abnormally with code \\([[:digit:]]+\\).*" error-string)
+    (ignore-errors
+      ;; Ignore errors to avoid any problems that might be caused by
+      ;; the error string not matching.  I don't think this is
+      ;; strictly necessary, but the old code caught errors, so just
+      ;; in case...
+      (string-to-int (match-string-no-properties 1 error-string)))))
 
 (provide 'matrix-helpers)
 ;;; matrix-helpers.el ends here
