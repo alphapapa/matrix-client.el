@@ -415,8 +415,7 @@ and password."
         (id (and room
                  (slot-boundp room :id)
                  (oref room :id))))
-    (matrix-send-message con id text))
-  text)
+    (matrix-send-message con id text)))
 
 (defun matrix-client-window-change-hook ()
   "Send a read receipt if necessary."
