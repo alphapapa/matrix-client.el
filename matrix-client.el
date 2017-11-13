@@ -325,12 +325,14 @@ and password."
     (--each fns
       (funcall it con room event))))
 
-(defmethod matrix-client-render-event-to-room ((con matrix-client-connection) room item)
+(cl-defmethod matrix-client-render-event-to-room ((con matrix-client-connection) room item)
   "Feed ITEM in to its proper `matrix-client-event-handlers' handler."
-  (let* ((type (matrix-get 'type item))
-         (handler (matrix-get type (oref con :event-handlers))))
-    (when handler
-      (funcall handler con room item))))
+  ;; NOTE: It's tempting to use `map-elt' here, but it uses `eql' to
+  ;; compare keys, and since the keys are strings, that doesn't work.
+  ;; MAYBE: Perhaps we should change the keys to symbols someday...
+  (when-let ((type (a-get item 'type))
+             (handler (a-get (oref con :event-handlers) type)))
+    (funcall handler con room item)))
 
 (defmethod matrix-client-inject-event-listeners ((con matrix-client-connection))
   "Inject the standard event listeners."
