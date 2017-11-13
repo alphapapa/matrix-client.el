@@ -268,18 +268,16 @@ Return nil if room is left, otherwise TEXT."
           nil))
     text))
 
-(defun matrix-client-input-filter-emote (con text)
-  "Input filter to handle emotes.  Filters TEXT."
+(defun matrix-client-input-filter-emote (_ text)
+  "Filter emotes from TEXT.
+Return nil if emote sent, otherwise TEXT."
   (if (string-match "^/me +\\(.*\\)" text)
-      (let ((emote (substring text (match-beginning 1) (match-end 1)))
-            (room-id (and (slot-boundp matrix-client-room-object :id)
-                          (oref matrix-client-room-object :id)))
-            (con (and (slot-boundp matrix-client-room-object :con)
-                      (oref matrix-client-room-object :con))))
-        (when (and con room-id)
-          (matrix-send-event con room-id "m.room.message"
-                             `(("msgtype" . "m.emote")
-                               ("body" . ,emote)))
+      (pcase-let ((emote (substring text (match-beginning 1) (match-end 1)))
+                  ((eieio id con) matrix-client-room-object))
+        (when (and con id)
+          (matrix-send-event con id "m.room.message"
+                             (a-list "msgtype" "m.emote"
+                                     "body" emote))
           nil))
     text))
 
