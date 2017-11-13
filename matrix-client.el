@@ -299,37 +299,38 @@ and password."
       :buffer room-buf)
     room-obj))
 
-(defmethod matrix-client-sync-handler ((con matrix-client-connection) data)
+(cl-defmethod matrix-client-sync-handler ((con matrix-client-connection) data)
   (when (oref con :running)
-    (mapc
-     (lambda (room-data)
-       (let* ((room-id (symbol-name (car room-data)))
-              (room (matrix-client-room-for-id con room-id)))
-         (when (and room (oref room :buffer))
-           (kill-buffer (oref room :buffer)))))
-     (matrix-get 'leave (matrix-get 'rooms data)))
-    (mapc
-     (lambda (room-data)
-       (let* ((room-id (symbol-name (car room-data)))
-              (room (or (matrix-get room-id (oref con :rooms))
-                        (matrix-client-setup-room con room-id)))
-              (room-events (cdr room-data)))
-         (mapc
-          (lambda (event)
-            (matrix-client-room-event room event))
-          (matrix-get 'events (matrix-get 'state room-events)))
-         (mapc
-          (lambda (event)
-            (matrix-client-room-event room event))
-          (matrix-get 'events (matrix-get 'timeline room-events)))))
-     (matrix-get 'join (matrix-get 'rooms data)))
-    (mapc
-     (lambda (room-data)
-       (matrix-client-invite-room con data))
-     (matrix-get 'invite (matrix-get 'rooms data)))
-    (let ((next (matrix-get 'next_batch data)))
-      (oset con :end-token next)
-      (oset con :last-event-ts  (float-time))
+
+    ;; Kill buffers for left rooms
+    (cl-loop for room in (a-get* data 'rooms 'leave)
+             do (let* ((room-id (symbol-name (car room)))
+                       (room (matrix-client-room-for-id con room-id)))
+                  (when (and room (oref room :buffer))
+                    (kill-buffer (oref room :buffer)))))
+
+    ;; Join joined rooms
+    (cl-loop for room-data in (a-get* data 'rooms 'join)
+             do (let* ((room-id (symbol-name (car room-data)))
+                       (room (or (matrix-get room-id (oref con :rooms))
+                                 (matrix-client-setup-room con room-id)))
+                       (room-events (cdr room-data)))
+                  ;; For some reason, the events are in arrays instead of lists.
+                  (cl-loop for event across (a-get* room-events 'state 'events)
+                           do (matrix-client-room-event room event))
+                  (cl-loop for event across (a-get* room-events 'timeline 'events)
+                           do (matrix-client-room-event room event))))
+
+    ;; (--each (a-get* data 'rooms 'invite)
+    ;; FIXME: Unimplemented.
+    ;;   ;; Process invitations
+    ;;   (matrix-client-invite-room con data))
+
+    ;; Process next batch
+    (let ((next (map-elt data 'next_batch)))
+      (oset-multi con
+        :end-token next
+        :last-event-ts (float-time))
       (matrix-client-start-watchdog con)
       (matrix-sync con next nil matrix-client-event-poll-timeout
                    (apply-partially #'matrix-client-sync-handler con)))))
