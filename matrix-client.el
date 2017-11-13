@@ -153,7 +153,8 @@ event-handlers and input-filters.")
 ;; (defvar matrix-client-event-stream-end-token nil)
 
 (defclass matrix-client-room ()
-  ((con :initarg :con)
+  ((con :initarg :con
+        :initform nil)
    (buffer :initarg :buffer
            :documentation "The buffer that contains the room's chat session")
    (name :initarg :room-name
@@ -399,8 +400,7 @@ and password."
   ;; with every message they send.
   (kill-line)
   (let* ((room matrix-client-room-object)
-         (con (when (slot-boundp room :con)
-                (oref room :con)))
+         (con (oref room :con))
          (input-filters (oref con :input-filters)))
     (cl-reduce 'matrix-client-run-through-input-filter
                input-filters
@@ -416,9 +416,8 @@ and password."
 (defun matrix-client-send-to-current-room (con text)
   "Send a string TEXT to the current buffer's room."
   (let ((room matrix-client-room-object)
-        (con (and room
-                  (slot-boundp room :con)
-                  (oref room :con)))
+        (con (when room
+               (oref room :con)))
         (id (and room
                  (slot-boundp room :id)
                  (oref room :id))))
