@@ -380,20 +380,24 @@ and password."
 (defun matrix-client-send-active-line ()
   "Send the current message-line text after running it through input-filters."
   (interactive)
-  (let ((buffer-undo-list t))
-    (goto-char (point-max))
-    (beginning-of-line)
-    (re-search-forward "▶")
-    (forward-char)
-    (kill-line)
-    (let* ((room matrix-client-room-object)
-           (con (and (slot-boundp room :con)
-                     (oref room :con)))
-           (input-filters (and (slot-boundp con :input-filters)
-                               (oref con :input-filters))))
-      (cl-reduce 'matrix-client-run-through-input-filter
-                 input-filters
-                 :initial-value (pop kill-ring)))))
+  (goto-char (point-max))
+  (beginning-of-line)
+  ;; TODO: Make the prompt character customizable, and probably use
+  ;; text-properties or an overlay to find it.
+  (re-search-forward "▶")
+  (forward-char)
+  ;; MAYBE: Just delete the text and store it in a var instead of
+  ;; killing it to the kill-ring.  On the one hand, it's a nice
+  ;; backup, but some users might prefer not to clutter the kill-ring
+  ;; with every message they send.
+  (kill-line)
+  (let* ((room matrix-client-room-object)
+         (con (when (slot-boundp room :con)
+                (oref room :con)))
+         (input-filters (and (slot-boundp con :input-filters) (oref con :input-filters))))
+    (cl-reduce 'matrix-client-run-through-input-filter
+               input-filters
+               :initial-value (pop kill-ring))))
 
 (defun matrix-client-run-through-input-filter (text filter)
   "Run each TEXT through a single FILTER.  Used by `matrix-client-send-active-line'."
