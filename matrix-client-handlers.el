@@ -199,13 +199,14 @@ Otherwise, use the room name or alias."
     (rename-buffer buffer-name)))
 
 (defun matrix-client-handler-m.presence (data)
-  (let* ((inhibit-read-only t)
-         (content (matrix-get 'content data))
-         (user-id (matrix-get 'user_id content))
-         (presence (matrix-get 'presence content))
-         (display-name (matrix-get 'displayname content)))
-    (with-current-buffer (get-buffer-create "*matrix-events*")
-      (when matrix-client-render-presence
+  "Insert presence message into events buffer for DATA."
+  (when matrix-client-render-presence
+    (let* ((inhibit-read-only t)
+           (content (map-elt data 'content))
+           (user-id (map-elt content 'user_id))
+           (presence (map-elt content 'presence))
+           (display-name (map-elt content 'displayname)))
+      (with-current-buffer (get-buffer-create "*matrix-events*")
         (goto-char (point-max))
         (insert-read-only "\n")
         (insert-read-only (format "%s (%s) --> %s" display-name user-id presence) face matrix-client-metadata)))))
