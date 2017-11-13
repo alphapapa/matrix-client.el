@@ -150,11 +150,12 @@ like."
      (insert-read-only output))))
 
 (defmatrix-client-handler "m.lightrix.pattern"
-  ((content (matrix-get 'content data)))
+  ;; FIXME: Move this to separate file for Ryan.  :)
+  ((content (map-elt data 'content)))
   ((insert "\n")
-   (insert-read-only (format "🌄 %s --> " (matrix-client-displayname-from-user-id room (matrix-get 'user_id data)))
+   (insert-read-only (format "🌄 %s --> " (matrix-client-displayname-from-user-id room (map-elt data 'user_id)))
                      face matrix-client-metadata)
-   (insert-read-only (matrix-get 'pattern content))))
+   (insert-read-only (map-elt content 'pattern))))
 
 (defmatrix-client-handler "m.room.member"
   ((content (matrix-get 'content data))
