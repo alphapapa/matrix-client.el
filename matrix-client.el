@@ -240,33 +240,28 @@ and password."
                                                     (-lambda ((_ . a-con) (_ . b-con))
                                                       (equal (oref a-con :token) (oref b-con :token)))))))
 
-(defmethod matrix-client-start-watchdog ((con matrix-client-connection) &optional force timer-secs)
+(cl-defmethod matrix-client-start-watchdog ((con matrix-client-connection) &optional force timer-secs)
   (when (or force matrix-client-enable-watchdog)
-    (let ((last-ts (or (and (slot-boundp con :last-event-ts)
-                            (oref con :last-event-ts))
-                       0))
-          (next (and (slot-boundp con :end-token)
-                     (oref con :end-token)))
-          (timer (and (slot-boundp con :watchdog-timer)
-                      (oref con :watchdog-timer))))
-      (if (and (slot-boundp con :watchdog-timer) ;; start timer if not running
-               (oref con :watchdog-timer))
-          (if (> (* 1000 (- (float-time) last-ts)) ;; If we've timed out, re-sync
+    (let ((last-ts (and (slot-boundp con :last-event-ts) (oref con :last-event-ts)))
+          (next (and (slot-boundp con :end-token) (oref con :end-token)))
+          (timer (and (slot-boundp con :watchdog-timer) (oref con :watchdog-timer))))
+      (if timer
+          (if (> (* 1000 (- (float-time) last-ts))
                  matrix-client-event-poll-timeout)
               (progn
+                ;; Timed out: resync
                 (cancel-timer timer)
                 ;; XXX Pull these fucking syncs out and bar them on (oref con :running)
-                (when (and (slot-boundp con :running)
-                           (oref con :running))
+                (when (oref con :running)
                   (message "Reconnecting you to Matrix, one monent please.")
                   (cancel-timer timer)
                   (matrix-sync con next nil matrix-client-event-poll-timeout
                                (apply-partially #'matrix-client-sync-handler con))))
+            ;; Not timed out: just cancel timer
             (cancel-timer timer)))
-      (oset con :watchdog-timer
-            (run-with-timer (or timer-secs (/ (* 2 matrix-client-event-poll-timeout) 1000))
-                            (or timer-secs (/ (* 2 matrix-client-event-poll-timeout) 1000))
-                            (apply-partially #'matrix-client-start-watchdog con))))))
+      (let ((timer-secs (or timer-secs (/ (* 2 matrix-client-event-poll-timeout) 1000))))
+        (oset con :watchdog-timer (run-with-timer timer-secs timer-secs
+                                                  (apply-partially #'matrix-client-start-watchdog con)))))))
 
 (defmethod matrix-client-setup-room ((con matrix-client-connection) room-id)
   (when (get-buffer room-id)
