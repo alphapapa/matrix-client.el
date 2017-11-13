@@ -129,6 +129,7 @@ See `defmatrix-client-handler'.")
    (username :initarg :username
              :documentation "Your Matrix username.")
    (input-filters :initarg :input-filters
+                  :initform nil
                   :documentation "List of functions to run input through.
 
 Each of these functions take a single argument, the TEXT the user
@@ -400,7 +401,7 @@ and password."
   (let* ((room matrix-client-room-object)
          (con (when (slot-boundp room :con)
                 (oref room :con)))
-         (input-filters (and (slot-boundp con :input-filters) (oref con :input-filters))))
+         (input-filters (oref con :input-filters)))
     (cl-reduce 'matrix-client-run-through-input-filter
                input-filters
                :initial-value (pop kill-ring))))
