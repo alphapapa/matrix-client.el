@@ -401,9 +401,10 @@ and password."
 
 (defun matrix-client-run-through-input-filter (text filter)
   "Run each TEXT through a single FILTER.  Used by `matrix-client-send-active-line'."
-  (let ((con (oref matrix-client-room-object :con)))
-    (when text
-      (funcall filter con text))))
+  (when text
+    (funcall filter
+             (oref matrix-client-room-object :con)
+             text)))
 
 (defun matrix-client-send-to-current-room (con text)
   "Send a string TEXT to the current buffer's room."
