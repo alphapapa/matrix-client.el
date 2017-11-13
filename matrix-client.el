@@ -116,13 +116,15 @@ connection basis.")
    (rooms :initarg :rooms
           :initform nil
           :documentation "List of matrix-room objects")
-   (end-token :initarg :end-token)
+   (end-token :initarg :end-token
+              :initform nil)
    (event-handlers :initarg :event-handlers
                    :documentation "An alist of (type . function) handler definitions for various matrix types.
 
 Each of these receives the raw event as a single DATA argument.
 See `defmatrix-client-handler'.")
    (event-hook :initarg :event-hook
+               :initform nil
                :documentation "A lists of functions that are evaluated when a new event comes in.")
    (username :initarg :username
              :documentation "Your Matrix username.")
@@ -132,8 +134,10 @@ See `defmatrix-client-handler'.")
 Each of these functions take a single argument, the TEXT the user
 inputs.  They can modify that text and return a new version of
 it, or they can return nil to prevent further processing of it.")
-   (watchdog-timer :initarg :watchdog-timer)
-   (last-event-ts :initarg :last-event-ts))
+   (watchdog-timer :initarg :watchdog-timer
+                   :initform nil)
+   (last-event-ts :initarg :last-event-ts
+                  :initform 0))
   :documentation "This is the basic UI encapsulation of a Matrix connection.
 
 To build a UI on top of `matrix-api' start here, wire up
@@ -163,6 +167,7 @@ event-handlers and input-filters.")
    (membership :initarg :membership
                :documentation "The list of members of the buffer's room.")
    (end-token :initarg :end-token
+              :initform nil
               :documentation "The most recent event-id in a room, used to push read-receipts to the server.")))
 
 (defvar-local matrix-client-room-typers nil
