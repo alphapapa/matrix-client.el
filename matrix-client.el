@@ -167,7 +167,8 @@ event-handlers and input-filters.")
    (id :initarg :id
        :initform nil
        :documentation "The Matrix ID of the buffer's room.")
-   (typers :initarg :typers)
+   (typers :initarg :typers
+           :initform nil)
    (membership :initarg :membership
                :documentation "The list of members of the buffer's room.")
    (end-token :initarg :end-token
@@ -361,7 +362,7 @@ and password."
   "Update the header line of the current buffer for ROOM."
   ;; Disable when tabbar mode is on
   (unless (and (boundp 'tabbar-mode) tabbar-mode)
-    (let ((typers (and (slot-boundp room :typers) (oref room :typers)))
+    (let ((typers (oref room :typers))
           (name (and (slot-boundp room :room-name) (oref room :room-name)))
           (topic (and (slot-boundp room :topic) (oref room :topic))))
       (setq header-line-format (if (> 0 (length typers))
