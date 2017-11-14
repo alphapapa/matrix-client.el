@@ -167,23 +167,27 @@ will be called by `request' when the call completes"
     (when callback
       (funcall callback data))))
 
-(cl-defmethod matrix-send-event ((con matrix-connection) room-id event-type content)
+(cl-defmethod matrix-send-event ((con matrix-connection) room-id event-type content
+                                 &optional &key async)
   "Send a raw event to the room ROOM-ID.
 EVENT-TYPE is the matrix event type to send (see Matrix spec).
 CONTENT is a `json-encode' compatible list to include in the
-event."
+event.  If ASYNC is non-nil, send the message asynchronously."
   (let* ((txn-id (incf (oref con :txn-id)))
          (path (format "/rooms/%s/send/%s/%s"
                        (url-encode-url room-id)
                        (url-encode-url event-type)
                        txn-id)))
-    (matrix-send con "PUT" path content)))
+    (pcase async
+      (`nil (matrix-send con "PUT" path content))
+      (`t (matrix-send-async con "PUT" path content)))))
 
 (cl-defmethod matrix-send-message ((con matrix-connection) room-id message)
   "Send string MESSAGE to room ROOM-ID."
   (matrix-send-event con room-id "m.room.message"
                      (a-list "msgtype" "m.text"
-                             "body" message)))
+                             "body" message)
+                     :async t))
 
 (cl-defmethod matrix-sync ((con matrix-connection) since full-state timeout callback)
   "Start an event poller starting from END-TOKEN.
