@@ -165,7 +165,7 @@ event-handlers and input-filters.")
          :documentation "The name of the buffer's room.")
    (aliases :initarg :aliases
             :initform nil
-            :documentation "The alises of the buffer's room.")
+            :documentation "The aliases of the buffer's room.")
    (topic :initarg :topic
           :initform nil
           :documentation "The topic of the buffer's room.")
