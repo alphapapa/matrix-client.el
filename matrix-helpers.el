@@ -65,6 +65,12 @@ PAIRS should be of the form (SLOT VALUE SLOT VALUE...)."
 
 ;;;; Functions
 
+(defun matrix-client-delete-backward-char (n &optional kill-flag)
+  "Delete backward unless the point is at the prompt or other read-only text."
+  (interactive "p\nP")
+  (unless (get-text-property (- (point) 2) 'read-only)
+    (call-interactively #'delete-backward-char n kill-flag)))
+
 (defun matrix-homeserver-api-url (&optional version)
   "Message `matrix-homeserver-base-url' in to a fully-qualified API endpoint URL."
   (let ((version (or version "api/v1")))

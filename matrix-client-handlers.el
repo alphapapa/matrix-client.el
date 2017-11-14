@@ -86,7 +86,7 @@ BODY is the function itself.  See, for example,
 like."
   (let ((fname (intern (format "matrix-client-handler-%s" msgtype))))
     `(defun ,fname (con room data)
-       (let* ((inhibit-read-only t)
+       (let* ((inhibit-read-only t)     ; FIXME: Can probably remove this now.
               (room-id (oref room :id))
               (room-buf (oref room :buffer))
               ,@varlist)
@@ -115,7 +115,9 @@ like."
   ((content (map-elt data 'content))
    (msg-type (map-elt content 'msgtype))
    (format (map-elt content 'format))
-   (timestamp (/ (map-elt data 'origin_server_ts) 1000))
+   ;; We don't use `matrix-client-event-data-timestamp', because for
+   ;; room messages, the origin_server_ts is the actual message time.
+   (timestamp (/ (a-get* data 'origin_server_ts) 1000))
    (sender (map-elt data 'sender))
    (display-name (matrix-client-displayname-from-user-id room (map-elt data 'sender)))
    (own-display-name (oref* room :con :username)))
@@ -148,8 +150,7 @@ like."
                                 (matrix-client-linkify-urls
                                  (matrix-transform-mxc-uri (or (map-elt content 'url)
                                                                (map-elt content 'thumbnail_url))))))
-                       (t
-                        (matrix-client-linkify-urls (map-elt content 'body))))))
+                       (_ (matrix-client-linkify-urls (map-elt content 'body))))))
 
      ;; Trim messages because HTML ones can have extra newlines
      (setq message (string-trim message))
@@ -163,23 +164,27 @@ like."
                message-face 'default))
        ;; Use 'append so that link faces are not overridden.
        (add-face-text-property 0 (length metadata) metadata-face 'append metadata)
-       (add-face-text-property 0 (length output) message-face 'append output))
-     ;; Add metadata to output
-     (setq output (concat metadata message))
-     ;; Add text properties
-     (setq output (propertize output
+       (add-face-text-property 0 (length message) message-face 'append message))
+
+     ;; Concat metadata with message and add text properties
+     (setq output (propertize (concat metadata message)
                               'timestamp timestamp
                               'display-name display-name
                               'sender sender
                               'event_id event_id))
+
      ;; Actually insert text
-     (insert-read-only "\n")
-     (insert-read-only output)
+     (matrix-client-insert room output)
 
      ;; Notification
      (unless (equal own-display-name display-name)
        (run-hook-with-args 'matrix-client-notify-hook "m.room.message" data
                            :room room)))))
+
+(defun insert-read-only (text &rest extra-props)
+  ;; NOTE: The "m.lightrix.pattern" handler is the only one that uses this now.
+  "Insert a block of TEXT as read-only, with the ability to add EXTRA-PROPS such as face."
+  (insert (apply #'propertize text 'read-only t extra-props)))
 
 (defmatrix-client-handler "m.lightrix.pattern"
   ;; FIXME: Move this to separate file for Ryan.  :)
@@ -196,52 +201,80 @@ like."
    (room-membership (oref room :membership))
    (display-name (map-elt content 'displayname)))
   ((assq-delete-all user-id room-membership)
-   (if (string= "join" membership)
-       (progn
-         (when matrix-client-render-membership
-           (insert-read-only "\n")
-           (insert-read-only (format "Joined: %s (%s) --> %s" display-name user-id membership) face matrix-client-metadata))
-         (push (cons user-id content) room-membership))
-     (when matrix-client-render-membership
-       (insert-read-only "\n")
-       (insert-read-only (format "Left: %s (%s) --> %s" display-name user-id membership) face matrix-client-metadata)))
+   (when-let ((render matrix-client-render-membership)
+              (timestamp (matrix-client-event-data-timestamp data))
+              (action (pcase membership
+                        ("join" (progn
+                                  (push (cons user-id content) room-membership)
+                                  "Joined"))
+                        ("leave" (progn
+                                   ;; FIXME: Remove user from room-membership
+                                   "Left"))
+                        (_ (format "Unknown membership message: %s" membership))))
+              (message (propertize (format "%s: %s (%s)" action display-name user-id)
+                                   'timestamp timestamp
+                                   'face 'matrix-client-metadata)))
+     (matrix-client-insert room message))
    (oset room :membership room-membership)
    (matrix-client-update-name room)))
 
 (defun matrix-client-handler-m.presence (data)
   "Insert presence message into events buffer for DATA."
   (when matrix-client-render-presence
-    (let* ((inhibit-read-only t)
+    (let* ((timestamp (matrix-client-event-data-timestamp data))
            (content (map-elt data 'content))
            (user-id (map-elt content 'user_id))
            (presence (map-elt content 'presence))
            (display-name (map-elt content 'displayname)))
       (with-current-buffer (get-buffer-create "*matrix-events*")
         (goto-char (point-max))
-        (insert-read-only "\n")
-        (insert-read-only (format "%s (%s) --> %s" display-name user-id presence) face matrix-client-metadata)))))
+        (matrix-client-insert room (propertize (format "%s (%s) --> %s" display-name user-id presence)
+                                               'face 'matrix-client-metadata
+                                               'timestamp timestamp))))))
+
+(defun matrix-client-event-data-timestamp (data)
+  "Return timestamp of event DATA."
+  (let ((server-ts (float (a-get* data 'origin_server_ts)))
+        (event-age (float (a-get* data 'unsigned 'age))))
+    ;; The timestamp and the age are in milliseconds.  We need
+    ;; millisecond precision in case of two messages sent/received
+    ;; within one second, but we need to return seconds, not
+    ;; milliseconds.  So we divide by 1000 to get the timestamp in
+    ;; seconds, but we keep millisecond resolution by using floats.
+    (/ (- server-ts event-age) 1000)))
 
 (defmatrix-client-handler "m.room.name"
   ()
   ((oset room :room-name (a-get* data 'content 'name))
    (matrix-client-update-name room)
-   (insert-read-only "\n")
-   (insert-read-only (format "Room name changed --> %s" (oref room :room-name)) face matrix-client-metadata)
-   (matrix-client-update-header-line room)))
+   (matrix-client-update-header-line room)
+   (when-let ((event_id (a-get data 'event_id))
+              (timestamp (matrix-client-event-data-timestamp data))
+              (message (propertize (format "Room name changed --> %s" (oref room :room-name))
+                                   'timestamp timestamp
+                                   'event_id event_id
+                                   'face 'matrix-client-metadata)))
+     (matrix-client-insert room message))))
 
 (defmatrix-client-handler "m.room.aliases"
   ((new-alias-list (a-get* data 'content 'aliases)))
-  ((oset room :aliases new-alias-list)
+  ((let* ((timestamp (matrix-client-event-data-timestamp data))
+          (message (propertize (format "Room alias changed --> %s" new-alias-list)
+                               'timestamp timestamp
+                               'face 'matrix-client-metadata)))
+     (matrix-client-insert room message))
+   (oset room :aliases new-alias-list)
    (matrix-client-update-name room)
-   (insert-read-only "\n")
-   (insert-read-only (format "Room alias changed --> %s" new-alias-list) face matrix-client-metadata)
    (matrix-client-update-header-line room)))
 
 (defmatrix-client-handler "m.room.topic"
   ((topic (a-get* data 'content 'topic)))
-  ((oset room :topic topic)
-   (insert-read-only "\n")
-   (insert-read-only (format "Room topic changed --> %s" topic) face matrix-client-metadata)
+  ((let* ((timestamp (matrix-client-event-data-timestamp data))
+          (message (propertize (format "Room topic changed --> %s" topic)
+                               'timestamp timestamp
+                               'face 'matrix-client-metadata)))
+     (matrix-client-insert room message))
+   (oset room :topic topic)
    (matrix-client-update-header-line room)))
 
 (defun matrix-client-handler-m.typing (con room data)

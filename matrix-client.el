@@ -7,7 +7,7 @@
 ;; Keywords: web
 ;; Homepage: http://doc.rix.si/matrix.html
 ;; Package-Version: 0.1.2
-;; Package-Requires: ((emacs "25.1") (dash "2.13.0") (json "1.4") (request "0.2.0") (a "0.1.0"))
+;; Package-Requires: ((emacs "25.1") (dash "2.13.0") (json "1.4") (request "0.2.0") (a "0.1.0") (ov "1.0.6"))
 
 ;; This file is not part of GNU Emacs.
 
@@ -47,6 +47,7 @@
 (require 'seq)
 
 (require 'dash)
+(require 'ov)
 
 ;;;###autoload
 (defcustom matrix-client-debug-events nil
@@ -383,6 +384,25 @@ and password."
              (handler (a-get (oref con :event-handlers) type)))
     (funcall handler con room item)))
 
+(cl-defmethod matrix-client-insert ((room matrix-client-room) string)
+  "Insert STRING into ROOM's buffer.
+STRING should have a `timestamp' text-property."
+  (let ((inhibit-read-only t)
+        (timestamp (get-text-property 0 'timestamp string)))
+    (with-current-buffer (oref room :buffer)
+      (cl-loop initially do (progn
+                              (goto-char (ov-beg (car (ov-in 'matrix-client-prompt t))))
+                              (forward-line -1))
+               for buffer-ts = (get-text-property (point) 'timestamp)
+               until (when buffer-ts
+                       (< buffer-ts timestamp))
+               while (when-let (pos (previous-single-property-change (point) 'timestamp))
+                       (goto-char pos))
+               finally do (when-let (pos (next-single-property-change (point) 'timestamp))
+                            (goto-char pos)))
+      (insert "\n"
+              (propertize string 'read-only t)))))
+
 (cl-defmethod matrix-client-inject-event-listeners ((con matrix-client-connection))
   "Inject the standard event listeners."
   (unless (oref con :event-hook)
@@ -406,34 +426,30 @@ and password."
                                    (format "(%d typing...) %s: %s" (length typers) name topic)
                                  (format "%s: %s" name topic))))))
 
-;;;###autoload
-(defmacro insert-read-only (text &rest extra-props)
-  ;; TODO: Remove this function, and/or move it to matrix-helpers.el.
-  "Insert a block of TEXT as read-only, with the ability to add EXTRA-PROPS such as face."
-  `(add-text-properties
-    (point) (progn
-              (insert ,text)
-              (point))
-    '(read-only t ,@extra-props)))
+(defvar matrix-client-input-prompt "▶ ")
 
 (cl-defmethod matrix-client-render-message-line ((room matrix-client-room room))
   ;; FIXME: Why is there an extra "room" the arg list?  EIEIO docs
   ;; don't seem to mention this.
   "Insert a message input at the end of the buffer."
   (goto-char (point-max))
-  (let ((inhibit-read-only t))
-    (insert "\n")
-    (insert-read-only "[::] ▶ " rear-nonsticky t)))
+  (let ((inhibit-read-only t)
+        (ov-sticky-front t))
+    (insert (propertize "\n" 'read-only t)
+            "\n")
+    (ov (point) (point)
+        'before-string (concat "\n" matrix-client-input-prompt)
+        'matrix-client-prompt t)))
 
 (defun matrix-client-send-active-line ()
   "Send the current message-line text after running it through input-filters."
   (interactive)
   (goto-char (point-max))
-  (beginning-of-line)
+
   ;; TODO: Make the prompt character customizable, and probably use
   ;; text-properties or an overlay to find it.
-  (re-search-forward "▶")
-  (forward-char)
+  (goto-char (ov-end (car (ov-in 'matrix-client-prompt t))))
+
   ;; MAYBE: Just delete the text and store it in a var instead of
   ;; killing it to the kill-ring.  On the one hand, it's a nice
   ;; backup, but some users might prefer not to clutter the kill-ring
