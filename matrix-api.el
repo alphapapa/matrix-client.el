@@ -87,7 +87,7 @@ CON."
   (dolist (handler matrix-error-hook)
     (funcall handler con symbol-status error-thrown))
   ;; Message some warnings if we know what it is
-  (let ((exit-code (matrix-parse-curl-exit-code (cdr error-thrown))))
+  (let ((exit-code (matrix-parse-curl-exit-code (cddr error-thrown))))
     (warn (pcase exit-code
             ((or 51 60) "Error sending request to matrix homeserver, SSL certificate is invalid")
             (`nil "Unknown error occurred sending request to matrix homeserver: %S")
