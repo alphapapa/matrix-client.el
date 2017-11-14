@@ -7,7 +7,7 @@
 ;; Keywords: web
 ;; Homepage: http://doc.rix.si/matrix.html
 ;; Package-Version: 0.1.2
-;; Package-Requires: ((emacs "25.1") (json "1.4") (request "0.2.0") (a "0.1.0"))
+;; Package-Requires: ((emacs "25.1") (dash "2.13.0") (json "1.4") (request "0.2.0") (a "0.1.0"))
 
 ;; This file is not part of GNU Emacs.
 
@@ -44,6 +44,9 @@
 
 (require 'matrix-api)
 (require 'cl-lib)
+(require 'seq)
+
+(require 'dash)
 
 ;;;###autoload
 (defcustom matrix-client-debug-events nil
@@ -113,24 +116,31 @@ connection basis.")
    (rooms :initarg :rooms
           :initform nil
           :documentation "List of matrix-room objects")
-   (end-token :initarg :end-token)
+   (end-token :initarg :end-token
+              :initform nil)
    (event-handlers :initarg :event-handlers
+                   :initform nil
                    :documentation "An alist of (type . function) handler definitions for various matrix types.
 
 Each of these receives the raw event as a single DATA argument.
 See `defmatrix-client-handler'.")
    (event-hook :initarg :event-hook
+               :initform nil
                :documentation "A lists of functions that are evaluated when a new event comes in.")
    (username :initarg :username
+             :initform nil
              :documentation "Your Matrix username.")
    (input-filters :initarg :input-filters
+                  :initform nil
                   :documentation "List of functions to run input through.
 
 Each of these functions take a single argument, the TEXT the user
 inputs.  They can modify that text and return a new version of
 it, or they can return nil to prevent further processing of it.")
-   (watchdog-timer :initarg :watchdog-timer)
-   (last-event-ts :initarg :last-event-ts))
+   (watchdog-timer :initarg :watchdog-timer
+                   :initform nil)
+   (last-event-ts :initarg :last-event-ts
+                  :initform 0))
   :documentation "This is the basic UI encapsulation of a Matrix connection.
 
 To build a UI on top of `matrix-api' start here, wire up
@@ -145,21 +155,30 @@ event-handlers and input-filters.")
 ;; (defvar matrix-client-event-stream-end-token nil)
 
 (defclass matrix-client-room ()
-  ((con :initarg :con)
+  ((con :initarg :con
+        :initform nil)
    (buffer :initarg :buffer
+           :initform nil
            :documentation "The buffer that contains the room's chat session")
    (name :initarg :room-name
+         :initform nil
          :documentation "The name of the buffer's room.")
    (aliases :initarg :aliases
+            :initform nil
             :documentation "The alises of the buffer's room.")
    (topic :initarg :topic
+          :initform nil
           :documentation "The topic of the buffer's room.")
    (id :initarg :id
+       :initform nil
        :documentation "The Matrix ID of the buffer's room.")
-   (typers :initarg :typers)
+   (typers :initarg :typers
+           :initform nil)
    (membership :initarg :membership
+               :initform nil
                :documentation "The list of members of the buffer's room.")
    (end-token :initarg :end-token
+              :initform nil
               :documentation "The most recent event-id in a room, used to push read-receipts to the server.")))
 
 (defvar-local matrix-client-room-typers nil
@@ -180,13 +199,11 @@ event-handlers and input-filters.")
   (interactive "i")
   (let* ((base-url matrix-homeserver-base-url)
          ;; Pass a username in to get an existing connection
-         (con (when username
-                (matrix-get username matrix-client-connections)))
-         (con (unless con
-                (matrix-client-connection
-                 matrix-homeserver-base-url
-                 :base-url matrix-homeserver-base-url))))
-    (unless (and (slot-boundp con :token) (oref con :token))
+         (con (if username
+                  (map-elt matrix-client-connections username)
+                (matrix-client-connection matrix-homeserver-base-url
+                                          :base-url matrix-homeserver-base-url))))
+    (unless (oref con :token)
       (matrix-client-login con username))
     (unless (oref con :running)
       (matrix-client-start-watchdog con nil 120)
@@ -194,99 +211,92 @@ event-handlers and input-filters.")
       (matrix-client-handlers-init con)
       (matrix-sync con nil t matrix-client-event-poll-timeout
                    (apply-partially #'matrix-client-sync-handler con))
-      (dolist (hook matrix-client-after-connect-hooks)
-        (funcall hook con)))
-    (add-to-list 'matrix-client-connections (list (oref con :username) con))
+      (run-hook-with-args 'matrix-client-after-connect-hooks con))
+    (map-put matrix-client-connections (oref con :username) con)
     (oset con :running t)
     (message "You're jacked in, welcome to Matrix. Your messages will arrive momentarily.")))
 
-(defmethod matrix-client-login ((con matrix-client-connection) &optional username)
-  "Get a token form the Matrix homeserver.
-
-If [`matrix-client-use-auth-source'] is non-nil, attempt to log in
-using data from auth-source. Otherwise, the user will be prompted
-for a username and password."
-  (let* ((auth-source-creation-prompts
-          '((username . "Matrix identity: ")
-            (secret . "Matrix password for %u (homeserver: %h): ")))
+(cl-defmethod matrix-client-login ((con matrix-client-connection) &optional username)
+  "Login to Matrix connection CON and get a token.
+If [`matrix-client-use-auth-source'] is non-nil, attempt to log
+in using data from auth-source.  Otherwise, prompt for username
+and password."
+  (let* ((auth-source-creation-prompts (a-list 'username "Matrix identity: "
+                                               'secret "Matrix password for %u (homeserver: %h): "))
          (found (nth 0 (auth-source-search :max 1
                                            :host (oref con :base-url)
                                            :user username
                                            :require '(:user :secret)
                                            :create t))))
-    (when (and
-           found
-           (matrix-login-with-password con
-                                       (plist-get found :user)
-                                       (let ((secret (plist-get found :secret)))
-                                         (if (functionp secret)
-                                             (funcall secret)
-                                           secret)))
-           (oset con :username (plist-get found :user))
-           (let ((save-func (plist-get found :save-function)))
-             (when save-func (funcall save-func)))))))
+    (when (and found
+               (matrix-login-with-password con (plist-get found :user)
+                                           (let ((secret (plist-get found :secret)))
+                                             (if (functionp secret)
+                                                 (funcall secret)
+                                               secret))))
+      (oset con :username (plist-get found :user))
+      (when-let ((save-func (plist-get found :save-function)))
+        (funcall save-func)))))
 
-(defun matrix-client-disconnect (&optional con)
-  "Disconnect from Matrix and kill all active room buffers."
+(defun matrix-client-disconnect (&optional connection)
+  "Disconnect from CONNECTION or all Matrix connections, killing room buffers."
   (interactive)
-  (let ((discon (lambda (con)
-                  (dolist (room (oref (cadr con) :rooms))
-                    (kill-buffer (oref (cdr room) :buffer)))
-                  (oset (cadr con) :running nil)
-                  (setq matrix-client-connections
-                        (cl-remove (car con)
-                                   matrix-client-connections
-                                   :test 'equal
-                                   :key 'car)))))
-    (if con
-        (funcall discon con)
-      (dolist (con matrix-client-connections)
-        (funcall discon con)))))
+  (let ((connections (if connection
+                         (list (cons nil connection))
+                       matrix-client-connections)))
+    (cl-loop for (_ . con) in connections
+             do (progn
+                  ;; TODO: Improve the structure of these lists.  It
+                  ;; feels inconsistent and confusing.
+                  (cl-loop for (_ . room) in (oref con :rooms)
+                           do (kill-buffer (oref room :buffer)))
+                  (oset con :running nil)))
+    (setq matrix-client-connections (seq-difference matrix-client-connections
+                                                    connections
+                                                    (-lambda ((_ . a-con) (_ . b-con))
+                                                      (equal (oref a-con :token) (oref b-con :token)))))))
 
-(defmethod matrix-client-start-watchdog ((con matrix-client-connection) &optional force timer-secs)
+(cl-defmethod matrix-client-start-watchdog ((con matrix-client-connection) &optional force timer-secs)
   (when (or force matrix-client-enable-watchdog)
-    (let ((last-ts (or (and (slot-boundp con :last-event-ts)
-                            (oref con :last-event-ts))
-                       0))
-          (next (and (slot-boundp con :end-token)
-                     (oref con :end-token)))
-          (timer (and (slot-boundp con :watchdog-timer)
-                      (oref con :watchdog-timer))))
-      (if (and (slot-boundp con :watchdog-timer) ;; start timer if not running
-               (oref con :watchdog-timer))
-          (if (> (* 1000 (- (float-time) last-ts)) ;; If we've timed out, re-sync
+    (let ((last-ts (oref con :last-event-ts))
+          (next (oref con :end-token))
+          (timer (oref con :watchdog-timer)))
+      (if timer
+          (if (> (* 1000 (- (float-time) last-ts))
                  matrix-client-event-poll-timeout)
               (progn
+                ;; Timed out: resync
                 (cancel-timer timer)
                 ;; XXX Pull these fucking syncs out and bar them on (oref con :running)
-                (when (and (slot-boundp con :running)
-                           (oref con :running))
-                  (message "Reconnecting you to Matrix, one monent please.")
+                (when (oref con :running)
+                  (message "Reconnecting you to Matrix, one moment please...")
                   (cancel-timer timer)
                   (matrix-sync con next nil matrix-client-event-poll-timeout
                                (apply-partially #'matrix-client-sync-handler con))))
+            ;; Not timed out: just cancel timer
             (cancel-timer timer)))
-      (oset con :watchdog-timer
-            (run-with-timer (or timer-secs (/ (* 2 matrix-client-event-poll-timeout) 1000))
-                            (or timer-secs (/ (* 2 matrix-client-event-poll-timeout) 1000))
-                            (apply-partially #'matrix-client-start-watchdog con))))))
+      (let ((timer-secs (or timer-secs (/ (* 2 matrix-client-event-poll-timeout) 1000))))
+        (oset con :watchdog-timer (run-with-timer timer-secs timer-secs
+                                                  (apply-partially #'matrix-client-start-watchdog con)))))))
 
-(defmethod matrix-client-setup-room ((con matrix-client-connection) room-id)
+(cl-defmethod matrix-client-setup-room ((con matrix-client-connection) room-id)
+  "Prepare and switch to buffer for ROOM-ID, and return room object."
   (when (get-buffer room-id)
     (kill-buffer room-id))
   (let* ((room-buf (get-buffer-create room-id))
-         (room-obj (matrix-client-room room-id :buffer room-buf :con con))
-         (new-room-list (append (oref con :rooms) (list (cons room-id room-obj)))))
+         (room-obj (matrix-client-room room-id :buffer room-buf :con con)))
     (with-current-buffer room-buf
       (matrix-client-mode)
+      (setq buffer-undo-list t)
       (erase-buffer)
       (matrix-client-render-message-line room-obj))
     (switch-to-buffer room-buf)
     (set (make-local-variable 'matrix-client-room-connection) con)
     (set (make-local-variable 'matrix-client-room-object) room-obj)
-    (oset con :rooms new-room-list)
-    (oset room-obj :id room-id)
-    (oset room-obj :buffer room-buf)
+    (push (cons room-id room-obj) (oref con :rooms))
+    (oset-multi room-obj
+      :id room-id
+      :buffer room-buf)
     room-obj))
 
 (defmethod matrix-client-sync-handler ((con matrix-client-connection) data)
@@ -295,7 +305,7 @@ for a username and password."
      (lambda (room-data)
        (let* ((room-id (symbol-name (car room-data)))
               (room (matrix-client-room-for-id con room-id)))
-         (when (and room (slot-boundp room :buffer))
+         (when (and room (oref room :buffer))
            (kill-buffer (oref room :buffer)))))
      (matrix-get 'leave (matrix-get 'rooms data)))
     (mapc
@@ -324,54 +334,48 @@ for a username and password."
       (matrix-sync con next nil matrix-client-event-poll-timeout
                    (apply-partially #'matrix-client-sync-handler con)))))
 
-(defmethod matrix-client-room-event ((room matrix-client-room) event)
+(cl-defmethod matrix-client-room-event ((room matrix-client-room) event)
   "Handle state events from a sync."
-  (let* ((con (oref room :con)))
-    (when (slot-boundp con :event-hook)
-      (mapc (lambda (hook)
-              (funcall hook con room event))
-            (oref con :event-hook)))))
+  (when-let ((con (oref room :con))
+             (fns (oref con :event-hook)))
+    (--each fns
+      (funcall it con room event))))
 
-(defmethod matrix-client-render-event-to-room ((con matrix-client-connection) room item)
+(cl-defmethod matrix-client-render-event-to-room ((con matrix-client-connection) room item)
   "Feed ITEM in to its proper `matrix-client-event-handlers' handler."
-  (let* ((type (matrix-get 'type item))
-         (handler (matrix-get type (oref con :event-handlers))))
-    (when handler
-      (funcall handler con room item))))
+  ;; NOTE: It's tempting to use `map-elt' here, but it uses `eql' to
+  ;; compare keys, and since the keys are strings, that doesn't work.
+  ;; MAYBE: Perhaps we should change the keys to symbols someday...
+  (when-let ((type (a-get item 'type))
+             (handler (a-get (oref con :event-handlers) type)))
+    (funcall handler con room item)))
 
-(defmethod matrix-client-inject-event-listeners ((con matrix-client-connection))
+(cl-defmethod matrix-client-inject-event-listeners ((con matrix-client-connection))
   "Inject the standard event listeners."
-  (unless (slot-boundp con :event-hook)
-    (oset con :event-hook
-          '(matrix-client-debug-event-maybe
-            matrix-client-render-event-to-room))))
+  (unless (oref con :event-hook)
+    (oset con :event-hook '(matrix-client-debug-event-maybe
+                            matrix-client-render-event-to-room))))
 
-(defmethod matrix-client-debug-event-maybe ((con matrix-client-connection) room data)
+(cl-defmethod matrix-client-debug-event-maybe ((con matrix-client-connection) room data)
   "Debug DATA to *matrix-events* if `matrix-client-debug-events' is non-nil."
-  (with-current-buffer (get-buffer-create "*matrix-events*")
-    (let ((inhibit-read-only t))
-      (when matrix-client-debug-events
+  (when matrix-client-debug-events
+    (with-current-buffer (get-buffer-create "*matrix-events*")
+      (let ((inhibit-read-only t))
         (goto-char (point-max))
-        (insert "\n")
-        (insert (prin1-to-string data))))))
+        (insert "\n" (prin1-to-string data))))))
 
 (defun matrix-client-update-header-line (room)
-  "Update the header line of the current buffer."
-	;; Disable when tabbar mode is on
-	(unless (and (boundp 'tabbar-mode) tabbar-mode)
-		(let ((typers (and (slot-boundp room :typers)
-										(oref room :typers)))
-					 (name (and (slot-boundp room :room-name)
-                   (oref room :room-name)))
-					 (topic (and (slot-boundp room :topic)
-                    (oref room :topic))))
-			(if (> 0 (length typers))
-        (progn
-          (setq header-line-format (format "(%d typing...) %s: %s" (length typers) name topic)))
-				(setq header-line-format (format "%s: %s" name topic))))))
+  "Update the header line of the current buffer for ROOM."
+  ;; Disable when tabbar mode is on
+  (unless (and (boundp 'tabbar-mode) tabbar-mode)
+    (pcase-let (((eieio typers name topic) room))
+      (setq header-line-format (if (> 0 (length typers))
+                                   (format "(%d typing...) %s: %s" (length typers) name topic)
+                                 (format "%s: %s" name topic))))))
 
 ;;;###autoload
 (defmacro insert-read-only (text &rest extra-props)
+  ;; TODO: Remove this function, and/or move it to matrix-helpers.el.
   "Insert a block of TEXT as read-only, with the ability to add EXTRA-PROPS such as face."
   `(add-text-properties
     (point) (progn
@@ -379,56 +383,60 @@ for a username and password."
               (point))
     '(read-only t ,@extra-props)))
 
-(defmethod matrix-client-render-message-line ((room matrix-client-room room))
+(cl-defmethod matrix-client-render-message-line ((room matrix-client-room room))
+  ;; FIXME: Why is there an extra "room" the arg list?  EIEIO docs
+  ;; don't seem to mention this.
   "Insert a message input at the end of the buffer."
   (goto-char (point-max))
   (let ((inhibit-read-only t))
     (insert "\n")
-    (insert-read-only "[::] ▶ " rear-nonsticky t)
-    (setq buffer-undo-list nil)))
+    (insert-read-only "[::] ▶ " rear-nonsticky t)))
 
 (defun matrix-client-send-active-line ()
   "Send the current message-line text after running it through input-filters."
   (interactive)
-  (let ((buffer-undo-list t))
-    (goto-char (point-max))
-    (beginning-of-line)
-    (re-search-forward "▶")
-    (forward-char)
-    (kill-line)
-    (let* ((room matrix-client-room-object)
-           (con (and (slot-boundp room :con)
-                     (oref room :con)))
-           (input-filters (and (slot-boundp con :input-filters)
-                               (oref con :input-filters))))
-      (cl-reduce 'matrix-client-run-through-input-filter
-                 input-filters
-                 :initial-value (pop kill-ring)))))
+  (goto-char (point-max))
+  (beginning-of-line)
+  ;; TODO: Make the prompt character customizable, and probably use
+  ;; text-properties or an overlay to find it.
+  (re-search-forward "▶")
+  (forward-char)
+  ;; MAYBE: Just delete the text and store it in a var instead of
+  ;; killing it to the kill-ring.  On the one hand, it's a nice
+  ;; backup, but some users might prefer not to clutter the kill-ring
+  ;; with every message they send.
+  (kill-line)
+  (let* ((room matrix-client-room-object)
+         (con (oref room :con))
+         (input-filters (oref con :input-filters)))
+    (cl-reduce 'matrix-client-run-through-input-filter
+               input-filters
+               :initial-value (pop kill-ring))))
 
 (defun matrix-client-run-through-input-filter (text filter)
   "Run each TEXT through a single FILTER.  Used by `matrix-client-send-active-line'."
-  (let ((con (oref matrix-client-room-object :con)))
-    (when text
-      (funcall filter con text))))
+  (when text
+    (funcall filter
+             (oref matrix-client-room-object :con)
+             text)))
 
 (defun matrix-client-send-to-current-room (con text)
   "Send a string TEXT to the current buffer's room."
   (let ((room matrix-client-room-object)
-        (con (and room
-                  (slot-boundp room :con)
-                  (oref room :con)))
-        (id (and room
-                 (slot-boundp room :id)
-                 (oref room :id))))
-    (matrix-send-message con id text))
-  text)
+        (con (when room
+               (oref room :con)))
+        (id (when room
+              (oref room :id))))
+    (matrix-send-message con id text)))
 
 (defun matrix-client-window-change-hook ()
   "Send a read receipt if necessary."
+  ;; FIXME: Unimplemented.
   ;; (when (and matrix-client-room-id matrix-client-room-end-token)
   ;;   (message "%s as read from %s" matrix-client-room-end-token matrix-client-room-id)
   ;;   (matrix-mark-as-read matrix-client-room-id matrix-client-room-end-token))
   )
 
 (provide 'matrix-client)
+
 ;;; matrix-client.el ends here
