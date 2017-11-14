@@ -312,7 +312,7 @@ and password."
     ;; Join joined rooms
     (cl-loop for room-data in (a-get* data 'rooms 'join)
              do (let* ((room-id (symbol-name (car room-data)))
-                       (room (or (matrix-get room-id (oref con :rooms))
+                       (room (or (a-get (oref con :rooms) room-id)
                                  (matrix-client-setup-room con room-id)))
                        (room-events (cdr room-data)))
                   ;; For some reason, the events are in arrays instead of lists.
