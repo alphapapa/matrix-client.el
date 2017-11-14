@@ -44,20 +44,21 @@ the Matrix spec for more information about its format."
   ;; FIXME: `matrix-client-window-change-hook' should be renamed, and
   ;; is currently unimplemented anyway.
   (push 'matrix-client-window-change-hook window-configuration-change-hook)
-  (unless (oref con :event-handlers)
-    (oset con :event-handlers (a-list "m.room.message" 'matrix-client-handler-m.room.message
-                                      "m.lightrix.pattern" 'matrix-client-handler-m.lightrix.pattern
-                                      "m.room.topic" 'matrix-client-handler-m.room.topic
-                                      "m.room.name" 'matrix-client-handler-m.room.name
-                                      "m.room.member" 'matrix-client-handler-m.room.member
-                                      "m.room.aliases" 'matrix-client-handler-m.room.aliases
-                                      "m.presence" 'matrix-client-handler-m.presence
-                                      "m.typing" 'matrix-client-handler-m.typing)))
-  (unless (oref con :input-filters)
-    (oset con :input-filters '(matrix-client-input-filter-emote
-                               matrix-client-input-filter-join
-                               matrix-client-input-filter-leave
-                               matrix-client-send-to-current-room))))
+  (with-slots (event-handlers input-filters) con
+    (unless event-handlers
+      (setq event-handlers (a-list "m.room.message" 'matrix-client-handler-m.room.message
+                                   "m.lightrix.pattern" 'matrix-client-handler-m.lightrix.pattern
+                                   "m.room.topic" 'matrix-client-handler-m.room.topic
+                                   "m.room.name" 'matrix-client-handler-m.room.name
+                                   "m.room.member" 'matrix-client-handler-m.room.member
+                                   "m.room.aliases" 'matrix-client-handler-m.room.aliases
+                                   "m.presence" 'matrix-client-handler-m.presence
+                                   "m.typing" 'matrix-client-handler-m.typing)))
+    (unless input-filters
+      (setq input-filters '(matrix-client-input-filter-emote
+                            matrix-client-input-filter-join
+                            matrix-client-input-filter-leave
+                            matrix-client-send-to-current-room)))))
 
 (defmacro defmatrix-client-handler (msgtype varlist body)
   "Create an matrix-client-handler.
