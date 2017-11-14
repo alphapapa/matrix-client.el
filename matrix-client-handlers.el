@@ -31,6 +31,8 @@
 
 ;;; Code:
 
+(require 'browse-url)
+
 (cl-defmethod matrix-client-handlers-init ((con matrix-client-connection))
   "Set up all the matrix-client event type handlers.
 
@@ -92,6 +94,20 @@ like."
              (end-of-line)
              ,@body))))))
 
+(defun matrix-client-linkify-urls (text)
+  "Return TEXT with URLs in it made clickable."
+  (with-temp-buffer
+    (insert text)
+    (goto-char (point-min))
+    (cl-loop while (re-search-forward (rx bow "http" (optional "s") "://" (1+ (not space))) nil 'noerror)
+             do (make-text-button (match-beginning 0) (match-end 0)
+                                  'mouse-face 'highlight
+                                  'face 'link
+                                  'help-echo (match-string 0)
+                                  'action #'browse-url-at-mouse
+                                  'follow-link t))
+    (buffer-string)))
+
 (defmatrix-client-handler "m.room.message"
   ((content (map-elt data 'content))
    (msg-type (map-elt content 'msgtype))
@@ -124,10 +140,11 @@ like."
                       ("m.image"
                        (concat (map-elt content 'body)
                                ": "
-                               (matrix-transform-mxc-uri (or (map-elt content 'url)
-                                                             (map-elt content 'thumbnail_url)))))
+                               (matrix-client-linkify-urls
+                                (matrix-transform-mxc-uri (or (map-elt content 'url)
+                                                              (map-elt content 'thumbnail_url))))))
                       (t
-                       (map-elt content 'body)))))
+                       (matrix-client-linkify-urls (map-elt content 'body))))))
 
      ;; Apply face for own messages
      (let (metadata-face message-face)
@@ -136,8 +153,9 @@ like."
                  message-face 'matrix-client-own-messages)
          (setq metadata-face 'matrix-client-metadata
                message-face 'default))
-       (add-face-text-property 0 (length metadata) metadata-face nil metadata)
-       (add-face-text-property 0 (length output) message-face nil output))
+       ;; Use 'append so that link faces are not overridden.
+       (add-face-text-property 0 (length metadata) metadata-face 'append metadata)
+       (add-face-text-property 0 (length output) message-face 'append output))
      ;; Add metadata to output
      (setq output (concat metadata output))
      ;; Add text properties
