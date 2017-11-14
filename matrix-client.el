@@ -423,14 +423,20 @@ and password."
              (oref matrix-client-room-object :con)
              text)))
 
-(defun matrix-client-send-to-current-room (con text)
+(defun matrix-client-send-to-current-room (con message)
   "Send a string TEXT to the current buffer's room."
-  (let ((room matrix-client-room-object)
-        (con (when room
-               (oref room :con)))
-        (id (when room
-              (oref room :id))))
-    (matrix-send-message con id text)))
+  (let* (;; FIXME: Setting `room' here seems to be unnecessary,
+         ;; because the function is called in the context of `room'.
+         ;; Until adding this comment, the `let*' was `let', so `room'
+         ;; was coming from the surrounding context, not this.
+         (room matrix-client-room-object)
+         ;; FIXME: We shouldn't need to get `con' again here, because
+         ;; it's passed to the function.
+         (con (when room
+                (oref room :con)))
+         (room-id (when room
+                    (oref room :id))))
+    (matrix-send-message con room-id message)))
 
 (defun matrix-client-window-change-hook ()
   "Send a read receipt if necessary."
