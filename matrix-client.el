@@ -190,9 +190,12 @@ Otherwise, use the room name or alias."
                ;; TODO: Make this a preference.  Some users might want
                ;; 1-1 chats always named after the other user, while
                ;; others might want them named with the room name.
-               (buffer-name (cond ((when membership
+               (buffer-name (cond ((> (length aliases) 0)
+                                   ;; First, if the room has a friendly alias (e.g. #room), use it.
+                                   (elt aliases 0)) ; The JSON list is converted to a vector.
+                                  ((when membership
                                      (eq 2 (length membership)))
-                                   ;; 1-1 chat
+                                   ;; Next, if the room is a 1-1 chat, use the other member's name.
                                    (when-let ((username (cl-loop for member in membership
                                                                  ;; Get non-self member
                                                                  when (not (equal username (map-elt member 'displayname)))
@@ -201,11 +204,11 @@ Otherwise, use the room name or alias."
                                      (if (eq (current-buffer) (get-buffer username))
                                          username
                                        (generate-new-buffer-name username))))
+                                  ;; Next, use the room's "name".
                                   (name)
-                                  ((> (length aliases) 0)
-                                   ;; The JSON list is converted to a vector.
-                                   (elt aliases 0))
+                                  ;; Finally, use the plain room ID.
                                   (id)
+                                  ;; If all else fails, use this string and give a warning.
                                   (t (progn
                                        (warn "Unknown room name for room: %s" room)
                                        "[unknown]")))))
