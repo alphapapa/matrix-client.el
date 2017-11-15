@@ -49,11 +49,11 @@ Optional REST of args are also applied to hooks and function."
 ;; define their arg lists in a certain way, and the macro would take
 ;; care of that automatically.
 
-(cl-defun matrix-client-notify-m.room.message (data &key room &allow-other-keys)
+(cl-defun matrix-client-notify-m.room.message (event &key room &allow-other-keys)
   "Show notification for m.room.message events.
 DATA should be the `data' variable from the
 `defmatrix-client-handler'.  ROOM should be the room object."
-  (pcase-let* (((map content sender event_id) data)
+  (pcase-let* (((map content sender event_id) event)
                ((map body) content)
                (display-name (matrix-client-displayname-from-user-id room sender))
                (buffer (oref room :buffer))
