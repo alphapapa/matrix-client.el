@@ -151,6 +151,9 @@ like."
                        (t
                         (matrix-client-linkify-urls (map-elt content 'body))))))
 
+     ;; Trim messages because HTML ones can have extra newlines
+     (setq message (string-trim message))
+
      ;; Apply face for own messages
      (let (metadata-face message-face)
        (if (string= display-name own-display-name)
