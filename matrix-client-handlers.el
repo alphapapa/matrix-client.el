@@ -226,8 +226,9 @@ Otherwise, use the room name or alias."
                                    (if (eq (current-buffer) (get-buffer username))
                                        username
                                      (generate-new-buffer-name username))))
-                                ((oref room :room-name))
-                                ((car (oref room :aliases))))))
+                           ((oref room :room-name))
+                           ((> (length (oref room :aliases)) 0)
+                            (elt (oref room :aliases) 0)))))
     (rename-buffer buffer-name)))
 
 (defun matrix-client-handler-m.presence (data)
