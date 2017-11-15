@@ -227,7 +227,13 @@ Otherwise, use the room name or alias."
                                        username
                                      (generate-new-buffer-name username))))
                                 ((oref room :room-name))
-                                ((car (oref room :aliases))))))
+                                ((oref room :aliases)
+                                 ;; The JSON list is converted to a vector.
+                                 (elt (oref room :aliases) 0))
+                                ((oref room :id))
+                                (t (progn
+                                     (warn "Unknown room name for room: %s" room)
+                                     "[unknown]")))))
     (rename-buffer buffer-name)))
 
 (defun matrix-client-handler-m.presence (data)
