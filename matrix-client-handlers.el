@@ -32,8 +32,28 @@
 ;;; Code:
 
 (require 'browse-url)
+(require 'shr)
+(require 'url-handlers)
+
+(require 'f)
 
 (require 'matrix-notifications)
+
+(defcustom matrix-client-show-images nil
+  "Download and show images posted to rooms.
+Images are downloaded synchronously, so images that download
+slowly may cause Emacs to appear to hang."
+  :type 'boolean)
+
+(defcustom matrix-client-image-url-prefixes
+  (list (rx bow "http" (optional "s") "://"
+            (or "i.imgur.com" "i.redd.it")
+            "/"))
+  "List of regexps matching parts of URLs to images that should be downloaded and displayed.
+Each regexp should match from the beginning of the URL, including
+the protocol type, if desired.  It will automatically be extended
+to match until the next whitespace character."
+  :type '(repeat string))
 
 (cl-defmethod matrix-client-handlers-init ((con matrix-client-connection))
   "Set up all the matrix-client event type handlers.
@@ -98,9 +118,22 @@ like."
              ,@body))))))
 
 (defun matrix-client-linkify-urls (text)
-  "Return TEXT with URLs in it made clickable."
+  "Return TEXT with URLs in it made clickable and images inserted."
   (with-temp-buffer
     (insert text)
+    ;; Insert images
+    (when matrix-client-show-images
+      (cl-loop for regexp in matrix-client-image-url-prefixes
+               for regexp = (rx-to-string `(seq (regexp ,regexp) (1+ (not space))))
+               do (goto-char (point-min))
+               while (re-search-forward regexp nil 'noerror)
+               for url = (match-string 0)
+               for image = (with-current-buffer (oref room :buffer)
+                             ;; Use room buffer so image can be resized to it
+                             (matrix-client--url-to-image url))
+               when image
+               do (insert image)))
+    ;; Linkify URLs
     (goto-char (point-min))
     (cl-loop while (re-search-forward (rx bow "http" (optional "s") "://" (1+ (not space))) nil 'noerror)
              do (make-text-button (match-beginning 0) (match-end 0)
@@ -110,6 +143,20 @@ like."
                                   'action #'browse-url-at-mouse
                                   'follow-link t))
     (buffer-string)))
+
+(defun matrix-client--url-to-image (url)
+  "Download image from URL and return a string to insert in the room buffer containing the image for display."
+  (if-let ((image-file (url-file-local-copy url))
+           (image-data (prog1
+                           (f-read-bytes image-file)
+                         (f-delete image-file)))
+           (image (shr-rescale-image image-data)))
+      (with-temp-buffer
+        ;; Newline helps prevent wide images from wrapping off the
+        ;; edge of the buffer.
+        (insert "\n")
+        (insert-image image)
+        (buffer-string))))
 
 (defmatrix-client-handler "m.room.message"
   ((content (map-elt data 'content))
@@ -145,9 +192,14 @@ like."
                        ("m.image"
                         (concat (map-elt content 'body)
                                 ": "
-                                (matrix-client-linkify-urls
-                                 (matrix-transform-mxc-uri (or (map-elt content 'url)
-                                                               (map-elt content 'thumbnail_url))))))
+                                (if-let ((url (matrix-transform-mxc-uri (or (map-elt content 'url)
+                                                                            (map-elt content 'thumbnail_url))))
+                                         (show-images matrix-client-show-images)
+                                         (image (matrix-client--url-to-image url)))
+                                    image
+                                  ;; If `matrix-client-show-images' is nil, or if the image can't be downloaded,
+                                  ;; the linkified URL will be returned.
+                                  (matrix-client-linkify-urls url))))
                        (t
                         (matrix-client-linkify-urls (map-elt content 'body))))))
 
