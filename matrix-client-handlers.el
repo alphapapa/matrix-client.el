@@ -206,37 +206,7 @@ like."
        (insert-read-only "\n")
        (insert-read-only (format "Left: %s (%s) --> %s" display-name user-id membership) face matrix-client-metadata)))
    (oset room :membership room-membership)
-   (matrix-update-room-name room)))
-
-(defun matrix-update-room-name (room)
-  "Update ROOM's buffer's name.
-If it only has two members, use the name of the other member.
-Otherwise, use the room name or alias."
-  (with-slots (con membership name aliases id) room
-    (when-let ((username (oref con :username))
-               ;; TODO: Make this a preference.  Some users might want
-               ;; 1-1 chats always named after the other user, while
-               ;; others might want them named with the room name.
-               (buffer-name (cond ((when membership
-                                     (eq 2 (length membership)))
-                                   ;; 1-1 chat
-                                   (when-let ((username (cl-loop for member in membership
-                                                                 ;; Get non-self member
-                                                                 when (not (equal username (map-elt member 'displayname)))
-                                                                 return (or (map-elt member 'displayname)
-                                                                            (car member)))))
-                                     (if (eq (current-buffer) (get-buffer username))
-                                         username
-                                       (generate-new-buffer-name username))))
-                                  (name)
-                                  ((> (length aliases) 0)
-                                   ;; The JSON list is converted to a vector.
-                                   (elt aliases 0))
-                                  (id)
-                                  (t (progn
-                                       (warn "Unknown room name for room: %s" room)
-                                       "[unknown]")))))
-      (rename-buffer buffer-name))))
+   (matrix-client-update-name room)))
 
 (defun matrix-client-handler-m.presence (data)
   "Insert presence message into events buffer for DATA."
@@ -254,7 +224,7 @@ Otherwise, use the room name or alias."
 (defmatrix-client-handler "m.room.name"
   ()
   ((oset room :room-name (a-get* data 'content 'name))
-   (matrix-update-room-name room)
+   (matrix-client-update-name room)
    (insert-read-only "\n")
    (insert-read-only (format "Room name changed --> %s" (oref room :room-name)) face matrix-client-metadata)
    (matrix-client-update-header-line room)))
@@ -262,7 +232,7 @@ Otherwise, use the room name or alias."
 (defmatrix-client-handler "m.room.aliases"
   ((new-alias-list (a-get* data 'content 'aliases)))
   ((oset room :aliases new-alias-list)
-   (matrix-update-room-name room)
+   (matrix-client-update-name room)
    (insert-read-only "\n")
    (insert-read-only (format "Room alias changed --> %s" new-alias-list) face matrix-client-metadata)
    (matrix-client-update-header-line room)))
