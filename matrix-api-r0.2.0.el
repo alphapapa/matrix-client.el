@@ -31,5 +31,9 @@ form (ROOM-ID (ACCOUNT_DATA...) (EPHEMERAL...) ...)."
 
 
 
-(--each matrix-client-connections
-  (matrix-client-sync (cdr it)))
+(when nil
+  ;; Easy way to stop these from being evaluated when the whole buffer
+  ;; is.
+
+  (--each matrix-client-connections
+    (matrix-client-sync (cdr it))))
