@@ -227,7 +227,7 @@ Otherwise, use the room name or alias."
                                        username
                                      (generate-new-buffer-name username))))
                                 ((oref room :room-name))
-                                ((oref room :aliases)
+                                ((> (length (oref room :aliases)) 0)
                                  ;; The JSON list is converted to a vector.
                                  (elt (oref room :aliases) 0))
                                 ((oref room :id))
