@@ -390,18 +390,19 @@ STRING should have a `timestamp' text-property."
   (let ((inhibit-read-only t)
         (timestamp (get-text-property 0 'timestamp string)))
     (with-current-buffer (oref room :buffer)
-      (cl-loop initially do (progn
-                              (goto-char (ov-beg (car (ov-in 'matrix-client-prompt t))))
-                              (forward-line -1))
-               for buffer-ts = (get-text-property (point) 'timestamp)
-               until (when buffer-ts
-                       (< buffer-ts timestamp))
-               while (when-let (pos (previous-single-property-change (point) 'timestamp))
-                       (goto-char pos))
-               finally do (when-let (pos (next-single-property-change (point) 'timestamp))
-                            (goto-char pos)))
-      (insert "\n"
-              (propertize string 'read-only t)))))
+      (save-excursion
+        (cl-loop initially do (progn
+                                (goto-char (ov-beg (car (ov-in 'matrix-client-prompt t))))
+                                (forward-line -1))
+                 for buffer-ts = (get-text-property (point) 'timestamp)
+                 until (when buffer-ts
+                         (< buffer-ts timestamp))
+                 while (when-let (pos (previous-single-property-change (point) 'timestamp))
+                         (goto-char pos))
+                 finally do (when-let (pos (next-single-property-change (point) 'timestamp))
+                              (goto-char pos)))
+        (insert "\n"
+                (propertize string 'read-only t))))))
 
 (cl-defmethod matrix-client-inject-event-listeners ((con matrix-client-connection))
   "Inject the standard event listeners."

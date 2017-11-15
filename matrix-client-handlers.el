@@ -97,6 +97,34 @@ like."
              (end-of-line)
              ,@body))))))
 
+(cl-defmacro defmatrix-client-handler-ng (msgtype &body body)
+  "Create an matrix-client-handler.
+
+This macro generates a standard function which provides some
+standard variables that each event handler can use to render an
+event sanely.  It also sets [`inhibit-read-only'] to true to
+allow you to freely render in to the buffer.
+
+MSGTYPE is the type of the message to handle.
+
+Provided Variables:
+
+- `data': data from the event.
+- `room': the `matrix-client-room' object that represents the room.
+- `room-id': the Matrix room id the message is intended for
+- `room-buf': the buffer tied to the Matrix room which the
+  message is intended for.
+- Any other variables in VARLIST are provided as well.
+
+BODY is the function itself.  See, for example,
+`matrix-client-handler-m.presence' for an example of what this looks
+like."
+  (let ((fname (intern (format "matrix-client-handler-%s" msgtype))))
+    `(defun ,fname (con room data)
+       (with-slots ((room-id id) buffer) room
+         (with-current-buffer buffer
+           ,@body)))))
+
 (defun matrix-client-linkify-urls (text)
   "Return TEXT with URLs in it made clickable."
   (with-temp-buffer
@@ -180,6 +208,60 @@ like."
      (unless (equal own-display-name display-name)
        (run-hook-with-args 'matrix-client-notify-hook "m.room.message" data
                            :room room)))))
+
+(defmatrix-client-handler-ng "m.room.message"
+  (pcase-let* (((map content event_id formatted_body msgtype origin_server_ts sender url thumbnail_url) data)
+               ((map body format) content)
+               (timestamp (/ origin_server_ts 1000))
+               (display-name (matrix-client-displayname-from-user-id room sender))
+               (own-display-name (oref* room :con :username))
+               (metadata (format "%s %s> "
+                                 (format-time-string "[%T]" (seconds-to-time timestamp))
+                                 display-name))
+               (metadata-face (pcase display-name
+                                (own-display-name 'matrix-client-own-metadata)
+                                (_ 'matrix-client-metadata)))
+               (message-face (pcase display-name
+                               (own-display-name 'matrix-client-own-messages)
+                               (_ 'default)))
+               (message (when content
+                          (string-trim
+                           ;; Trim messages because HTML ones can have extra newlines
+                           (pcase msgtype
+                             ("m.emote" (concat "* " body))
+                             ("m.image" (concat body
+                                                ": "
+                                                (matrix-client-linkify-urls
+                                                 (matrix-transform-mxc-uri (or url thumbnail_url)))))
+                             ((guard (and matrix-client-render-html (string= "org.matrix.custom.html" format)))
+                              (with-temp-buffer
+                                (insert formatted_body)
+                                (goto-char (point-min))
+                                (while (re-search-forward "\\(<br />\\)+" nil t)
+                                  (replace-match "<br />"))
+                                (let ((document (libxml-parse-html-region (point) (point-max))))
+                                  (erase-buffer)
+                                  (shr-insert-document document)
+                                  (goto-char (point-min))
+                                  (delete-blank-lines)
+                                  (buffer-string))))
+                             (_ (matrix-client-linkify-urls body))))))
+               (output))
+    ;; Use 'append so that link faces are not overridden.
+    (add-face-text-property 0 (length metadata) metadata-face 'append metadata)
+    (add-face-text-property 0 (length message) message-face 'append message)
+    ;; Add text properties
+    (setq output (propertize (concat metadata message)
+                             'timestamp timestamp
+                             'display-name display-name
+                             'sender sender
+                             'event_id event_id))
+    ;; Actually insert text
+    (matrix-client-insert room output)
+    ;; Notification
+    (unless (equal own-display-name display-name)
+      (run-hook-with-args 'matrix-client-notify-hook "m.room.message" data
+                          :room room))))
 
 (defun insert-read-only (text &rest extra-props)
   ;; NOTE: The "m.lightrix.pattern" handler is the only one that uses this now.
