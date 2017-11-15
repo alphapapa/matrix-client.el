@@ -181,6 +181,36 @@ event-handlers and input-filters.")
               :initform nil
               :documentation "The most recent event-id in a room, used to push read-receipts to the server.")))
 
+(cl-defmethod matrix-client-update-name ((room matrix-client-room))
+  "Update ROOM's buffer's name.
+If it only has two members, use the name of the other member.
+Otherwise, use the room name or alias."
+  (with-slots (con membership name aliases id) room
+    (when-let ((username (oref con :username))
+               ;; TODO: Make this a preference.  Some users might want
+               ;; 1-1 chats always named after the other user, while
+               ;; others might want them named with the room name.
+               (buffer-name (cond ((when membership
+                                     (eq 2 (length membership)))
+                                   ;; 1-1 chat
+                                   (when-let ((username (cl-loop for member in membership
+                                                                 ;; Get non-self member
+                                                                 when (not (equal username (map-elt member 'displayname)))
+                                                                 return (or (map-elt member 'displayname)
+                                                                            (car member)))))
+                                     (if (eq (current-buffer) (get-buffer username))
+                                         username
+                                       (generate-new-buffer-name username))))
+                                  (name)
+                                  ((> (length aliases) 0)
+                                   ;; The JSON list is converted to a vector.
+                                   (elt aliases 0))
+                                  (id)
+                                  (t (progn
+                                       (warn "Unknown room name for room: %s" room)
+                                       "[unknown]")))))
+      (rename-buffer buffer-name))))
+
 (defvar-local matrix-client-room-typers nil
   "The list of members of the buffer's room who are currently typing.")
 
