@@ -176,6 +176,10 @@ like."
      ;; Actually insert text
      (matrix-client-insert room output)
 
+     ;; Move last-seen line if it's our own message
+     (when (equal own-display-name display-name)
+       (matrix-client-update-last-seen))
+
      ;; Notification
      (unless (equal own-display-name display-name)
        (run-hook-with-args 'matrix-client-notify-hook "m.room.message" data

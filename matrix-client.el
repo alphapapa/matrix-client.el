@@ -331,7 +331,8 @@ and password."
       (when matrix-client-mark-modified-rooms
         (add-hook 'buffer-list-update-hook #'matrix-client-buffer-list-update-hook 'append 'local))
       (erase-buffer)
-      (matrix-client-render-message-line room-obj))
+      (matrix-client-render-message-line room-obj)
+      (matrix-client-insert-last-seen-overlay))
     (switch-to-buffer room-buf)
     (set (make-local-variable 'matrix-client-room-connection) con)
     (set (make-local-variable 'matrix-client-room-object) room-obj)
@@ -464,7 +465,8 @@ Also update prompt with typers."
     (insert (propertize "\n" 'read-only t)
             "\n")
     (ov (point) (point)
-        'before-string (concat "\n" matrix-client-input-prompt)
+        'before-string (concat (propertize "\n" 'face '(:height 0.1))
+                               matrix-client-input-prompt)
         'matrix-client-prompt t)))
 
 (defun matrix-client-send-active-line ()
@@ -486,7 +488,8 @@ Also update prompt with typers."
          (input-filters (oref con :input-filters)))
     (cl-reduce 'matrix-client-run-through-input-filter
                input-filters
-               :initial-value (pop kill-ring))))
+               :initial-value (pop kill-ring)))
+  (matrix-client-update-last-seen))
 
 (defun matrix-client-run-through-input-filter (text filter)
   "Run each TEXT through a single FILTER.  Used by `matrix-client-send-active-line'."
