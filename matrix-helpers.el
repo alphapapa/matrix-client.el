@@ -106,13 +106,22 @@ If BUFFER is nil, use the current buffer."
 
 (defun matrix-parse-curl-exit-code (error-string)
   "Return exit code from ERROR-STRING as a number, or nil if none found."
-  (when (string-match "exited abnormally with code \\([[:digit:]]+\\).*" error-string)
-    (ignore-errors
-      ;; Ignore errors to avoid any problems that might be caused by
-      ;; the error string not matching.  I don't think this is
-      ;; strictly necessary, but the old code caught errors, so just
-      ;; in case...
-      (string-to-int (match-string-no-properties 1 error-string)))))
+  (cond
+   ;; If we get a list with a number, use that '(401)
+   ((and (listp error-string)
+         (> (length error-string) 0)
+         (numberp (first error-string)))
+    (first error-string))
+   ((stringp error-string)
+    (when (string-match "exited abnormally with code \\([[:digit:]]+\\).*" error-string)
+      (ignore-errors
+        ;; Ignore errors to avoid any problems that might be caused by
+        ;; the error string not matching.  I don't think this is
+        ;; strictly necessary, but the old code caught errors, so just
+        ;; in case...
+        (string-to-number (match-string-no-properties 1 error-string)))))
+   (t
+    nil)))
 
 (provide 'matrix-helpers)
 ;;; matrix-helpers.el ends here
