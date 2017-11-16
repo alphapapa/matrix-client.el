@@ -66,5 +66,10 @@
   "Face for user's own chat messages."
   :group 'matrix-client-faces)
 
+(defface matrix-client-last-seen
+  '((t (:inherit 'highlight :height 0.1)))
+  "Face for last-seen overlay."
+  :group 'matrix-client-faces)
+
 (provide 'matrix-client-modes)
 ;;; matrix-client-modes.el ends here

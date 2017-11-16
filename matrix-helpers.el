@@ -66,9 +66,52 @@ PAIRS should be of the form (SLOT VALUE SLOT VALUE...)."
 ;;;; Functions
 
 (defun matrix-client-buffer-list-update-hook ()
-  "Set buffer's modified status when focused."
-  (when (matrix-client-buffer-visible-p)
-    (set-buffer-modified-p nil)))
+  "Set buffer's modified status and move last-seen overlay when focused."
+  ;; NOTE: Since this hook is added to the `buffer-list-update-hook', it
+  ;; is ABSOLUTELY NECESSARY that this function be COMPLETELY bug
+  ;; free.  If there is any bug, it can make it virtually impossible
+  ;; to use Emacs, because nearly any command (especially if using
+  ;; something like Helm) calls this hook, and the bug causes an error
+  ;; before the command the user is running actually does anything.
+  ;; Practically the only solution is to kill and restart Emacs (even
+  ;; C-x C-c doesn't work).
+
+  ;; FIXME: Using `when-let' to test for `matrix-client-room-object'
+  ;; should be safe, but given the risk of using
+  ;; `buffer-list-update-hook', and the fact that it's called in so
+  ;; many places in Emacs, it would be better to do this a different
+  ;; way altogether.  Maybe we could use `window-configuration-change-hook'.
+  (when-let ((room matrix-client-room-object)
+             (buffer (oref room buffer))
+             (window (get-buffer-window buffer))
+             (window-active-p (equal window (selected-window)))
+             (one-window-p (= 1 (length (window-list)))))
+    (when (and (matrix-client-buffer-visible-p)
+               window-active-p
+               (not one-window-p))
+      ;; FIXME: Need a way to move the seen line when there's one
+      ;; window visible and the user has seen it.  Unfortunately,
+      ;; there seems to be no way to detect whether the Emacs frame
+      ;; ("window" in X) has focus, other than using focus hooks and
+      ;; tracking state ourselves, which seems messy.  This is good
+      ;; enough for now.
+      (set-buffer-modified-p nil)
+      (matrix-client-update-last-seen room))))
+
+(defun matrix-client-update-last-seen (&rest _)
+  "Move the last-seen overlay to after the last message."
+  (when-let ((prompt-ov (car (ov-in 'matrix-client-prompt)))
+             (seen-ov (car (ov-in 'matrix-client-last-seen)))
+             (target-pos (1- (ov-beg prompt-ov))))
+    (ov-move seen-ov target-pos target-pos)))
+
+(defun matrix-client-insert-last-seen-overlay ()
+  "Insert last-seen overlay into current buffer."
+  (when-let ((prompt-ov (car (ov-in 'matrix-client-prompt)))
+             (target-pos (1- (ov-beg prompt-ov))))
+    (ov target-pos target-pos
+        'before-string (concat "\n" (propertize "\n\n" 'face 'matrix-client-last-seen))
+        'matrix-client-last-seen t)))
 
 (defun matrix-client-buffer-visible-p (&optional buffer)
   "Return non-nil if BUFFER is currently visible.
