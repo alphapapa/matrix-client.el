@@ -93,6 +93,11 @@ ad-hoc 'org.matrix.custom.html' messages that Vector emits."
 `matrix-client-event-poll-timeout'."
   :group 'matrix-client)
 
+(defcustom matrix-client-mark-modified-rooms t
+  ;; This actually only controls whether a function is added to a hook
+  ;; in each room's buffer.
+  "Mark rooms with new messages as modified, and unmark them when their buffers are seen.")
+
 (defvar matrix-client-event-handlers '()
   "An alist of (type . function) handler definitions for various matrix types.
 
@@ -322,6 +327,9 @@ and password."
     (with-current-buffer room-buf
       (matrix-client-mode)
       (setq buffer-undo-list t)
+      ;; Unset buffer's modified status when it's selected
+      (when matrix-client-mark-modified-rooms
+        (add-hook 'buffer-list-update-hook #'matrix-client-buffer-list-update-hook 'append 'local))
       (erase-buffer)
       (matrix-client-render-message-line room-obj))
     (switch-to-buffer room-buf)
@@ -404,7 +412,9 @@ STRING should have a `timestamp' text-property."
                finally do (when-let (pos (next-single-property-change (point) 'timestamp))
                             (goto-char pos)))
       (insert "\n"
-              (propertize string 'read-only t)))))
+              (propertize string 'read-only t))
+      (unless (matrix-client-buffer-visible-p)
+        (set-buffer-modified-p t)))))
 
 (cl-defmethod matrix-client-inject-event-listeners ((con matrix-client-connection))
   "Inject the standard event listeners."

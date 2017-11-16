@@ -65,6 +65,18 @@ PAIRS should be of the form (SLOT VALUE SLOT VALUE...)."
 
 ;;;; Functions
 
+(defun matrix-client-buffer-list-update-hook ()
+  "Set buffer's modified status when focused."
+  (when (matrix-client-buffer-visible-p)
+    (set-buffer-modified-p nil)))
+
+(defun matrix-client-buffer-visible-p (&optional buffer)
+  "Return non-nil if BUFFER is currently visible.
+If BUFFER is nil, use the current buffer."
+  (let ((buffer (or buffer (current-buffer))))
+    (or (eq buffer (window-buffer (selected-window)))
+        (get-buffer-window buffer))))
+
 (defun matrix-client-delete-backward-char (n &optional kill-flag)
   "Delete backward unless the point is at the prompt or other read-only text."
   (interactive "p\nP")
