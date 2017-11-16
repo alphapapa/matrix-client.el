@@ -358,6 +358,9 @@ and password."
                                  (matrix-client-setup-room con room-id)))
                        (room-events (cdr room-data)))
                   ;; For some reason, the events are in arrays instead of lists.
+                  (cl-loop for event across (a-get* room-events 'ephemeral 'events)
+                           ;; e.g. typing
+                           do (matrix-client-room-event room event))
                   (cl-loop for event across (a-get* room-events 'state 'events)
                            do (matrix-client-room-event room event))
                   (cl-loop for event across (a-get* room-events 'timeline 'events)
@@ -431,13 +434,23 @@ STRING should have a `timestamp' text-property."
         (insert "\n" (prin1-to-string data))))))
 
 (defun matrix-client-update-header-line (room)
-  "Update the header line of the current buffer for ROOM."
+  "Update the header line of the current buffer for ROOM.
+Also update prompt with typers."
   ;; Disable when tabbar mode is on
   (unless (and (boundp 'tabbar-mode) tabbar-mode)
-    (pcase-let (((eieio typers name topic) room))
-      (setq header-line-format (if (> 0 (length typers))
-                                   (format "(%d typing...) %s: %s" (length typers) name topic)
-                                 (format "%s: %s" name topic))))))
+    (pcase-let* (((eieio typers name topic) room)
+                 (name (when name
+                         (propertize name 'face 'font-lock-keyword-face)))
+                 (ov (car (ov-in 'matrix-client-prompt)))
+                 (typers-string (s-join ", " (cl-loop for user across typers
+                                                      collect (matrix-client-displayname-from-user-id room user))))
+                 (prompt (if (> (length typers) 0)
+                             (concat (propertize (concat "Typing: " typers-string)
+                                                 'face 'font-lock-comment-face)
+                                     "\n" matrix-client-input-prompt)
+                           matrix-client-input-prompt)))
+      (ov-set ov 'before-string prompt)
+      (setq header-line-format (format "%s: %s" name topic)))))
 
 (defvar matrix-client-input-prompt "▶ ")
 

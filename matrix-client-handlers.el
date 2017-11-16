@@ -279,9 +279,10 @@ like."
    (matrix-client-update-header-line room)))
 
 (defun matrix-client-handler-m.typing (con room data)
-  (with-current-buffer (oref room :buffer)
-    (set (make-local-variable 'matrix-client-room-typers) (a-get* data 'content 'user_ids))
-    (matrix-client-update-header-line room)))
+  (with-slots (buffer typers) room
+    (with-current-buffer buffer
+      (setq typers (a-get* data 'content 'user_ids))
+      (matrix-client-update-header-line room))))
 
 (defun matrix-client-displayname-from-user-id (room user-id)
   "Return display name for USER-ID in ROOM."
