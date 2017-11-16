@@ -235,7 +235,8 @@ like."
 (defun matrix-client-event-data-timestamp (data)
   "Return timestamp of event DATA."
   (let ((server-ts (float (a-get* data 'origin_server_ts)))
-        (event-age (float (a-get* data 'unsigned 'age))))
+        (event-age (float (or (a-get* data 'unsigned 'age)
+                              0))))
     ;; The timestamp and the age are in milliseconds.  We need
     ;; millisecond precision in case of two messages sent/received
     ;; within one second, but we need to return seconds, not
