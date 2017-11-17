@@ -326,6 +326,7 @@ and password."
          (room-obj (matrix-client-room room-id :buffer room-buf :con con)))
     (with-current-buffer room-buf
       (matrix-client-mode)
+      (visual-line-mode 1)
       (setq buffer-undo-list t)
       ;; Unset buffer's modified status when it's selected
       (when matrix-client-mark-modified-rooms
