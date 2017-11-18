@@ -54,41 +54,39 @@
   :group 'communication
   :link '(url-link "https://github.com/jgkamat/matrix-client-legacy-el"))
 
-;;;###autoload
 (defcustom matrix-client-debug-events nil
   "When non-nil, log raw events to *matrix-events* buffer."
   :type 'boolean)
 
-;;;###autoload
 (defcustom matrix-client-event-poll-timeout 30000
-  "How long to wait for a Matrix event in the EventStream before timing out and trying again."
-  :type 'number)
+  "How long to wait, in milliseconds, for a Matrix event in the EventStream before timing out and trying again."
+  :type 'integer)
 
-;;;###autoload
 (defcustom matrix-client-backfill-count 10
-  "How many messages to backfill at a time when scrolling.")
+  "How many messages to backfill at a time when scrolling."
+  :type 'integer)
 
-;;;###autoload
 (defcustom matrix-client-backfill-threshold 5
-  "How close to the top of a buffer point needs to be before backfilling events.")
+  "How close to the top of a buffer point needs to be before backfilling events."
+  :type 'integer)
 
-;;;###autoload
 (defcustom matrix-client-render-presence t
-  "Show presence changes in the main buffer windows.")
+  "Show presence changes in the main buffer windows."
+  :type 'boolean)
 
-;;;###autoload
 (defcustom matrix-client-render-membership t
-  "Show membership changes in the main buffer windows.")
+  "Show membership changes in the main buffer windows."
+  :type 'boolean)
 
-;;;###autoload
 (defcustom matrix-client-render-html (featurep 'shr)
   "Render HTML messages in buffers. These are currently the
-ad-hoc 'org.matrix.custom.html' messages that Vector emits.")
+ad-hoc 'org.matrix.custom.html' messages that Vector emits."
+  :type 'boolean)
 
-;;;###autoload
 (defcustom matrix-client-enable-watchdog t
   "If enabled, a timer will be run after twice the interval of
-`matrix-client-event-poll-timeout'.")
+`matrix-client-event-poll-timeout'."
+  :type 'boolean)
 
 (defcustom matrix-client-show-room-avatars nil
   "Download and show room avatars."
@@ -97,7 +95,8 @@ ad-hoc 'org.matrix.custom.html' messages that Vector emits.")
 (defcustom matrix-client-mark-modified-rooms t
   ;; This actually only controls whether a function is added to a hook
   ;; in each room's buffer.
-  "Mark rooms with new messages as modified, and unmark them when their buffers are seen.")
+  "Mark rooms with new messages as modified, and unmark them when their buffers are seen."
+  :type 'boolean)
 
 (defvar matrix-client-event-handlers '()
   "An alist of (type . function) handler definitions for various matrix types.
@@ -106,14 +105,6 @@ Each of these receives the raw event as a single DATA argument.
 See `defmatrix-client-handler'. This value is used as the default
 for every `matrix-client-connection' and can be overridden on a
 connection basis.")
-
-;; (defvar matrix-client-active-rooms nil
-;;   "Rooms the active client is in.")
-
-;; (defvar matrix-client-event-listener-running nil)
-
-;; (defvar matrix-client-new-event-hook nil
-;;   )
 
 ;;;###autoload
 (defclass matrix-client-connection (matrix-connection)
