@@ -55,7 +55,11 @@ DATA should be the `data' variable from the
                (display-name (matrix-client-displayname-from-user-id room sender))
                (buffer (oref room :buffer))
                (id (notifications-notify :title (format "<b>%s</b>" display-name)
-                                         :body body
+                                         ;; Encode the message as ASCII because dbus-notify
+                                         ;; can't handle some Unicode chars.  And
+                                         ;; `ignore-errors' doesn't work to ignore errors
+                                         ;; from it.  Don't ask me why.
+                                         :body (encode-coding-string body 'us-ascii)
                                          :category "im.received"
                                          :timeout 5000
                                          :app-icon nil
