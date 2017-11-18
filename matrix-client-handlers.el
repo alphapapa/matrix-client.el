@@ -90,6 +90,7 @@ the Matrix spec for more information about its format."
                                              :max-height 32))
         ;; Avatar removed
         (oset room avatar nil)
+        ;; TODO: A function to automatically propertize a string with its related event data would be nice.
         (matrix-client-insert room msg)
         (matrix-client-update-header-line room))
 
