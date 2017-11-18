@@ -33,6 +33,7 @@
 
 (require 'browse-url)
 
+(require 'matrix-client-images)
 (require 'matrix-notifications)
 
 (cl-defmethod matrix-client-handlers-init ((con matrix-client-connection))
@@ -113,7 +114,7 @@ like."
 
 (defmatrix-client-handler "m.room.message"
   ((content (map-elt data 'content))
-   (msg-type (map-elt content 'msgtype))
+   (msgtype (map-elt content 'msgtype))
    (format (map-elt content 'format))
    ;; We don't use `matrix-client-event-data-timestamp', because for
    ;; room messages, the origin_server_ts is the actual message time.
@@ -125,36 +126,34 @@ like."
   ((when content
      ;; Redacted messages have no content, so we should do nothing for them.
      (pcase-let (((map event_id) data)
-                 (metadata)
-                 (output))
+                 (metadata) (message) (matrix-image-url))
        (setq metadata (format "%s %s> "
                               (format-time-string "[%T]" (seconds-to-time timestamp))
                               display-name))
-       (setq message (pcase msg-type
-                       ("m.emote"
-                        (concat "* " (map-elt content 'body)))
-                       ((guard (and matrix-client-render-html (string= "org.matrix.custom.html" format)))
-                        (with-temp-buffer
-                          (insert (map-elt content 'formatted_body))
-                          (goto-char (point-min))
-                          (while (re-search-forward "\\(<br />\\)+" nil t)
-                            (replace-match "<br />"))
-                          (let ((document (libxml-parse-html-region (point) (point-max))))
-                            (erase-buffer)
-                            (shr-insert-document document)
-                            (goto-char (point-min))
-                            (delete-blank-lines)
-                            (buffer-string))))
-                       ("m.image"
-                        (concat (map-elt content 'body)
-                                ": "
-                                (matrix-client-linkify-urls
-                                 (matrix-transform-mxc-uri (or (map-elt content 'url)
-                                                               (map-elt content 'thumbnail_url))))))
-                       (_ (matrix-client-linkify-urls (map-elt content 'body)))))
-
-       ;; Trim messages because HTML ones can have extra newlines
-       (setq message (string-trim message))
+       (setq message (string-trim
+                      ;; Trim messages because HTML ones can have extra newlines
+                      (pcase msgtype
+                        ("m.emote"
+                         (concat "* " (map-elt content 'body)))
+                        ((guard (and matrix-client-render-html (string= "org.matrix.custom.html" format)))
+                         (with-temp-buffer
+                           (insert (map-elt content 'formatted_body))
+                           (goto-char (point-min))
+                           (while (re-search-forward "\\(<br />\\)+" nil t)
+                             (replace-match "<br />"))
+                           (let ((document (libxml-parse-html-region (point) (point-max))))
+                             (erase-buffer)
+                             (shr-insert-document document)
+                             (goto-char (point-min))
+                             (delete-blank-lines)
+                             (buffer-string))))
+                        ("m.image"
+                         (setq matrix-image-url (matrix-transform-mxc-uri (or (map-elt content 'url)
+                                                                              (map-elt content 'thumbnail_url))))
+                         (concat (map-elt content 'body)
+                                 ": "
+                                 (matrix-client-linkify-urls matrix-image-url)))
+                        (_ (matrix-client-linkify-urls (map-elt content 'body))))))
 
        ;; Apply face for own messages
        (let (metadata-face message-face)
@@ -167,15 +166,18 @@ like."
          (add-face-text-property 0 (length metadata) metadata-face 'append metadata)
          (add-face-text-property 0 (length message) message-face 'append message))
 
-       ;; Concat metadata with message and add text properties
-       (setq output (propertize (concat metadata message)
-                                'timestamp timestamp
-                                'display-name display-name
-                                'sender sender
-                                'event_id event_id))
+       ;; Insert metadata with message and add text properties
+       (matrix-client-insert room (propertize (concat metadata message)
+                                              'timestamp timestamp
+                                              'display-name display-name
+                                              'sender sender
+                                              'event_id event_id))
 
-       ;; Actually insert text
-       (matrix-client-insert room output)
+       ;; Start image insertion if necessary
+       (when matrix-client-show-images
+         (cl-loop for url in (-non-nil (append (matrix-client--image-urls message)
+                                               (list matrix-image-url)))
+                  do (matrix-client-insert-image room event_id url)))
 
        ;; Move last-seen line if it's our own message
        (when (equal own-display-name display-name)
