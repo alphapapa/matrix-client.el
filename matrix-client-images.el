@@ -5,7 +5,8 @@
 
 (defcustom matrix-client-show-images nil
   "Download and show images posted to rooms."
-  :type 'boolean)
+  :type 'boolean
+  :group 'matrix-client)
 
 (defcustom matrix-client-image-url-prefixes
   (list (rx bow "http" (optional "s") "://"
@@ -15,7 +16,8 @@
 Each regexp should match from the beginning of the URL, including
 the protocol type, if desired.  It will automatically be extended
 to match until the next whitespace character."
-  :type '(repeat string))
+  :type '(repeat string)
+  :group 'matrix-client)
 
 (defun matrix-client--image-urls (text)
   "Return list of supported image URLs in TEXT."
