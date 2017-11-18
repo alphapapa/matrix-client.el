@@ -50,26 +50,26 @@
     (((class color) (background dark)) (:foreground "#4444FF" :weight bold))
     (t (:weight bold)))
   "Face for chat metadata properties."
-  :group 'matrix-client-faces)
+  :group 'matrix-client)
 
 (defface matrix-client-own-metadata
   '((((class color) (background light)) (:foreground "#268bd2" :weight bold))
     (((class color) (background dark)) (:foreground "#268bd2" :weight bold))
     (t (:weight bold)))
   "Face for user's own chat metadata properties."
-  :group 'matrix-client-faces)
+  :group 'matrix-client)
 
 (defface matrix-client-own-messages
   '((((class color) (background light)) (:foreground "#586e75" :weight bold :slant italic))
     (((class color) (background dark)) (:foreground "#586e75" :weight bold :slant italic))
     (t (:weight bold :slant italic)))
   "Face for user's own chat messages."
-  :group 'matrix-client-faces)
+  :group 'matrix-client)
 
 (defface matrix-client-last-seen
   '((t (:inherit 'highlight :height 0.1)))
   "Face for last-seen overlay."
-  :group 'matrix-client-faces)
+  :group 'matrix-client)
 
 (provide 'matrix-client-modes)
 ;;; matrix-client-modes.el ends here

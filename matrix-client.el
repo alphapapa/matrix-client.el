@@ -49,49 +49,46 @@
 (require 'dash)
 (require 'ov)
 
+(defgroup matrix-client nil
+  "Settings for `matrix-client'."
+  :group 'communication
+  :link '(url-link "https://github.com/jgkamat/matrix-client-legacy-el"))
+
 ;;;###autoload
 (defcustom matrix-client-debug-events nil
   "When non-nil, log raw events to *matrix-events* buffer."
-  :type 'boolean
-  :group 'matrix-client)
+  :type 'boolean)
 
 ;;;###autoload
 (defcustom matrix-client-event-poll-timeout 30000
   "How long to wait for a Matrix event in the EventStream before timing out and trying again."
-  :type 'number
-  :group 'matrix-client)
+  :type 'number)
 
 ;;;###autoload
 (defcustom matrix-client-backfill-count 10
-  "How many messages to backfill at a time when scrolling."
-  :group 'matrix-client)
+  "How many messages to backfill at a time when scrolling.")
 
 ;;;###autoload
 (defcustom matrix-client-backfill-threshold 5
-  "How close to the top of a buffer point needs to be before backfilling events."
-  :group 'matrix-client)
+  "How close to the top of a buffer point needs to be before backfilling events.")
 
 ;;;###autoload
 (defcustom matrix-client-render-presence t
-  "Show presence changes in the main buffer windows."
-  :group 'matrix-client)
+  "Show presence changes in the main buffer windows.")
 
 ;;;###autoload
 (defcustom matrix-client-render-membership t
-  "Show membership changes in the main buffer windows."
-  :group 'matrix-client)
+  "Show membership changes in the main buffer windows.")
 
 ;;;###autoload
 (defcustom matrix-client-render-html (featurep 'shr)
   "Render HTML messages in buffers. These are currently the
-ad-hoc 'org.matrix.custom.html' messages that Vector emits."
-  :group 'matrix-client)
+ad-hoc 'org.matrix.custom.html' messages that Vector emits.")
 
 ;;;###autoload
 (defcustom matrix-client-enable-watchdog t
   "If enabled, a timer will be run after twice the interval of
-`matrix-client-event-poll-timeout'."
-  :group 'matrix-client)
+`matrix-client-event-poll-timeout'.")
 
 (defcustom matrix-client-mark-modified-rooms t
   ;; This actually only controls whether a function is added to a hook
