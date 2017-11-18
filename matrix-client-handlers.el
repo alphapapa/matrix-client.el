@@ -122,13 +122,14 @@ like."
    (display-name (matrix-client-displayname-from-user-id room (map-elt data 'sender)))
    (own-display-name (oref* room :con :username)))
 
-  ((pcase-let (((map event_id) data)
-               (metadata)
-               (output))
-     (setq metadata (format "%s %s> "
-                            (format-time-string "[%T]" (seconds-to-time timestamp))
-                            display-name))
-     (when content
+  ((when content
+     ;; Redacted messages have no content, so we should do nothing for them.
+     (pcase-let (((map event_id) data)
+                 (metadata)
+                 (output))
+       (setq metadata (format "%s %s> "
+                              (format-time-string "[%T]" (seconds-to-time timestamp))
+                              display-name))
        (setq message (pcase msg-type
                        ("m.emote"
                         (concat "* " (map-elt content 'body)))
@@ -150,40 +151,40 @@ like."
                                 (matrix-client-linkify-urls
                                  (matrix-transform-mxc-uri (or (map-elt content 'url)
                                                                (map-elt content 'thumbnail_url))))))
-                       (_ (matrix-client-linkify-urls (map-elt content 'body))))))
+                       (_ (matrix-client-linkify-urls (map-elt content 'body)))))
 
-     ;; Trim messages because HTML ones can have extra newlines
-     (setq message (string-trim message))
+       ;; Trim messages because HTML ones can have extra newlines
+       (setq message (string-trim message))
 
-     ;; Apply face for own messages
-     (let (metadata-face message-face)
-       (if (string= display-name own-display-name)
-           (setq metadata-face 'matrix-client-own-metadata
-                 message-face 'matrix-client-own-messages)
-         (setq metadata-face 'matrix-client-metadata
-               message-face 'default))
-       ;; Use 'append so that link faces are not overridden.
-       (add-face-text-property 0 (length metadata) metadata-face 'append metadata)
-       (add-face-text-property 0 (length message) message-face 'append message))
+       ;; Apply face for own messages
+       (let (metadata-face message-face)
+         (if (string= display-name own-display-name)
+             (setq metadata-face 'matrix-client-own-metadata
+                   message-face 'matrix-client-own-messages)
+           (setq metadata-face 'matrix-client-metadata
+                 message-face 'default))
+         ;; Use 'append so that link faces are not overridden.
+         (add-face-text-property 0 (length metadata) metadata-face 'append metadata)
+         (add-face-text-property 0 (length message) message-face 'append message))
 
-     ;; Concat metadata with message and add text properties
-     (setq output (propertize (concat metadata message)
-                              'timestamp timestamp
-                              'display-name display-name
-                              'sender sender
-                              'event_id event_id))
+       ;; Concat metadata with message and add text properties
+       (setq output (propertize (concat metadata message)
+                                'timestamp timestamp
+                                'display-name display-name
+                                'sender sender
+                                'event_id event_id))
 
-     ;; Actually insert text
-     (matrix-client-insert room output)
+       ;; Actually insert text
+       (matrix-client-insert room output)
 
-     ;; Move last-seen line if it's our own message
-     (when (equal own-display-name display-name)
-       (matrix-client-update-last-seen))
+       ;; Move last-seen line if it's our own message
+       (when (equal own-display-name display-name)
+         (matrix-client-update-last-seen))
 
-     ;; Notification
-     (unless (equal own-display-name display-name)
-       (run-hook-with-args 'matrix-client-notify-hook "m.room.message" data
-                           :room room)))))
+       ;; Notification
+       (unless (equal own-display-name display-name)
+         (run-hook-with-args 'matrix-client-notify-hook "m.room.message" data
+                             :room room))))))
 
 (defun insert-read-only (text &rest extra-props)
   ;; NOTE: The "m.lightrix.pattern" handler is the only one that uses this now.
