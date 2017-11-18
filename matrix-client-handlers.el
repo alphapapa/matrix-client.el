@@ -159,11 +159,15 @@ like."
 
        ;; Apply face for own messages
        (let (metadata-face message-face)
-         (if (string= display-name own-display-name)
-             (setq metadata-face 'matrix-client-own-metadata
-                   message-face 'matrix-client-own-messages)
-           (setq metadata-face 'matrix-client-metadata
-                 message-face 'default))
+         (cond ((string= display-name own-display-name)
+                (setq metadata-face 'matrix-client-own-metadata
+                      message-face 'matrix-client-own-messages))
+               ((string= msgtype "m.notice")
+                (setq metadata-face 'matrix-client-notice-metadata
+                      message-face 'matrix-client-notice))
+               (t
+                (setq metadata-face 'matrix-client-metadata
+                      message-face 'default)))
          ;; Use 'append so that link faces are not overridden.
          (add-face-text-property 0 (length metadata) metadata-face 'append metadata)
          (add-face-text-property 0 (length message) message-face 'append message))

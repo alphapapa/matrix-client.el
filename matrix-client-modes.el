@@ -66,6 +66,16 @@
   "Face for user's own chat messages."
   :group 'matrix-client)
 
+(defface matrix-client-notice
+  '((t :inherit font-lock-comment-face))
+  "Face for notices."
+  :group 'matrix-client)
+
+(defface matrix-client-notice-metadata
+  '((t :inherit font-lock-comment-face))
+  "Face for notices."
+  :group 'matrix-client)
+
 (defface matrix-client-last-seen
   '((t (:inherit 'highlight :height 0.1)))
   "Face for last-seen overlay."
