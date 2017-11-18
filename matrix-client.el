@@ -218,7 +218,18 @@ Otherwise, use the room name or alias."
                                   (t (progn
                                        (warn "Unknown room name for room: %s" room)
                                        "[unknown]")))))
-      (rename-buffer buffer-name))))
+      ;; If `buffer-file-name' is set to an empty string, Emacs always
+      ;; uses "-" as the buffer name when calling `rename-buffer', but
+      ;; we need `buffer-file-name' to be set so that, e.g. Helm can
+      ;; see it as a modified buffer with file backing (see
+      ;; >https://github.com/emacs-helm/helm/pull/1917>), because Helm
+      ;; cannot treat all non-file modified buffers specially, because
+      ;; that would include non-file buffers that are always
+      ;; considered modified, like *scratch*.  So we bind
+      ;; `buffer-file-name' to nil around the call to `rename-buffer'
+      ;; so Emacs will actually use the buffer name we want.
+      (let ((buffer-file-name nil))
+        (rename-buffer buffer-name)))))
 
 (defvar-local matrix-client-room-typers nil
   "The list of members of the buffer's room who are currently typing.")
@@ -328,6 +339,10 @@ and password."
       (matrix-client-mode)
       (visual-line-mode 1)
       (setq buffer-undo-list t)
+      ;; Set `buffer-file-name' so e.g. Helm will treat it as a
+      ;; file-backed buffer.  This requires that we bind
+      ;; `buffer-file-name' to nil around calls to `rename-buffer'.
+      (setq buffer-file-name "")
       ;; Unset buffer's modified status when it's selected
       (when matrix-client-mark-modified-rooms
         (add-hook 'buffer-list-update-hook #'matrix-client-buffer-list-update-hook 'append 'local))
