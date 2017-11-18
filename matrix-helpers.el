@@ -94,7 +94,12 @@ PAIRS should be of the form (SLOT VALUE SLOT VALUE...)."
       ;; tracking state ourselves, which seems messy.  This is good
       ;; enough for now.
       (set-buffer-modified-p nil)
-      (matrix-client-update-last-seen room))))
+      (matrix-client-update-last-seen room)
+      (when (featurep 'helm)
+        ;; Allow Helm to distinguish this non-file-backed, modified
+        ;; buffer from other non-file-backed, modified buffers.  See
+        ;; <https://github.com/emacs-helm/helm/pull/1917>.
+        (setq helm-buffers-tick-counter (buffer-modified-tick))))))
 
 (defun matrix-client-update-last-seen (&rest _)
   "Move the last-seen overlay to after the last message."
