@@ -57,6 +57,7 @@ the Matrix spec for more information about its format."
                                    "m.room.name" 'matrix-client-handler-m.room.name
                                    "m.room.member" 'matrix-client-handler-m.room.member
                                    "m.room.aliases" 'matrix-client-handler-m.room.aliases
+                                   "m.room.avatar" 'matrix-client-handler-m.room.avatar
                                    "m.presence" 'matrix-client-handler-m.presence
                                    "m.typing" 'matrix-client-handler-m.typing)))
     (unless input-filters
@@ -64,6 +65,54 @@ the Matrix spec for more information about its format."
                             matrix-client-input-filter-join
                             matrix-client-input-filter-leave
                             matrix-client-send-to-current-room)))))
+
+(defun matrix-client-handler-m.room.avatar (con room data)
+  (when matrix-client-show-room-avatars
+    (pcase-let* (((map sender content) data)
+                 ((map url) content)
+                 (username (matrix-client-displayname-from-user-id room sender))
+                 (own-username (oref* con :username))
+                 (timestamp (matrix-client-event-data-timestamp data))
+                 (time-string (format-time-string "[%T]" (seconds-to-time timestamp)))
+                 (action (if url "changed" "removed"))
+                 (msg (propertize (format "%s %s %s the room avatar" time-string username action)
+                                  'timestamp timestamp
+                                  'face 'matrix-client-notice)))
+      (if url
+          ;; New avatar
+          ;; TODO: Maybe display the new avatar in the chat list, like Riot.
+          (request (matrix-transform-mxc-uri url)
+                   :parser (apply-partially #'matrix-client-parse-image room :max-width 32 :max-height 32)
+                   :success (apply-partially #'matrix-client-room-avatar-callback
+                                             :room room
+                                             :message msg
+                                             :max-width 32
+                                             :max-height 32))
+        ;; Avatar removed
+        (oset room avatar nil)
+        (matrix-client-insert room msg)
+        (matrix-client-update-header-line room))
+
+      ;; Move last-seen line if it's our own message
+      (when (equal own-username username)
+        (matrix-client-update-last-seen room)))))
+
+(cl-defmethod matrix-client-room-avatar-callback (&key (room matrix-client-room) message
+                                                       data error-thrown symbol-status response
+                                                       &allow-other-keys)
+  "Set avatar for ROOM.
+Image is passed from parser as DATA, which should be an image
+object made with `create-image'.  This function should be called
+as an async callback when the image is downloaded."
+  (with-slots (avatar) room
+    (when-let ((str (with-temp-buffer
+                      (insert " ")
+                      (insert-image data)
+                      (insert " ")
+                      (buffer-string))))
+      (setq avatar str)
+      (matrix-client-update-header-line room)
+      (matrix-client-insert room message))))
 
 (defmacro defmatrix-client-handler (msgtype varlist body)
   "Create an matrix-client-handler.
@@ -187,7 +236,7 @@ like."
 
        ;; Move last-seen line if it's our own message
        (when (equal own-display-name display-name)
-         (matrix-client-update-last-seen))
+         (matrix-client-update-last-seen room))
 
        ;; Notification
        (unless (equal own-display-name display-name)

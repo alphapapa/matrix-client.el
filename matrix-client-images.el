@@ -32,8 +32,9 @@ to match until the next whitespace character."
                                      :message-id message-id
                                      :url url)))
 
-(cl-defmethod matrix-client-parse-image ((room matrix-client-room))
-  "Parse image from current HTTP response buffer and return image object."
+(cl-defmethod matrix-client-parse-image ((room matrix-client-room) &rest rescale-args)
+  "Parse image from current HTTP response buffer and return image object.
+RESCALE-ARGS are passed to `matrix-client-rescale-image'."
   (pcase-let* ((data (progn
                        ;; Disabling multibyte is required for reading binary data.
                        ;; FIXME: require or autoload this function
@@ -43,18 +44,20 @@ to match until the next whitespace character."
                ((eieio buffer) room))
     (with-current-buffer buffer
       ;; Rescale image in room buffer to get proper size
-      (matrix-client-rescale-image data))))
+      (apply #'matrix-client-rescale-image data rescale-args))))
 
-(defun matrix-client-rescale-image (data)
-  "Rescale DATA, if too big, to fit the current buffer."
+(cl-defun matrix-client-rescale-image (data &key max-width max-height &allow-other-keys)
+  "Rescale DATA, if too big, to fit the current buffer.
+MAX-WIDTH and MAX-HEIGHT are used if set, otherwise they are
+determined by the size of the buffer's window."
   ;; Copied from image.el
   (if (not (and (fboundp 'imagemagick-types)
                 (get-buffer-window (current-buffer))))
       (create-image data nil t :ascent 100)
     (let ((edges (window-inside-pixel-edges
                   (get-buffer-window (current-buffer))))
-          (max-width (window-pixel-width))
-          (max-height (/ (window-pixel-height) 2)))
+          (max-width (or max-width (window-pixel-width)))
+          (max-height (or max-height (/ (window-pixel-height) 2))))
       (create-image data 'imagemagick 'data-p
                     :max-width max-width
                     :max-height max-height))))
