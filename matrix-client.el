@@ -90,6 +90,10 @@ ad-hoc 'org.matrix.custom.html' messages that Vector emits.")
   "If enabled, a timer will be run after twice the interval of
 `matrix-client-event-poll-timeout'.")
 
+(defcustom matrix-client-show-room-avatars nil
+  "Download and show room avatars."
+  :type 'boolean)
+
 (defcustom matrix-client-mark-modified-rooms t
   ;; This actually only controls whether a function is added to a hook
   ;; in each room's buffer.
@@ -172,6 +176,9 @@ event-handlers and input-filters.")
    (topic :initarg :topic
           :initform nil
           :documentation "The topic of the buffer's room.")
+   (avatar :initarg :avatar
+           :initform nil
+           :documentation "The room avatar.  This should be a string containing an image in its display properties.")
    (id :initarg :id
        :initform nil
        :documentation "The Matrix ID of the buffer's room.")
@@ -454,7 +461,7 @@ STRING should have a `timestamp' text-property."
 Also update prompt with typers."
   ;; Disable when tabbar mode is on
   (unless (and (boundp 'tabbar-mode) tabbar-mode)
-    (pcase-let* (((eieio typers name topic) room)
+    (pcase-let* (((eieio avatar typers name topic) room)
                  (name (when name
                          (propertize name 'face 'font-lock-keyword-face)))
                  (ov (car (ov-in 'matrix-client-prompt)))
@@ -466,7 +473,7 @@ Also update prompt with typers."
                                      "\n" matrix-client-input-prompt)
                            matrix-client-input-prompt)))
       (ov-set ov 'before-string prompt)
-      (setq header-line-format (format "%s: %s" name topic)))))
+      (setq header-line-format (concat avatar (format "%s: %s" name topic))))))
 
 (defvar matrix-client-input-prompt "▶ ")
 
