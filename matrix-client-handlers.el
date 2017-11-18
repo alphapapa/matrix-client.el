@@ -44,6 +44,8 @@ the function that handles them.  Currently only a single handler
 for each event is supported.  The handler takes a single argument,
 DATA, which is a `json-read' object from the Event stream.  See
 the Matrix spec for more information about its format."
+  ;; NOTE: Roughly corresponds with the Matrix Python SDK here:
+  ;; <https://github.com/matrix-org/matrix-python-sdk/blob/master/matrix_client/client.py#L486>
   ;; FIXME: `matrix-client-window-change-hook' should be renamed, and
   ;; is currently unimplemented anyway.
   (push 'matrix-client-window-change-hook window-configuration-change-hook)

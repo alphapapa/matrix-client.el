@@ -359,6 +359,8 @@ and password."
     room-obj))
 
 (cl-defmethod matrix-client-sync-handler ((con matrix-client-connection) data)
+  ;; NOTE: This function, in addition to `matrix-client-handlers-init', roughly corresponds with the Python SDK at
+  ;; <https://github.com/matrix-org/matrix-python-sdk/blob/master/matrix_client/client.py#L486>.
   (when (oref con :running)
 
     ;; Kill buffers for left rooms
