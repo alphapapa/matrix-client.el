@@ -1,15 +1,4 @@
-CASK ?= cask
-EMACS ?= emacs
+.PHONY: test
 
-all: test
-
-test: unit #ecukes
-
-unit:
-	${CASK} exec ert-runner
-
-ecukes:
-	${CASK} exec ecukes
-
-install:
-	${CASK} install
+test:
+	cask exec buttercup -L .
