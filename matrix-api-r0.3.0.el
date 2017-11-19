@@ -6,6 +6,19 @@
 
 ;;; Code:
 
+;;;; Requirements
+
+(require 'cl-lib)
+(require 'eieio)
+(require 'map)
+(require 'seq)
+
+(require 'a)
+(require 'dash)
+(require 'json)
+(require 'request)
+(require 's)
+
 ;;;; Variables
 
 (defvar matrix-log-buffer "*matrix-log*"
@@ -98,13 +111,14 @@ Defaults to 0 and should be automatically incremented for each request.")
    (rooms :initform nil
           :type list
           :documentation "List of room objects user has joined.")
-   (since :initform nil
-          :type string
-          :documentation "API \"next_batch\" token of the last successful sync request, used for the \"since\" token in the next request.  If a sync is not fully completed, this value will not be updated, so we can try the sync again."))
+   (next-batch :initform nil
+               :type string
+               :documentation "The batch token to supply in the since param of the next /sync request."))
   :allow-nil-initform t)
 
 (matrix-defclass matrix-room ()
   ((id :documentation "Fully-qualified room ID."
+       :initarg :id
        :type string
        :initform nil)
    (members :documentation "List of room members, as user objects."
@@ -115,6 +129,9 @@ Defaults to 0 and should be automatically incremented for each request.")
    (timeline :documentation "List of timeline events."
              :type list
              :initform nil)
+   (prev-batch :documentation "A token that can be supplied to to the from parameter of the rooms/{roomId}/messages endpoint."
+               ;; :type string
+               :initform nil)
    (ephemeral :documentation "The ephemeral events in the room that aren't recorded in the timeline or state of the room. e.g. typing."
               :initform nil)
    (account-data :documentation "The private data that this user has attached to this room."
@@ -126,11 +143,13 @@ Defaults to 0 and should be automatically incremented for each request.")
 ;;;; Functions
 
 (cl-defun matrix-log (message &rest args)
-  "Log MESSAGE with ARGS to Matrix log buffer.
+  "Log MESSAGE with ARGS to Matrix log buffer and return non-nil.
 MESSAGE and ARGS should be a string and list of strings for
 `format'."
   (with-current-buffer (get-buffer-create matrix-log-buffer)
-    (insert (apply #'format message args) "\n")))
+    (insert (apply #'format message args) "\n")
+    ;; Returning t is more convenient than nil, which is returned by `message'.
+    t))
 
 (defun matrix-get (&rest args)
   "Call `matrix-request' with ARGS for a \"GET\" request."
@@ -145,6 +164,14 @@ MESSAGE and ARGS should be a string and list of strings for
 
 ;;;;; Request
 
+;; NOTE: Every callback defined that is passed to `matrix-request'
+;; should be a method specialized on `matrix-session'.  While it means
+;; that sometimes we must look up a room object by room ID, since we
+;; can't specialize on `matrix-room', it also means that we only need
+;; to pass the method name as the callback, rather than a partially
+;; applied method.  This might be a worthwhile tradeoff, but we might
+;; change this later.
+
 (cl-defmethod matrix-request ((session matrix-session) endpoint data callback
                               &optional &key (method 'get) (error-callback #'matrix-request-error-callback))
   "Make request to ENDPOINT on SESSION with DATA and call CALLBACK on success.
@@ -153,13 +180,15 @@ Request is made asynchronously.  METHOD should be a symbol,
 symbol and should represent the final part of the API
 URL (e.g. for \"/_matrix/client/r0/login\", it should be
 \"login\".  DATA should be an alist which will be automatically
-encoded to JSON.  CALLBACK should be a callback function defined
-in accordance with the `request' package's API.  ERROR-CALLBACK,
-if set, will be called if the request fails."
+encoded to JSON.  CALLBACK should be a method specialized on
+`matrix-session', whose subsequent arguments are defined in
+accordance with the `request' package's API.  ERROR-CALLBACK, if
+set, will be called if the request fails."
   (with-slots (api-url-prefix access-token) session
-    (let* ((url (concat api-url-prefix (cl-typecase endpoint
-                                         (string endpoint)
-                                         (symbol (symbol-name endpoint)))))
+    (let* ((url (url-encode-url
+                 (concat api-url-prefix (cl-typecase endpoint
+                                          (string endpoint)
+                                          (symbol (symbol-name endpoint))))))
            (data (map-put data 'access_token access-token))
            (data (map-filter
                   ;; Remove keys with null values
@@ -167,8 +196,8 @@ if set, will be called if the request fails."
                     v)
                   data))
            (method (upcase (symbol-name method))))
-      (matrix-log "REQUEST: %s" (a-list 'method method
-                                        'endpoint endpoint
+      (matrix-log "REQUEST: %s" (a-list 'url url
+                                        'method method
                                         'data data
                                         'callback callback))
       (pcase method
@@ -210,22 +239,19 @@ DEVICE-ID and INITIAL-DEVICE-DISPLAY-NAME."
 
 (matrix-defcallback login matrix-session
   "Callback function for successful login.
-Set access_token and device_id in session and start initial
-sync."
+Set access_token and device_id in session."
   :slots (access-token device-id)
   :body (pcase-let* (((map access_token device_id) data))
-          (matrix-log "LOGIN CALLBACK: %s" data)
           (setq access-token access_token
-                device-id device_id)
-          (matrix-sync session)))
+                device-id device_id)))
 
 ;;;;; Sync
 
 (cl-defmethod matrix-sync ((session matrix-session) &key full-state set-presence timeout)
   ;; https://matrix.org/docs/spec/client_server/r0.2.0.html#id126
-  (with-slots (access-token since) session
+  (with-slots (access-token next-batch) session
     (matrix-get session 'sync
-                (a-list 'since since
+                (a-list 'since next-batch
                         'full_state full-state
                         'set_presence set-presence
                         'timeout timeout)
@@ -234,80 +260,115 @@ sync."
 (matrix-defcallback sync matrix-session
   "Callback function for successful sync request."
   ;; https://matrix.org/docs/spec/client_server/r0.3.0.html#id167
-  :slots (rooms since)
-  :body (let (failure)
-          (matrix-log "SYNC CALLBACK: %s" data)
-          (--each '(rooms presence account_data to_device device_lists)
-            (unless failure
-              (let ((method-name (intern (concat "matrix-sync-" (symbol-name it)))))
-                (if (functionp method-name)
-                    (unless (funcall method-name session (a-get data it))
-                      (setq failure t))
-                  (warn "Unimplemented method: %s" method-name)))))
-          (unless failure
-            (setq since (a-get data next_batch)))))
+  :slots (rooms next-batch)
+  :body (cl-loop for it in '(rooms presence account_data to_device device_lists)
+                 for method = (intern (concat "matrix-sync-" (symbol-name it)))
+                 always (if (functionp method)
+                            (unless (funcall method session (a-get data it))
+                              (setq failure t))
+                          (warn "Unimplemented method: %s" method))))
 
 (cl-defmethod matrix-sync-rooms ((session matrix-session) rooms)
   "Process ROOMS from sync response on SESSION."
   ;; https://matrix.org/docs/spec/client_server/r0.3.0.html#id167
-  (--each rooms
-    (pcase it
-      (`(join _) (matrix-sync-join session it))
-      (`(invite _) (matrix-log "Would process room invites: %s" it))
-      (`(leave _) (matrix-log "Would process room leaves: %s" it)))))
+  (cl-loop for room in rooms
+           always (pcase room
+                    (`(join . ,_) (matrix-sync-join session room))
+                    (`(invite .  ,_) (matrix-log "Would process room invites: %s" room))
+                    (`(leave . ,_) (matrix-log "Would process room leaves: %s" room)))))
 
 (cl-defmethod matrix-sync-join ((session matrix-session) join)
   "Sync JOIN, a list of joined rooms, on SESSION."
   ;; https://matrix.org/docs/spec/client_server/r0.3.0.html#id167
   (with-slots (rooms) session
-    (--each join
-      (pcase-let* ((`(,joined-room-id . ,joined-room) it)
-                   (params '(state timeline ephemeral account_data unread_notifications))
-                   (room-obj (or (cl-loop for room in rooms
-                                          when (equal (oref room id) joined-room-id)
-                                          return it)
-                                 ;; Make new room
-                                 (matrix-room :id room-id)))
-                   (failure))
-        (--each params
-          (unless failure
-            (let ((method-name (intern (concat "matrix-sync-") (symbol-name it))))
-              (if (functionp method-name)
-                  (unless (funcall method-name room (a-get joined-room it))
-                    (setq failure t))
-                (warn "Unimplemented method: %s" method-name)))))
-        (unless failure
-          (setq last-since since))))))
+    (cl-loop for it in (cdr join)
+             always (pcase-let* ((`(,joined-room-id . ,joined-room) it)
+                                 ;; Room IDs are decoded from JSON as symbols, so we convert to strings.
+                                 (room-id (symbol-name joined-room-id))
+                                 (params '(state timeline ephemeral account_data unread_notifications))
+                                 (room (or (--first (equal (oref it id) room-id)
+                                                    rooms)
+                                           ;; Make new room
+                                           (let ((new-room (matrix-room :id room-id)))
+                                             (push new-room rooms)
+                                             new-room))))
+                      (cl-loop for param in params
+                               for method = (intern (concat "matrix-sync-" (symbol-name param)))
+                               always (if (functionp method)
+                                          (funcall method room (a-get joined-room param))
+                                        ;; `warn' seems to return non-nil.  Convenient.
+                                        (warn "Unimplemented method: %s" method-name)))))))
 
 (cl-defmethod matrix-sync-state ((room matrix-room) state)
   "Sync STATE in ROOM."
   (pcase-let (((map events) state))
-    (--each events
-      (matrix-log "Would process state event in %s: " room it))))
+    ;; events is an array, not a list, so we can't use --each.
+    (seq-doseq (event events)
+      (matrix-log "Would process state event in %s: " room event))
+    t))
 
-(cl-defmethod matrix-sync-timeline ((room matrix-room) timeline)
-  "Sync TIMELINE in ROOM."
-  (pcase-let (((map events limited prev_batch) timeline))
-    (--each events
-      (matrix-log "Would process timeline event in %s: " room it))))
+(cl-defmethod matrix-sync-timeline ((room matrix-room) timeline-sync)
+  "Sync TIMELINE-SYNC in ROOM."
+  (with-slots (timeline prev-batch) room
+    (pcase-let (((map events limited prev_batch) timeline-sync))
+      (seq-doseq (event events)
+        (push event timeline))
+      (setq prev-batch prev_batch))))
+
+(cl-defmethod matrix-messages ((session matrix-session) room-id
+                               &key (direction "b") limit)
+  "Request messages for ROOM-ID in SESSION.
+DIRECTION must be \"b\" (the default) or \"f\".  LIMIT is the
+maximum number of events to return (default 10)."
+  (pcase-let* (((eieio rooms) session)
+               (room (object-assoc room-id :id rooms))
+               ((eieio prev-batch) room))
+    (matrix-get session (format "rooms/%s/messages" room-id)
+                (a-list 'from prev-batch
+                        'dir direction
+                        'limit limit)
+                #'matrix-messages-callback)))
+
+(matrix-defcallback messages matrix-session
+  "Callback for /rooms/{roomID}/messages."
+  :slots (rooms)
+  :body (pcase-let* ((room (object-assoc room-id :id rooms))
+                     ((map start end chunk) data))
+          ;; NOTE: API docs:
+          ;; start: The token the pagination starts from. If dir=b
+          ;; this will be the token supplied in from.
+          ;; end: The token the pagination ends at. If dir=b this
+          ;; token should be used again to request even earlier
+          ;; events.
+
+          ;; FIXME: Does prev-batch need to be stored in timeline
+          ;; rather than the room?  is there a prev-batch for other
+          ;; things besides timeline?
+          (with-slots (timeline prev-batch) room
+            (seq-doseq (event chunk)
+              (push event timeline))
+            (setq prev-batch end))))
 
 (cl-defmethod matrix-sync-ephemeral ((room matrix-room) ephemeral)
   "Sync EPHEMERAL in ROOM."
   (pcase-let (((map events) ephemeral))
-    (--each events
-      (matrix-log "Would process ephemeral event in %s: " room it))))
+    (seq-doseq (event events)
+      (matrix-log "Would process ephemeral event in %s: " room event))
+    t))
 
 (cl-defmethod matrix-sync-account_data ((room matrix-room) account-data)
   "Sync ACCOUNT-DATA in ROOM."
   (pcase-let (((map events) account-data))
-    (--each events
-      (matrix-log "Would process account-data event in %s: " room it))))
+    (seq-doseq (event events)
+      (matrix-log "Would process account-data event in %s: " room event))
+    t))
 
 (cl-defmethod matrix-sync-unread_notifications ((room matrix-room) unread-notifications)
   "Sync UNREAD-NOTIFICATIONS in ROOM."
   (pcase-let (((map highlight_count notification_count) unread-notifications))
     (matrix-log "Would process highlight_count in %s: " room highlight_count)
-    (matrix-log "Would process notification_count in %s: " room notification_count)))
+    (matrix-log "Would process notification_count in %s: " room notification_count)
+    t))
 
 ;;; Footer
 

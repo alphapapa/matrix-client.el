@@ -1,8 +1,16 @@
+(package-file "matrix-client.el")
+
 (source gnu)
 (source melpa)
 
 (development
-  (depends-on "buttercup"))
+  (depends-on "buttercup")
+  (depends-on "f")
+  (depends-on "cl-lib")
+  (depends-on "map")
+  (depends-on "seq")
+  (depends-on "a")
+  (depends-on "request"))
 
 
 ;; (development
