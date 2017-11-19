@@ -9,7 +9,6 @@
                                   :device-id (md5 (concat "matrix-client.el/test.el" (current-time-string) (system-name)))
                                   :initial-device-display-name (format "matrix-client.el/test.el @ %s (%s)"
                                                                        (system-name) (format-time-string "%F %T"))))
-    (setq password "testing")
     (setq matrix-synchronous t))
 
   (describe "login"
@@ -20,4 +19,9 @@
                 (matrix-login session password)
                 (oref session access-token))
               :to-match (rx (1+ alnum)))
-      (expect 'matrix-sync :to-have-been-called))))
+      (expect 'matrix-sync :to-have-been-called))
+
+    (it "Can sync"
+      (spy-on #'matrix-sync-rooms)
+      (spy-on #'matrix-sync-join)
+      (matrix-sync session))))
