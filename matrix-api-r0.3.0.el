@@ -23,6 +23,8 @@
 (require 'request)
 (require 's)
 
+(require 'matrix-macros)
+
 ;;;; Variables
 
 (defvar matrix-log-buffer "*matrix-log*"
@@ -121,7 +123,9 @@ Defaults to 0 and should be automatically incremented for each request.")
   :allow-nil-initform t)
 
 (matrix-defclass matrix-room ()
-  ((id :documentation "Fully-qualified room ID."
+  ((session :initarg :session
+            :type matrix-session)
+   (id :documentation "Fully-qualified room ID."
        :initarg :id
        :type string
        :initform nil)
@@ -164,6 +168,11 @@ MESSAGE and ARGS should be a string and list of strings for
   (nconc args (list :method 'post))
   (apply #'matrix-request args))
 
+(defun matrix-put (&rest args)
+  "Call `matrix-request' with ARGS for a \"PUT\" request."
+  (nconc args (list :method 'put))
+  (apply #'matrix-request args))
+
 ;;;; Methods
 
 ;;;;; Request
@@ -193,13 +202,11 @@ set, will be called if the request fails."
                  (concat api-url-prefix (cl-typecase endpoint
                                           (string endpoint)
                                           (symbol (symbol-name endpoint))))))
-           (data (progn
-                   (map-put data 'access_token access-token)
-                   (map-filter
-                    ;; Remove keys with null values
-                    (lambda (k v)
-                      v)
-                    data)))
+           (data (map-filter
+                  ;; Remove keys with null values
+                  (lambda (k v)
+                    v)
+                  data))
            (callback (cl-typecase callback
                        ;; If callback is a symbol, apply session to
                        ;; it.  If it's an already-partially-applied
@@ -207,7 +214,8 @@ set, will be called if the request fails."
                        ;; FIXME: Add to docstring.
                        (symbolp (apply-partially callback session))
                        (t callback)))
-           (method (upcase (symbol-name method))))
+           (method (upcase (symbol-name method)))
+           (request-log-level 'debug))
       (matrix-log "REQUEST: %s" (a-list 'url url
                                         'method method
                                         'data data
@@ -215,6 +223,7 @@ set, will be called if the request fails."
       (pcase method
         ("GET" (request url
                         :type method
+                        :headers (a-list 'Authorization (format "Bearer %s" access-token))
                         :params data
                         :parser #'json-read
                         :success callback
@@ -222,11 +231,22 @@ set, will be called if the request fails."
                         :sync matrix-synchronous))
         ("POST" (request url
                          :type method
+                         :headers (a-list 'Content-Type "application/json"
+                                          'Authorization (format "Bearer %s" access-token))
                          :data (json-encode data)
                          :parser #'json-read
                          :success callback
                          :error (apply-partially error-callback session)
-                         :sync matrix-synchronous))))))
+                         :sync matrix-synchronous))
+        ("PUT" (request url
+                        :type method
+                        :headers (a-list 'Content-Type "application/json"
+                                         'Authorization (format "Bearer %s" access-token))
+                        :data (json-encode data)
+                        :parser #'json-read
+                        :success callback
+                        :error (apply-partially error-callback session)
+                        :sync matrix-synchronous))))))
 
 (matrix-defcallback request-error matrix-session
   "Callback function for request error."
@@ -301,7 +321,8 @@ Set access_token and device_id in session."
                                  (room (or (--first (equal (oref it id) room-id)
                                                     rooms)
                                            ;; Make new room
-                                           (let ((new-room (matrix-room :id room-id)))
+                                           (let ((new-room (matrix-room :session session
+                                                                        :id room-id)))
                                              (push new-room rooms)
                                              new-room))))
                       (cl-loop for param in params
@@ -379,6 +400,52 @@ maximum number of events to return (default 10)."
     (matrix-log "Would process highlight_count in %s: " room highlight_count)
     (matrix-log "Would process notification_count in %s: " room notification_count)
     t))
+
+;;;;; Rooms
+
+(cl-defmethod matrix-create-room ((session matrix-session) &key (is-direct t))
+  "Create new room on SESSION.
+When IS-DIRECT is non-nil, set that flag on the new room."
+  ;; https://matrix.org/docs/spec/client_server/r0.3.0.html#id190
+  (matrix-post session 'createRoom (a-list 'is-direct is-direct
+                                           'name "test room"
+                                           'topic "test topic"
+                                           'preset "private_chat"
+                                           )
+               #'matrix-create-room-callback))
+
+(matrix-defcallback create-room matrix-session
+  "Callback for create-room.
+Add new room to SESSION."
+  :slots (rooms)
+  :body (pcase-let* (((map room_id) data)
+                     (room (matrix-room :session session
+                                        :id room_id)))
+          (push room rooms)))
+
+(cl-defmethod matrix-send-message ((room matrix-room) message)
+  "Send MESSAGE to ROOM."
+  ;; https://matrix.org/docs/spec/client_server/r0.3.0.html#id182
+  (with-slots (id session) room
+    (with-slots (txn-id) session
+      ;; This makes it easy to increment the txn-id
+      (let* ((type "m.text")
+             (txn-id (cl-incf txn-id))
+             (endpoint (format "rooms/%s/send/%s/%s"
+                               id type txn-id)))
+        (matrix-put session endpoint
+                    (a-list 'roomId id
+                            'eventType type
+                            'txnId txn-id
+                            'body message)
+                    (apply-partially #'matrix-send-message-callback room))))))
+
+(matrix-defcallback send-message matrix-room
+  "Callback for send-message."
+  ;; For now, just log it, because we'll get it back when we sync anyway.
+  :slots nil
+  :body (matrix-log "Message \"%s\" sent to room %s. Event ID: %s"
+                    (oref room id) message (a-get data 'event_id)))
 
 ;;; Footer
 

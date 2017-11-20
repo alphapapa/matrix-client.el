@@ -37,13 +37,29 @@
 
   ;; (it "Can create a room, join it, and send messages to it")
 
-  (it "Can do an initial sync"
-    (matrix-sync session)
-    ;; There should be some timeline event objects in the first room.
-    (expect (length (oref (car (oref session rooms)) timeline))
+  ;; (it "Can do an initial sync"
+  ;;   (matrix-sync session)
+  ;;   ;; There should be some timeline event objects in the first room.
+  ;;   (expect (length (oref (car (oref session rooms)) timeline))
+  ;;           :to-be-greater-than 0))
+
+  (it "Can create a room"
+    (matrix-create-room session)
+    (expect (length (oref session rooms))
             :to-be-greater-than 0))
 
-  (it "Can fetch more messages"
+  (it "Can send messages to a room"
+    (matrix-send-message (car (oref session rooms)) "Test message."))
+
+  (it "Can do a subsequent sync"
+    (matrix-sync session)
+    (expect (length (oref (car (oref session rooms)) timeline))
+            :to-be-greater-than 0)
+    (expect (a-get* (car (oref (car (oref session rooms)) timeline)) 'content 'body)
+            :to-equal "Test message."))
+
+
+  (xit "Can fetch more messages"
     (pcase-let* ((room (car (oref session rooms)))
                  ((eieio id) room))
       (matrix-messages session id))
