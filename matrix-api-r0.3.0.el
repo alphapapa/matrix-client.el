@@ -436,8 +436,7 @@ Add new room to SESSION."
              (txn-id (cl-incf txn-id))
              (endpoint (format "rooms/%s/send/%s/%s"
                                id type txn-id)))
-        (matrix-put session endpoint
-                    content
+        (matrix-put session endpoint content
                     (apply-partially #'matrix-send-message-callback room))))))
 
 (matrix-defcallback send-message matrix-room
@@ -458,10 +457,19 @@ Add new room to SESSION."
 (matrix-defcallback leave matrix-room
   "Leave room callback."
   :slots (session)
+  ;; TODO: Verify that this works in more circumstances.  `equal' is
+  ;; used, and it works in the test, but will it always work?
   :body (object-remove-from-list session :rooms room))
 
 (cl-defmethod matrix-forget ((room matrix-room))
   "Forget ROOM."
+  ;; TODO: Maybe use room ID instead of object, since if we've left a
+  ;; room, the object should be gone.  Alternatively, instead of
+  ;; removing the room when it's left, change its status, or put it in
+  ;; a list of left-but-not-forgotten rooms.  Should look at how the
+  ;; API does it more, probably in /sync with the different lists of
+  ;; rooms.
+
   ;; https://matrix.org/docs/spec/client_server/r0.3.0.html#id204
   (with-slots (id session) room
     (let* ((endpoint (format "rooms/%s/forget" id)))
