@@ -24,12 +24,17 @@
                                   :device-id (md5 (concat "matrix-client.el/test.el" (current-time-string) (system-name)))
                                   :initial-device-display-name (format "matrix-client.el/test.el @ %s (%s)"
                                                                        (system-name) (format-time-string "%F %T"))))
-    (setq matrix-synchronous t))
+    (setq matrix-synchronous t)
+    (defvar matrix-test-joined-rooms nil))
 
   (it "Can log in and get an access_token"
     (matrix-login session matrix-password)
     (expect (oref session access-token)
             :to-match (rx (1+ alnum))))
+
+  (it "Begins with no rooms"
+    (expect (length (oref session rooms))
+            :to-be 0))
 
   ;; TODO: If we create a new room, we can send messages to it, then
   ;; test retrieving them with sync, and then leave/delete the room
@@ -45,6 +50,8 @@
 
   (it "Can create a room"
     (matrix-create-room session)
+    ;; Used to forget the room later
+    (push (car (oref session rooms)) matrix-test-joined-rooms)
     (expect (length (oref session rooms))
             :to-be-greater-than 0))
 
@@ -55,9 +62,20 @@
     (matrix-sync session)
     (expect (length (oref (car (oref session rooms)) timeline))
             :to-be-greater-than 0)
-    (expect (a-get* (car (oref (car (oref session rooms)) timeline)) 'content 'body)
+    (expect (pcase-let* (((eieio rooms) session)
+                         (room (car rooms))
+                         ((eieio timeline) room)
+                         (first-event (car timeline)))
+              (a-get* first-event 'content 'body))
             :to-equal "Test message."))
 
+  (it "Can leave a room"
+    (matrix-leave (car (oref session rooms)))
+    (expect (length (oref session rooms))
+            :to-equal 0))
+
+  (it "Can forget a room"
+    (matrix-forget (car matrix-test-joined-rooms)))
 
   (xit "Can fetch more messages"
     (pcase-let* ((room (car (oref session rooms)))

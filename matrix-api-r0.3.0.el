@@ -115,6 +115,7 @@ Ignored if device_id corresponds to a known device.")
            :documentation "Transaction ID.
 Defaults to 0 and should be automatically incremented for each request.")
    (rooms :initform nil
+          :initarg :rooms
           :type list
           :documentation "List of room objects user has joined.")
    (next-batch :initform nil
@@ -429,15 +430,14 @@ Add new room to SESSION."
   (with-slots (id session) room
     (with-slots (txn-id) session
       ;; This makes it easy to increment the txn-id
-      (let* ((type "m.text")
+      (let* ((type "m.room.message")
+             (content (a-list 'msgtype "m.text"
+                              'body message))
              (txn-id (cl-incf txn-id))
              (endpoint (format "rooms/%s/send/%s/%s"
                                id type txn-id)))
         (matrix-put session endpoint
-                    (a-list 'roomId id
-                            'eventType type
-                            'txnId txn-id
-                            'body message)
+                    content
                     (apply-partially #'matrix-send-message-callback room))))))
 
 (matrix-defcallback send-message matrix-room
@@ -446,6 +446,31 @@ Add new room to SESSION."
   :slots nil
   :body (matrix-log "Message \"%s\" sent to room %s. Event ID: %s"
                     (oref room id) message (a-get data 'event_id)))
+
+(cl-defmethod matrix-leave ((room matrix-room))
+  "Leave room."
+  ;; https://matrix.org/docs/spec/client_server/r0.3.0.html#id203
+  (with-slots (id session) room
+    (let* ((endpoint (format "rooms/%s/leave" id)))
+      (matrix-post session endpoint nil
+                   (apply-partially #'matrix-leave-callback room)))))
+
+(matrix-defcallback leave matrix-room
+  "Leave room callback."
+  :slots (session)
+  :body (object-remove-from-list session :rooms room))
+
+(cl-defmethod matrix-forget ((room matrix-room))
+  "Forget ROOM."
+  ;; https://matrix.org/docs/spec/client_server/r0.3.0.html#id204
+  (with-slots (id session) room
+    (let* ((endpoint (format "rooms/%s/forget" id)))
+      (matrix-post session endpoint nil
+                   (apply-partially #'matrix-forget-callback room)))))
+
+(matrix-defcallback forget matrix-room
+  "Forget room callback."
+  :body (matrix-log "FORGOT ROOM: %s" (oref room id)))
 
 ;;; Footer
 
