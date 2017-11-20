@@ -4,6 +4,10 @@
 ;; "released" then, and now it is, so the versions are named with an R
 ;; instead of a V.
 
+;; TODO: Consider let-binding `json-array-type' to `list'.  I'm not
+;; sure there's any advantage to using vectors, and it makes the code
+;; more error-prone because some things are lists and some vectors.
+
 ;;; Code:
 
 ;;;; Requirements
@@ -189,12 +193,20 @@ set, will be called if the request fails."
                  (concat api-url-prefix (cl-typecase endpoint
                                           (string endpoint)
                                           (symbol (symbol-name endpoint))))))
-           (data (map-put data 'access_token access-token))
-           (data (map-filter
-                  ;; Remove keys with null values
-                  (lambda (k v)
-                    v)
-                  data))
+           (data (progn
+                   (map-put data 'access_token access-token)
+                   (map-filter
+                    ;; Remove keys with null values
+                    (lambda (k v)
+                      v)
+                    data)))
+           (callback (cl-typecase callback
+                       ;; If callback is a symbol, apply session to
+                       ;; it.  If it's an already-partially-applied
+                       ;; function, use it as-is.
+                       ;; FIXME: Add to docstring.
+                       (symbolp (apply-partially callback session))
+                       (t callback)))
            (method (upcase (symbol-name method))))
       (matrix-log "REQUEST: %s" (a-list 'url url
                                         'method method
@@ -205,14 +217,14 @@ set, will be called if the request fails."
                         :type method
                         :params data
                         :parser #'json-read
-                        :success (apply-partially callback session)
+                        :success callback
                         :error (apply-partially error-callback session)
                         :sync matrix-synchronous))
         ("POST" (request url
                          :type method
                          :data (json-encode data)
                          :parser #'json-read
-                         :success (apply-partially callback session)
+                         :success callback
                          :error (apply-partially error-callback session)
                          :sync matrix-synchronous))))))
 
@@ -327,13 +339,12 @@ maximum number of events to return (default 10)."
                 (a-list 'from prev-batch
                         'dir direction
                         'limit limit)
-                #'matrix-messages-callback)))
+                (apply-partially #'matrix-messages-callback room))))
 
-(matrix-defcallback messages matrix-session
+(matrix-defcallback messages matrix-room
   "Callback for /rooms/{roomID}/messages."
-  :slots (rooms)
-  :body (pcase-let* ((room (object-assoc room-id :id rooms))
-                     ((map start end chunk) data))
+  :slots (timeline prev-batch)
+  :body (pcase-let* (((map start end chunk) data))
           ;; NOTE: API docs:
           ;; start: The token the pagination starts from. If dir=b
           ;; this will be the token supplied in from.
@@ -344,10 +355,9 @@ maximum number of events to return (default 10)."
           ;; FIXME: Does prev-batch need to be stored in timeline
           ;; rather than the room?  is there a prev-batch for other
           ;; things besides timeline?
-          (with-slots (timeline prev-batch) room
-            (seq-doseq (event chunk)
-              (push event timeline))
-            (setq prev-batch end))))
+          (seq-doseq (event chunk)
+            (push event timeline))
+          (setq prev-batch end)))
 
 (cl-defmethod matrix-sync-ephemeral ((room matrix-room) ephemeral)
   "Sync EPHEMERAL in ROOM."
