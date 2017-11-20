@@ -178,14 +178,6 @@ MESSAGE and ARGS should be a string and list of strings for
 
 ;;;;; Request
 
-;; NOTE: Every callback defined that is passed to `matrix-request'
-;; should be a method specialized on `matrix-session'.  While it means
-;; that sometimes we must look up a room object by room ID, since we
-;; can't specialize on `matrix-room', it also means that we only need
-;; to pass the method name as the callback, rather than a partially
-;; applied method.  This might be a worthwhile tradeoff, but we might
-;; change this later.
-
 (cl-defmethod matrix-request ((session matrix-session) endpoint data callback
                               &optional &key (method 'get) (error-callback #'matrix-request-error-callback))
   "Make request to ENDPOINT on SESSION with DATA and call CALLBACK on success.
