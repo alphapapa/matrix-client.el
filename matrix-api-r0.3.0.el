@@ -222,24 +222,15 @@ set, will be called if the request fails."
                         :success callback
                         :error (apply-partially error-callback session)
                         :sync matrix-synchronous))
-        ("POST" (request url
-                         :type method
-                         :headers (a-list 'Content-Type "application/json"
-                                          'Authorization (format "Bearer %s" access-token))
-                         :data (json-encode data)
-                         :parser #'json-read
-                         :success callback
-                         :error (apply-partially error-callback session)
-                         :sync matrix-synchronous))
-        ("PUT" (request url
-                        :type method
-                        :headers (a-list 'Content-Type "application/json"
-                                         'Authorization (format "Bearer %s" access-token))
-                        :data (json-encode data)
-                        :parser #'json-read
-                        :success callback
-                        :error (apply-partially error-callback session)
-                        :sync matrix-synchronous))))))
+        ((or "POST" "PUT") (request url
+                                    :type method
+                                    :headers (a-list 'Content-Type "application/json"
+                                                     'Authorization (format "Bearer %s" access-token))
+                                    :data (json-encode data)
+                                    :parser #'json-read
+                                    :success callback
+                                    :error (apply-partially error-callback session)
+                                    :sync matrix-synchronous))))))
 
 (matrix-defcallback request-error matrix-session
   "Callback function for request error."
