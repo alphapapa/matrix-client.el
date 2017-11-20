@@ -442,9 +442,9 @@ Add new room to SESSION."
 (matrix-defcallback send-message matrix-room
   "Callback for send-message."
   ;; For now, just log it, because we'll get it back when we sync anyway.
-  :slots nil
+  :slots (id)
   :body (matrix-log "Message \"%s\" sent to room %s. Event ID: %s"
-                    (oref room id) message (a-get data 'event_id)))
+                    id message (a-get data 'event_id)))
 
 (cl-defmethod matrix-leave ((room matrix-room))
   "Leave room."
@@ -478,7 +478,8 @@ Add new room to SESSION."
 
 (matrix-defcallback forget matrix-room
   "Forget room callback."
-  :body (matrix-log "FORGOT ROOM: %s" (oref room id)))
+  :slots (id)
+  :body (matrix-log "FORGOT ROOM: %s" id))
 
 ;;; Footer
 
