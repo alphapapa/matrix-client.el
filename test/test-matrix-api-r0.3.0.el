@@ -33,20 +33,9 @@
             :to-match (rx (1+ alnum))))
 
   (it "Begins with no rooms"
+    (matrix-sync session)
     (expect (length (oref session rooms))
             :to-be 0))
-
-  ;; TODO: If we create a new room, we can send messages to it, then
-  ;; test retrieving them with sync, and then leave/delete the room
-  ;; afterward.
-
-  ;; (it "Can create a room, join it, and send messages to it")
-
-  ;; (it "Can do an initial sync"
-  ;;   (matrix-sync session)
-  ;;   ;; There should be some timeline event objects in the first room.
-  ;;   (expect (length (oref (car (oref session rooms)) timeline))
-  ;;           :to-be-greater-than 0))
 
   (it "Can create a room"
     (matrix-create-room session)
