@@ -22,4 +22,23 @@ return any value."
                            ,(car keys))))
     (rec (nreverse keys))))
 
+(defmacro with-slots* (slots-objects &rest body)
+  "Access slots of nested objects, evaluating BODY.
+Creates nested `with-slots' forms, so each slot is a generalized
+variable.  For example:
+
+\(with-slots* (((id session) room)
+              ((user) session))
+             user)
+
+Is transformed to:
+
+\(with-slots (id session) room
+  (with-slots (user) session
+    user))"
+  (declare (indent defun))
+  (cl-loop for (slots object) in (reverse slots-objects)
+           do (setq body `((with-slots ,slots ,object ,@body)))
+           finally return (car body)))
+
 (provide 'matrix-macros)

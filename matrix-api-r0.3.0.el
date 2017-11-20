@@ -427,17 +427,17 @@ Add new room to SESSION."
 (cl-defmethod matrix-send-message ((room matrix-room) message)
   "Send MESSAGE to ROOM."
   ;; https://matrix.org/docs/spec/client_server/r0.3.0.html#id182
-  (with-slots (id session) room
-    (with-slots (txn-id) session
-      ;; This makes it easy to increment the txn-id
-      (let* ((type "m.room.message")
-             (content (a-list 'msgtype "m.text"
-                              'body message))
-             (txn-id (cl-incf txn-id))
-             (endpoint (format "rooms/%s/send/%s/%s"
-                               id type txn-id)))
-        (matrix-put session endpoint content
-                    (apply-partially #'matrix-send-message-callback room))))))
+  (with-slots* (((id session) room)
+                ((txn-id) session))
+    ;; Use `with-slots*' instead of `pcase-let*' so we can `incf' the txn-id.
+    (let* ((type "m.room.message")
+           (content (a-list 'msgtype "m.text"
+                            'body message))
+           (txn-id (cl-incf txn-id))
+           (endpoint (format "rooms/%s/send/%s/%s"
+                             id type txn-id)))
+      (matrix-put session endpoint content
+                  (apply-partially #'matrix-send-message-callback room)))))
 
 (matrix-defcallback send-message matrix-room
   "Callback for send-message."
