@@ -123,6 +123,8 @@ Defaults to 0 and should be automatically incremented for each request.")
                :documentation "The batch token to supply in the since param of the next /sync request."))
   :allow-nil-initform t)
 
+;;;;; Room
+
 (matrix-defclass matrix-room ()
   ((session :initarg :session
             :type matrix-session)
@@ -318,11 +320,11 @@ Set access_token and device_id in session."
 
 (cl-defmethod matrix-sync-state ((room matrix-room) state)
   "Sync STATE in ROOM."
-  (pcase-let (((map events) state))
-    ;; events is an array, not a list, so we can't use --each.
-    (seq-doseq (event events)
-      (matrix-log "Would process state event in %s: " room event))
-    t))
+  (with-slots (state) room
+    (pcase-let (((map events) state))
+      ;; events is an array, not a list, so we can't use --each.
+      (seq-doseq (event events)
+        (push event state)))))
 
 (cl-defmethod matrix-sync-timeline ((room matrix-room) timeline-sync)
   "Sync TIMELINE-SYNC in ROOM."
@@ -366,17 +368,17 @@ maximum number of events to return (default 10)."
 
 (cl-defmethod matrix-sync-ephemeral ((room matrix-room) ephemeral)
   "Sync EPHEMERAL in ROOM."
-  (pcase-let (((map events) ephemeral))
-    (seq-doseq (event events)
-      (matrix-log "Would process ephemeral event in %s: " room event))
-    t))
+  (with-slots (ephemeral) room
+    (pcase-let (((map events) ephemeral))
+      (seq-doseq (event events)
+        (push event ephemeral)))))
 
 (cl-defmethod matrix-sync-account_data ((room matrix-room) account-data)
   "Sync ACCOUNT-DATA in ROOM."
-  (pcase-let (((map events) account-data))
-    (seq-doseq (event events)
-      (matrix-log "Would process account-data event in %s: " room event))
-    t))
+  (with-slots (account-data) room
+    (pcase-let (((map events) account-data))
+      (seq-doseq (event events)
+        (push event account-data)))))
 
 (cl-defmethod matrix-sync-unread_notifications ((room matrix-room) unread-notifications)
   "Sync UNREAD-NOTIFICATIONS in ROOM."
@@ -387,20 +389,27 @@ maximum number of events to return (default 10)."
 
 ;;;;; Rooms
 
-(cl-defmethod matrix-create-room ((session matrix-session) &key (is-direct t))
+(cl-defmethod matrix-create-room ((session matrix-session)
+                                  &key (visibility "private") alias name topic invite preset (is-direct t))
   "Create new room on SESSION.
 When IS-DIRECT is non-nil, set that flag on the new room."
   ;; https://matrix.org/docs/spec/client_server/r0.3.0.html#id190
-  (matrix-post session 'createRoom (a-list 'is-direct is-direct
-                                           'name "test room"
-                                           'topic "test topic"
-                                           'preset "private_chat"
-                                           )
+
+  ;; MAYBE: Add other parameters: invite_3pid, creation_content,
+  ;; initial_state.  Not sure how useful these would be for us.
+
+  (matrix-post session 'createRoom (a-list 'visibility visibility
+                                           'room_alias_name alias
+                                           'name name
+                                           'topic topic
+                                           'preset preset
+                                           'is-direct is-direct)
                #'matrix-create-room-callback))
 
 (matrix-defcallback create-room matrix-session
   "Callback for create-room.
 Add new room to SESSION."
+  ;; TODO: Should we add the room directly here, or should we do that after /sync?
   :slots (rooms)
   :body (pcase-let* (((map room_id) data)
                      (room (matrix-room :session session
@@ -464,6 +473,8 @@ Add new room to SESSION."
   :slots (id)
   :body (matrix-log "FORGOT ROOM: %s" id))
 
-;;; Footer
+;;;; Footer
 
 (provide 'matrix-api-r0.3.0)
+
+;;; matrix-api-r0.3.0.el ends here

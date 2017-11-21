@@ -67,6 +67,12 @@
                   (a-get* first-event 'content 'body))
                 :to-equal "Test message.")))
 
+    (xit "Can change room name")
+
+    (xit "Can change room topic")
+
+    (xit "Can change room alias")
+
     (it "Can leave a room"
       (matrix-leave (car (oref session rooms)))
       (expect (length (oref session rooms))
@@ -88,6 +94,12 @@
               ;; room, we'll have to ensure we add more than 10
               ;; events.
               :to-be-greater-than 10)))
+
+  (describe "Initial sync"
+
+    ;; TODO: Need a second test account that remains in rooms with messages for testing initial sync.
+
+)
 
 
 
