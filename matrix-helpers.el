@@ -96,15 +96,6 @@ PAIRS should be of the form (SLOT VALUE SLOT VALUE...)."
       (set-buffer-modified-p nil)
       (matrix-client-update-last-seen room))))
 
-(cl-defmethod matrix-client-update-last-seen ((room matrix-client-room) &rest _)
-  "Move the last-seen overlay to after the last message in ROOM."
-  (with-slots (buffer) room
-    (with-current-buffer buffer
-      (when-let ((prompt-ov (car (ov-in 'matrix-client-prompt)))
-                 (seen-ov (car (ov-in 'matrix-client-last-seen)))
-                 (target-pos (1- (ov-beg prompt-ov))))
-        (ov-move seen-ov target-pos target-pos)))))
-
 (defun matrix-client-insert-last-seen-overlay ()
   "Insert last-seen overlay into current buffer."
   (when-let ((prompt-ov (car (ov-in 'matrix-client-prompt)))

@@ -527,6 +527,15 @@ Also update prompt with typers."
                     (oref room :id))))
     (matrix-send-message con room-id message)))
 
+(cl-defmethod matrix-client-update-last-seen ((room matrix-client-room) &rest _)
+  "Move the last-seen overlay to after the last message in ROOM."
+  (with-slots (buffer) room
+    (with-current-buffer buffer
+      (when-let ((prompt-ov (car (ov-in 'matrix-client-prompt)))
+                 (seen-ov (car (ov-in 'matrix-client-last-seen)))
+                 (target-pos (1- (ov-beg prompt-ov))))
+        (ov-move seen-ov target-pos target-pos)))))
+
 (defun matrix-client-window-change-hook ()
   "Send a read receipt if necessary."
   ;; FIXME: Unimplemented.
