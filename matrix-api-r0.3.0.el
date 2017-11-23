@@ -1,5 +1,5 @@
 ;; Here is a playground for implementing the latest version of the
-;; API, r0.2.0.  Confusingly, "v1" of the API is older and more
+;; API, r0.3.0.  Confusingly, "v1" of the API is older and more
 ;; primitive than "r0".  Apparently the API was not considered
 ;; "released" then, and now it is, so the versions are named with an R
 ;; instead of a V.
