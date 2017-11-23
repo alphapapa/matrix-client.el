@@ -407,11 +407,10 @@ If sync was successful or timed-out, make a new sync request."
                                  (params '(state timeline ephemeral account_data unread_notifications))
                                  (room (or (--first (equal (oref it id) room-id)
                                                     rooms)
-                                           ;; Make new room
-                                           (let ((new-room (matrix-room :session session
-                                                                        :id room-id)))
-                                             (push new-room rooms)
-                                             new-room))))
+                                           ;; Make and return new room
+                                           (car (push (matrix-room :session session
+                                                                   :id room-id)
+                                                      rooms)))))
                       (cl-loop for param in params
                                for method = (intern (concat "matrix-sync-" (symbol-name param)))
                                do (if (functionp method)
