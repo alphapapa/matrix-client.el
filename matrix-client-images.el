@@ -52,17 +52,25 @@ RESCALE-ARGS are passed to `matrix-client-rescale-image'."
   "Rescale DATA, if too big, to fit the current buffer.
 MAX-WIDTH and MAX-HEIGHT are used if set, otherwise they are
 determined by the size of the buffer's window."
-  ;; Copied from image.el
-  (if (not (and (fboundp 'imagemagick-types)
-                (get-buffer-window (current-buffer))))
-      (create-image data nil t :ascent 100)
-    (let ((edges (window-inside-pixel-edges
-                  (get-buffer-window (current-buffer))))
-          (max-width (or max-width (window-pixel-width)))
-          (max-height (or max-height (/ (window-pixel-height) 2))))
-      (create-image data 'imagemagick 'data-p
-                    :max-width max-width
-                    :max-height max-height))))
+  ;; Based on image.el
+  (when (fboundp 'imagemagick-types)
+    (cond ((and max-width max-height)
+           ;; Use given size
+           )
+          ((get-buffer-window (current-buffer))
+           ;; Use window size
+           (setq max-width (or max-width (window-pixel-width))
+                 max-height (or max-height (/ (window-pixel-height) 2))))
+          ((current-buffer)
+           ;; Buffer not displayed; use frame
+           (setq max-width (or max-width (frame-pixel-width))
+                 max-height (or max-height (/ (frame-pixel-height) 2))))
+          (t
+           ;; This should not happen with the fixes above, but just in case:
+           (warn "Weird error rescaling image, please report.  Buffer: %s" (current-buffer))))
+    (create-image data 'imagemagick 'data-p
+                  :max-width max-width
+                  :max-height max-height)))
 
 (cl-defmethod matrix-client-insert-image-callback (&key (room matrix-client-room) message-id url
                                                         data error-thrown symbol-status response
