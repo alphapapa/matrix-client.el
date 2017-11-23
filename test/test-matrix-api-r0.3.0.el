@@ -34,17 +34,13 @@
 
   (describe "Rooms"
 
-    (it "Begins with no rooms"
-      (matrix-sync session)
-      (expect (length (oref session rooms))
-              :to-be 0))
-
     (it "Can create a room"
-      (matrix-create-room session)
-      ;; Used to forget the room later
-      (push (car (oref session rooms)) matrix-test-joined-rooms)
-      (expect (length (oref session rooms))
-              :to-be-greater-than 0))
+      (let ((rooms-length (length (oref session rooms))))
+        (matrix-create-room session)
+        ;; Used to forget the room later
+        (push (car (oref session rooms)) matrix-test-joined-rooms)
+        (expect (length (oref session rooms))
+                :to-be-greater-than rooms-length)))
 
     (describe "Messages"
 
