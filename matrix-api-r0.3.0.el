@@ -359,6 +359,13 @@ requests, and we make a new request."
 
   ;; I think what I will do for now is just raise a warning if "limited" is ever set.
 
+  ;; The /messages call does NOT return a "limited", so I guess there is no way to know when
+  ;; you've retrieved all of the messages that /sync WOULD have sent you if there were no
+  ;; limit.  So I guess we have to decide for ourselves how many messages we want to show on
+  ;; initial sync, and fetch backward until we have that many--unless, of course, we hit the
+  ;; beginning of the room, in which case I guess the start/end tokens from /messages will be
+  ;; the same...?  Or we'll receive fewer messages than the limit...?
+
   (with-slots (access-token next-batch) session
     (matrix-get session 'sync (a-list 'since next-batch
                                       'full_state full-state
@@ -468,7 +475,7 @@ SESSION has no access token, consider the session logged-out."
       (setq prev-batch prev_batch)
       (when limited
         ;; FIXME: Handle this for real.
-        (matrix-warn "ROOM TIMELINE WAS LIMITED: %s" id)))))
+        (matrix-warn "ROOM %s TIMELINE WAS LIMITED: %s" id data)))))
 
 (cl-defmethod matrix-messages ((session matrix-session) room-id
                                &key (direction "b") limit)
@@ -498,7 +505,8 @@ maximum number of events to return (default 10)."
           ;; events.
           (seq-doseq (event chunk)
             (push event timeline))
-          (setq prev-batch end)))
+          (setq prev-batch end)
+          (matrix-log "MESSAGES CALLBACK: %s" data)))
 
 (cl-defmethod matrix-sync-ephemeral ((room matrix-room) ephemeral)
   "Sync EPHEMERAL in ROOM."
