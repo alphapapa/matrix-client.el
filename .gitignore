@@ -1,3 +1,4 @@
 *.elc
 .ert-runner
 .cask
+/test/account.el
