@@ -40,6 +40,10 @@
 ;;;; Macros
 
 (defmacro matrix-defclass (name superclasses slots &rest options-and-doc)
+  "Identical to `defclass', except adds optional `:instance-initform' argument to each slot.
+This should be a sexp that will be evaluated in the context of
+the object's slots (using `with-slots') when it is
+initialized (like Python's __init__ method)."
   (declare (indent defun))
   (let* ((slot-inits (-non-nil (--map (let ((name (car it))
                                             (initer (plist-get (cdr it) :instance-initform)))
