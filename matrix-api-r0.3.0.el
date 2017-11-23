@@ -131,7 +131,9 @@ automatically, and other keys are allowed."
                    :type hash-table
                    :documentation "Hash table of user IDs whose presence this user wants to follow.")
    (next-batch :type string
-               :documentation "The batch token to supply in the since param of the next /sync request."))
+               :documentation "The batch token to supply in the since param of the next /sync request.")
+   (extra :initarg :extra
+          :documentation "Reserved for users of the library, who may store whatever they want here."))
   :allow-nil-initform t)
 
 ;;;;; Room
@@ -142,6 +144,7 @@ automatically, and other keys are allowed."
    (id :documentation "Fully-qualified room ID."
        :initarg :id
        :type string)
+   (aliases :initarg :aliases)
    (members :documentation "List of room members, as user objects."
             :type list)
    (state :documentation "Updates to the state, between the time indicated by the since parameter, and the start of the timeline (or all state up to the start of the timeline, if since is not given, or full_state is true).")
@@ -151,7 +154,11 @@ automatically, and other keys are allowed."
    (last-full-sync :documentation "The oldest \"since\" token for which the room has been synced completely.")
    (ephemeral :documentation "The ephemeral events in the room that aren't recorded in the timeline or state of the room. e.g. typing.")
    (account-data :documentation "The private data that this user has attached to this room.")
-   (unread-notifications :documentation "Counts of unread notifications for this room."))
+   (unread-notifications :documentation "Counts of unread notifications for this room.")
+   (hook :initarg :hook
+         :documentation "List of functions called when room is updated.  Function is called with one argument, this room object.")
+   (extra :initarg :extra
+          :documentation "Reserved for users of the library, who may store whatever they want here."))
   :allow-nil-initform t)
 
 ;;;; Functions
@@ -458,13 +465,18 @@ SESSION has no access token, consider the session logged-out."
       (seq-doseq (event events)
         (push event state)))))
 
+(defvar matrix-sync-timeline-hook nil
+  "List of functions called for new timeline events.
+Each function is called with ROOM and EVENT.")
+
 (cl-defmethod matrix-sync-timeline ((room matrix-room) data)
   "Sync timeline DATA in ROOM."
   (with-slots* (((id session timeline prev-batch last-full-sync) room)
                 ((next-batch) session))
     (pcase-let (((map events limited prev_batch) data))
       (seq-doseq (event events)
-        (push event timeline))
+        (push event timeline)
+        (run-hook-with-args 'matrix-sync-timeline-hook room event))
       (setq prev-batch prev_batch)
       (if (and limited last-full-sync)
           ;; Timeline is limited and we have a token to fill to: fill the gap.  If
