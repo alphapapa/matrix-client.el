@@ -493,10 +493,6 @@ maximum number of events to return (default 10)."
           ;; end: The token the pagination ends at. If dir=b this
           ;; token should be used again to request even earlier
           ;; events.
-
-          ;; FIXME: Does prev-batch need to be stored in timeline
-          ;; rather than the room?  is there a prev-batch for other
-          ;; things besides timeline?
           (seq-doseq (event chunk)
             (push event timeline))
           (setq prev-batch end)))
