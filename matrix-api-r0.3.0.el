@@ -192,7 +192,8 @@ MESSAGE and ARGS should be a string and list of strings for
 ;;;;; Request
 
 (cl-defmethod matrix-request ((session matrix-session) endpoint data callback
-                              &optional &key (method 'get) (error-callback #'matrix-request-error-callback))
+                              &optional &key (method 'get) (error-callback #'matrix-request-error-callback)
+                              complete-callback timeout)
   "Make request to ENDPOINT on SESSION with DATA and call CALLBACK on success.
 Request is made asynchronously.  METHOD should be a symbol,
 `get' (the default) or `post'.  ENDPOINT may be a string or
@@ -203,6 +204,12 @@ encoded to JSON.  CALLBACK should be a method specialized on
 `matrix-session', whose subsequent arguments are defined in
 accordance with the `request' package's API.  ERROR-CALLBACK, if
 set, will be called if the request fails."
+
+  ;; TODO: Add general completion callback that retries requests if they timeout.  e.g. if a
+  ;; message-send request times out, we should retry it at least once, and then give an error.
+  ;; We should check the API docs to see if there's a recommended timeout value for requests
+  ;; like that.
+
   (with-slots (api-url-prefix access-token) session
     (let* ((url (url-encode-url
                  (concat api-url-prefix (cl-typecase endpoint
@@ -220,6 +227,14 @@ set, will be called if the request fails."
                        ;; FIXME: Add to docstring.
                        (symbolp (apply-partially callback session))
                        (t callback)))
+           (complete-callback (pcase complete-callback
+                                ;; If complete-callback is a symbol, apply session to
+                                ;; it.  If it's an already-partially-applied
+                                ;; function, use it as-is.
+                                ;; FIXME: Add to docstring.
+                                (`nil nil)
+                                ((pred symbolp) (apply-partially complete-callback session))
+                                (_ complete-callback)))
            (method (upcase (symbol-name method)))
            (request-log-level 'debug))
       (matrix-log "REQUEST: %s" (a-list 'url url
@@ -234,6 +249,8 @@ set, will be called if the request fails."
                         :parser #'json-read
                         :success callback
                         :error (apply-partially error-callback session)
+                        :complete complete-callback
+                        :timeout timeout
                         :sync matrix-synchronous))
         ((or "POST" "PUT") (request url
                                     :type method
@@ -243,6 +260,8 @@ set, will be called if the request fails."
                                     :parser #'json-read
                                     :success callback
                                     :error (apply-partially error-callback session)
+                                    :complete complete-callback
+                                    :timeout timeout
                                     :sync matrix-synchronous))))))
 
 (matrix-defcallback request-error matrix-session
@@ -319,7 +338,11 @@ requests, and we make a new request."
                         'full_state full-state
                         'set_presence set-presence
                         'timeout timeout)
-                #'matrix-sync-callback)))
+                #'matrix-sync-callback
+                :complete-callback #'matrix-sync-complete-callback
+                ;; Add 5 seconds to timeout to give server a bit of grace period before we
+                ;; consider it unresponsive.
+                :timeout (+ timeout 5))))
 
 (matrix-defcallback sync matrix-session
   "Callback function for successful sync request."
@@ -332,14 +355,24 @@ requests, and we make a new request."
                  do (if (functionp method)
                         (funcall method session (a-get data param))
                       (warn "Unimplemented method: %s" method))
-                 finally do (progn
-                              (setq next-batch (a-get data 'next_batch))
-                              ;; Call self again to wait for more data.  But don't do this if
-                              ;; `matrix-synchronous' is set, which would cause an infinite
-                              ;; loop.  It should only be set when testing, in which case we
-                              ;; sync manually.
-                              (unless matrix-synchronous
-                                (matrix-sync session)))))
+                 finally do (setq next-batch (a-get data 'next_batch))))
+
+(matrix-defcallback sync-complete matrix-session
+  "Completion callback function for sync requests.
+If sync was successful or timed-out, make a new sync request."
+  :body (pcase symbol-status
+          ((or 'success 'timeout)
+           (matrix-log "SYNC COMPLETE: %s.  Making new sync request..." symbol-status)
+           (unless matrix-synchronous
+             ;; Call self again to wait for more data.  But don't do this if
+             ;; `matrix-synchronous' is set, which would cause an infinite
+             ;; loop.  It should only be set when testing, in which case we
+             ;; sync manually.
+             (matrix-sync session)))
+          (_ (let ((msg (format "SYNC FAILED: %s  NOT STARTING NEW SYNC REQUEST.  API SHOULD BE CONSIDERED DISCONNECTED."
+                                (upcase (symbol-name symbol-status)))))
+               (warn msg)
+               (matrix-log msg)))))
 
 (cl-defmethod matrix-sync-presence ((session matrix-session) state-changes)
   "Process presence STATE-CHANGES."
