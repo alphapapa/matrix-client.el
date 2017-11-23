@@ -291,7 +291,19 @@ Unset access_token and device_id in session."
 ;;;;; Sync
 
 (cl-defmethod matrix-sync ((session matrix-session) &key full-state set-presence (timeout 30))
+  "Start making /sync API requests.
+Every TIMEOUT seconds, the server should return any outstanding
+requests, and we make a new request."
   ;; https://matrix.org/docs/spec/client_server/r0.2.0.html#id126
+
+  ;; TODO: Probably should add a watchdog in case the server drops the connection and doesn't
+  ;; actually return when timed-out.  We should be able to check the `symbol-status' arg to the
+  ;; callback, and if it's `timeout' or `abort', we call /sync again.  That would let us avoid
+  ;; using a timer.  To do this, we also need to set the timeout arg to `request' to, say, a
+  ;; few seconds more than the timeout sent in the API request.
+
+  ;; MAYBE: Don't make new /sync request if timeout is 0/nil.  It would have to be passed
+  ;; through to the callback.
 
   ;; MAYBE: Can we just set the :complete arg to `request' to `matrix-sync' so that it will be
   ;; called repeatedly?  Or should we call `matrix-sync' again in the success callback?  Do we
