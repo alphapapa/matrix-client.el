@@ -42,7 +42,8 @@
   (it "Can do initial sync"
     (spy-on #'matrix-sync-callback :and-call-through)
     (matrix-sync matrix-test-session)
-    (expect #'matrix-sync-callback :to-have-been-called))
+    (expect #'matrix-sync-callback :to-have-been-called)
+    (expect (oref matrix-test-session next-batch) :to-be-truthy))
 
   (describe "Rooms"
 
@@ -103,10 +104,4 @@
               ;; events in it.  If we start testing by making our own
               ;; room, we'll have to ensure we add more than 10
               ;; events.
-              :to-be-greater-than 10)))
-
-  (describe "Initial sync"
-
-    ;; TODO: Need a second test account that remains in rooms with messages for testing initial sync.
-
-    ))
+              :to-be-greater-than 10))))

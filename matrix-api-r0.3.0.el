@@ -88,15 +88,14 @@ automatically, and other keys are allowed."
          :documentation "The fully qualified user ID, e.g. @user:matrix.org.")
    (server :initarg :server
            :initform nil
-           :instance-initform (nth 2 (s-match (rx "@" (group (1+ (not (any ":")))) ":" (group (1+ anything)))
+           :instance-initform (nth 2 (s-match (rx "@" (group (1+ (not (any ":"))))
+                                                  ":" (group (1+ anything)))
                                               user))
            :type string
-           :documentation "FQDN of server, e.g. \"matrix.org\" for the official homeserver.
-Derived automatically from USER.")
+           :documentation "FQDN of server, e.g. \"matrix.org\" for the official homeserver.  Derived automatically from USER.")
    (api-url-prefix :type string
                    :instance-initform (concat "https://" server "/_matrix/client/r0/")
-                   :documentation "URL prefix for API requests.
-Derived automatically from server-name and built-in API version.")
+                   :documentation "URL prefix for API requests.  Derived automatically from server-name and built-in API version.")
    (device-id :initarg :device-id
               ;; FIXME: Does the initform work for this?  When this
               ;; file gets byte-compiled, does it get hard-coded in
@@ -112,16 +111,14 @@ Derived automatically from server-name and built-in API version.")
     ;; instance-initform instead?
     :initform (concat "matrix-client.el @ " (system-name))
     :type string
-    :documentation "A display name to assign to the newly-created device.
-Ignored if device_id corresponds to a known device.")
+    :documentation "A display name to assign to the newly-created device.  Ignored if device_id corresponds to a known device.")
    (access-token :initarg :access-token
                  :initform nil
                  :documentation "API access_token.")
    (txn-id :initarg :txn-id
            :initform 0
            :type integer
-           :documentation "Transaction ID.
-Defaults to 0 and should be automatically incremented for each request.")
+           :documentation "Transaction ID.  Defaults to 0 and should be automatically incremented for each request.")
    (rooms :initform nil
           :initarg :rooms
           :type list
