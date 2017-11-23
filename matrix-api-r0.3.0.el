@@ -210,6 +210,8 @@ set, will be called if the request fails."
   ;; We should check the API docs to see if there's a recommended timeout value for requests
   ;; like that.
 
+  ;; TODO: Use request's :status-code argument to handle error responses more precisely.
+
   (with-slots (api-url-prefix access-token) session
     (let* ((url (url-encode-url
                  (concat api-url-prefix (cl-typecase endpoint
