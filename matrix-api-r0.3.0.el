@@ -359,7 +359,9 @@ requests, and we make a new request."
 
 (matrix-defcallback sync-complete matrix-session
   "Completion callback function for sync requests.
-If sync was successful or timed-out, make a new sync request."
+If sync was successful or timed-out, make a new sync request.  If
+SESSION has no access token, consider the session logged-out."
+  :slots (access-token)
   :body (pcase symbol-status
           ((or 'success 'timeout)
            (matrix-log "SYNC COMPLETE: %s.  Making new sync request..." symbol-status)
@@ -368,7 +370,8 @@ If sync was successful or timed-out, make a new sync request."
              ;; `matrix-synchronous' is set, which would cause an infinite
              ;; loop.  It should only be set when testing, in which case we
              ;; sync manually.
-             (matrix-sync session)))
+             (when access-token
+               (matrix-sync session))))
           (_ (let ((msg (format "SYNC FAILED: %s  NOT STARTING NEW SYNC REQUEST.  API SHOULD BE CONSIDERED DISCONNECTED."
                                 (upcase (symbol-name symbol-status)))))
                (warn msg)
