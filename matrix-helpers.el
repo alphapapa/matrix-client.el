@@ -85,10 +85,8 @@ PAIRS should be of the form (SLOT VALUE SLOT VALUE...)."
              (buffer (oref room buffer))
              (window (get-buffer-window buffer))
              (window-active-p (equal window (selected-window)))
-             (one-window-p (= 1 (length (window-list)))))
-    (when (and (matrix-client-buffer-visible-p)
-               window-active-p
-               (not one-window-p))
+             (not-one-window-p (not (= 1 (length (window-list))))))
+    (when (matrix-client-buffer-visible-p)
       ;; FIXME: Need a way to move the seen line when there's one
       ;; window visible and the user has seen it.  Unfortunately,
       ;; there seems to be no way to detect whether the Emacs frame
