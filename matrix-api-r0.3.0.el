@@ -44,6 +44,7 @@
 This should be a sexp that will be evaluated in the context of
 the object's slots (using `with-slots') when it is
 initialized (like Python's __init__ method)."
+  ;; TODO: Default :initform to nil.
   (declare (indent defun))
   (let* ((slot-inits (-non-nil (--map (let ((name (car it))
                                             (initer (plist-get (cdr it) :instance-initform)))
@@ -154,6 +155,8 @@ automatically, and other keys are allowed."
    (prev-batch :documentation "A token that can be supplied to to the from parameter of the rooms/{roomId}/messages endpoint."
                ;; :type string
                :initform nil)
+   (last-full-sync :documentation "The oldest \"since\" token for which the room has been synced completely."
+                   :initform nil)
    (ephemeral :documentation "The ephemeral events in the room that aren't recorded in the timeline or state of the room. e.g. typing."
               :initform nil)
    (account-data :documentation "The private data that this user has attached to this room."
@@ -468,34 +471,43 @@ SESSION has no access token, consider the session logged-out."
 
 (cl-defmethod matrix-sync-timeline ((room matrix-room) data)
   "Sync timeline DATA in ROOM."
-  (with-slots (id timeline prev-batch) room
+  (with-slots* (((id session timeline prev-batch last-full-sync) room)
+                ((next-batch) session))
     (pcase-let (((map events limited prev_batch) data))
       (seq-doseq (event events)
         (push event timeline))
       (setq prev-batch prev_batch)
-      (when limited
-        ;; FIXME: Handle this for real.
-        (matrix-warn "ROOM %s TIMELINE WAS LIMITED: %s" id data)))))
+      (if (and limited last-full-sync)
+          ;; Timeline is limited and we have a token to fill to: fill the gap.  If
+          ;; `last-full-sync' is nil, this should mean that we are doing an initial sync, and
+          ;; since we have no previous "since" token to fetch up to, we do not bother to fetch
+          ;; more messages, even if the timeline is limited.
+          ;; MAYBE: Add setting for minimum number of events/messages to initially fetch.
+          (progn
+            (matrix-warn "ROOM %s TIMELINE WAS LIMITED: %s.  Trying to fill gap..." id data)
+            (matrix-messages room))
+        ;; Timeline is not limited: save the not-yet-updated next-batch token.  If the next
+        ;; timeline is limited, we use this token to know when we have filled the timeline gap.
+        (matrix-log "ROOM %s FULLY SYNCED." id)
+        (setq last-full-sync next-batch)))))
 
-(cl-defmethod matrix-messages ((session matrix-session) room-id
-                               &key (direction "b") limit)
+(cl-defmethod matrix-messages ((room matrix-room)
+                               &key (direction "b") (limit 100))
   "Request messages for ROOM-ID in SESSION.
 DIRECTION must be \"b\" (the default) or \"f\".  LIMIT is the
 maximum number of events to return (default 10)."
-  ;; MAYBE: Increase the default limit.  The API default is 10, but if we have to fetch
-  ;; messages to fill gaps, retrieving 10 at a time seems like a very small number.
-  (pcase-let* (((eieio rooms) session)
-               (room (object-assoc room-id :id rooms))
-               ((eieio prev-batch) room))
+  ;; TODO: As written, this may only work going backward.  Needs testing.
+  (with-slots (id session prev-batch last-full-sync) room
     (matrix-get session (format "rooms/%s/messages" room-id)
                 (a-list 'from prev-batch
+                        'to last-full-sync
                         'dir direction
                         'limit limit)
                 (apply-partially #'matrix-messages-callback room))))
 
 (matrix-defcallback messages matrix-room
   "Callback for /rooms/{roomID}/messages."
-  :slots (timeline prev-batch)
+  :slots (id timeline prev-batch last-full-sync)
   :body (pcase-let* (((map start end chunk) data))
           ;; NOTE: API docs:
           ;; start: The token the pagination starts from. If dir=b
@@ -505,8 +517,16 @@ maximum number of events to return (default 10)."
           ;; events.
           (seq-doseq (event chunk)
             (push event timeline))
-          (setq prev-batch end)
-          (matrix-log "MESSAGES CALLBACK: %s" data)))
+
+          (if (equal end last-full-sync)
+              ;; Gap has been filled: clear the last-full-sync token (NOTE: Not sure if this is correct)
+              (progn
+                (matrix-log "MESSAGES CALLBACK for ROOM: %s: gap is filled: %s" id data)
+                (setq last-full-sync nil))
+            ;; Gap not yet filled: continue filling
+            (matrix-log "MESSAGES CALLBACK for ROOM: %s: gap NOT filled: %s" id data)
+            (setq prev-batch end)
+            (matrix-messages room))))
 
 (cl-defmethod matrix-sync-ephemeral ((room matrix-room) ephemeral)
   "Sync EPHEMERAL in ROOM."
