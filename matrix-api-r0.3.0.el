@@ -252,7 +252,7 @@ set, will be called if the request fails."
           (warn msg)
           (matrix-log msg)))
 
-;;;;; Login
+;;;;; Login/logout
 
 (cl-defmethod matrix-login ((session matrix-session) password)
   "Log in to SESSION with PASSWORD.
@@ -273,6 +273,20 @@ Set access_token and device_id in session."
   :body (pcase-let* (((map access_token device_id) data))
           (setq access-token access_token
                 device-id device_id)))
+
+(cl-defmethod matrix-logout ((session matrix-session))
+  "Log out of SESSION."
+  (with-slots (user device-id initial-device-display-name) session
+    (matrix-post session 'logout nil
+                 #'matrix-logout-callback)))
+
+(matrix-defcallback logout matrix-session
+  "Callback function for successful logout.
+Unset access_token and device_id in session."
+  :slots (access-token device-id)
+  ;; TODO: Do we need to set the device_id to nill?
+  :body (setq access-token nil
+              device-id nil))
 
 ;;;;; Sync
 

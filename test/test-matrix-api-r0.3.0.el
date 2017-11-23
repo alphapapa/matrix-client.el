@@ -104,4 +104,12 @@
               ;; events in it.  If we start testing by making our own
               ;; room, we'll have to ensure we add more than 10
               ;; events.
-              :to-be-greater-than 10))))
+              :to-be-greater-than 10)))
+
+  (it "Can log out"
+    (spy-on #'matrix-logout-callback :and-call-through)
+    (matrix-logout matrix-test-session)
+    (expect #'matrix-logout-callback :to-have-been-called)
+    (with-slots (access-token device-id) matrix-test-session
+      (expect access-token :to-be nil)
+      (expect device-id :to-be nil))))
