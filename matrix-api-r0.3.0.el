@@ -313,12 +313,12 @@ Unset access_token and device_id in session."
   "Callback function for successful sync request."
   ;; https://matrix.org/docs/spec/client_server/r0.3.0.html#id167
   :slots (rooms next-batch)
-  :body (cl-loop for it in '(rooms presence account_data to_device device_lists)
-                 for method = (intern (concat "matrix-sync-" (symbol-name it)))
+  :body (cl-loop for param in '(rooms presence account_data to_device device_lists)
+                 for method = (intern (concat "matrix-sync-" (symbol-name param)))
                  ;; Assume that methods called will signal errors if anything goes wrong, so
                  ;; ignore return values.
                  do (if (functionp method)
-                        (funcall method session (a-get data it))
+                        (funcall method session (a-get data param))
                       (warn "Unimplemented method: %s" method))
                  finally do (progn
                               (setq next-batch (a-get data 'next_batch))
