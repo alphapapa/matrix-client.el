@@ -343,13 +343,23 @@ requests, and we make a new request."
   ;; summarising any state changes in the omitted part of the timeline. The client may
   ;; therefore end up with \"gaps\" in its knowledge of the message timeline. The client can
   ;; fill these gaps using the /rooms/<room_id>/messages API. This situation looks like this:"
+
+  ;; So IIUC, we need to see if "limited" is true FOR EACH ROOM, and if so, get the
+  ;; "prev_batch" token FOR THAT ROOM and call `matrix-messages' with it.  But it seems that we
+  ;; also need to call it with an "end" token, which I guess should be the "next_batch" token
+  ;; from the last non-limited /sync request (which starts to get confusing).  The API docs
+  ;; aren't especially clear here.  NOTE: I guess this will be difficult or impossible to test,
+  ;; because I don't know how often the server returns limited timelines (i.e. how busy a room
+  ;; has to be), or how we could make it do so, because there is no "limit" param for /sync.
+
+  ;; I think what I will do for now is just raise a warning if "limited" is ever set.
+
   (with-slots (access-token next-batch) session
-    (matrix-get session 'sync
-                (a-list 'since next-batch
-                        'full_state full-state
-                        'set_presence set-presence
-                        ;; Convert timeout to milliseconds
-                        'timeout (* timeout 1000))
+    (matrix-get session 'sync (a-list 'since next-batch
+                                      'full_state full-state
+                                      'set_presence set-presence
+                                      ;; Convert timeout to milliseconds
+                                      'timeout (* timeout 1000))
                 #'matrix-sync-callback
                 :complete-callback #'matrix-sync-complete-callback
                 ;; Add 5 seconds to timeout to give server a bit of grace period before we
@@ -448,11 +458,16 @@ SESSION has no access token, consider the session logged-out."
 
 (cl-defmethod matrix-sync-timeline ((room matrix-room) timeline-sync)
   "Sync TIMELINE-SYNC in ROOM."
-  (with-slots (timeline prev-batch) room
+  (with-slots (id timeline prev-batch) room
     (pcase-let (((map events limited prev_batch) timeline-sync))
       (seq-doseq (event events)
         (push event timeline))
-      (setq prev-batch prev_batch))))
+      (setq prev-batch prev_batch)
+      (when limited
+        ;; FIXME: Handle this for real.
+        (let ((msg (format "ROOM TIMELINE WAS LIMITED: %s" id)))
+          (matrix-log msg)
+          (warn msg))))))
 
 (cl-defmethod matrix-messages ((session matrix-session) room-id
                                &key (direction "b") limit)
