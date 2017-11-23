@@ -12,11 +12,13 @@
 
 ;;;; Requirements
 
+;; Built-in
 (require 'cl-lib)
 (require 'eieio)
 (require 'map)
 (require 'seq)
 
+;; MELPA
 (require 'a)
 (require 'dash)
 (require 'ht)
@@ -24,6 +26,7 @@
 (require 'request)
 (require 's)
 
+;; Local
 (require 'matrix-macros)
 
 ;;;; Variables
@@ -290,6 +293,15 @@ Set access_token and device_id in session."
                             (funcall method session (a-get data it))
                           (warn "Unimplemented method: %s" method))))
 
+(cl-defmethod matrix-sync-rooms ((session matrix-session) rooms)
+  "Process ROOMS from sync response on SESSION."
+  ;; https://matrix.org/docs/spec/client_server/r0.3.0.html#id167
+  (cl-loop for room in rooms
+           always (pcase room
+                    (`(join . ,_) (matrix-sync-join session room))
+                    (`(invite .  ,_) (matrix-log "Would process room invites: %s" room))
+                    (`(leave . ,_) (matrix-log "Would process room leaves: %s" room)))))
+
 (cl-defmethod matrix-sync-presence ((session matrix-session) state-changes)
   "Process presence STATE-CHANGES."
   ;; TODO: Test this.
@@ -302,15 +314,6 @@ Set access_token and device_id in session."
                                                'currently_active currently_active
                                                'last_active_ago last_active_ago
                                                'presence presence))))))
-
-(cl-defmethod matrix-sync-rooms ((session matrix-session) rooms)
-  "Process ROOMS from sync response on SESSION."
-  ;; https://matrix.org/docs/spec/client_server/r0.3.0.html#id167
-  (cl-loop for room in rooms
-           always (pcase room
-                    (`(join . ,_) (matrix-sync-join session room))
-                    (`(invite .  ,_) (matrix-log "Would process room invites: %s" room))
-                    (`(leave . ,_) (matrix-log "Would process room leaves: %s" room)))))
 
 (cl-defmethod matrix-sync-join ((session matrix-session) join)
   "Sync JOIN, a list of joined rooms, on SESSION."
@@ -330,10 +333,11 @@ Set access_token and device_id in session."
                                              new-room))))
                       (cl-loop for param in params
                                for method = (intern (concat "matrix-sync-" (symbol-name param)))
-                               always (if (functionp method)
-                                          (funcall method room (a-get joined-room param))
-                                        ;; `warn' seems to return non-nil.  Convenient.
-                                        (warn "Unimplemented method: %s" method-name)))))))
+                               do (if (functionp method)
+                                      ;; If the event array is empty, the function will be called anyway, so ignore its return value.
+                                      (funcall method room (a-get joined-room param))
+                                    ;; `warn' seems to return non-nil.  Convenient.
+                                    (warn "Unimplemented method: %s" method-name)))))))
 
 (cl-defmethod matrix-sync-state ((room matrix-room) state)
   "Sync STATE in ROOM."
