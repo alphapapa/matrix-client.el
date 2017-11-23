@@ -61,7 +61,8 @@ the Matrix spec for more information about its format."
                                    "m.presence" 'matrix-client-handler-m.presence
                                    "m.typing" 'matrix-client-handler-m.typing)))
     (unless input-filters
-      (setq input-filters '(matrix-client-input-filter-emote
+      (setq input-filters '(matrix-client-input-filter-who
+                            matrix-client-input-filter-emote
                             matrix-client-input-filter-join
                             matrix-client-input-filter-leave
                             matrix-client-send-to-current-room)))))
@@ -387,6 +388,23 @@ Return nil if emote sent, otherwise TEXT."
                              (a-list "msgtype" "m.emote"
                                      "body" emote))
           nil))
+    text))
+
+(defun matrix-client-input-filter-who (_ text)
+  "Show room members in buffer when user types \"/who\".
+If user typed /who, return nil, otherwise TEXT for further
+filtering."
+  (if (string-match (rx bos "/who" (or (1+ space) eos)) text)
+      (let ((room matrix-client-room-object))
+        (with-slots (membership) room
+          (matrix-client-insert room (propertize (format "Room members: %s" (--> membership
+                                                                                 (--map (a-get (cdr it) 'displayname) it)
+                                                                                 (--sort (string-collate-lessp it other nil 'ignore-case)
+                                                                                         it)
+                                                                                 (s-join ", " it)))
+                                                 'timestamp (time-to-seconds)
+                                                 'face 'matrix-client-notice))
+          (matrix-client-update-last-seen room)))
     text))
 
 (provide 'matrix-client-handlers)
