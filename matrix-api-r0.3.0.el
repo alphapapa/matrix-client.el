@@ -126,6 +126,8 @@ Defaults to 0 and should be automatically incremented for each request.")
           :initarg :rooms
           :type list
           :documentation "List of room objects user has joined.")
+   (account-data :documentation "The private data that this user has attached to this account."
+                 :initform nil)
    (followed-users :initform (ht)
                    :initarg :followed-users
                    :type hash-table
@@ -293,9 +295,25 @@ Set access_token and device_id in session."
   :slots (rooms next-batch)
   :body (cl-loop for it in '(rooms presence account_data to_device device_lists)
                  for method = (intern (concat "matrix-sync-" (symbol-name it)))
-                 always (if (functionp method)
-                            (funcall method session (a-get data it))
-                          (warn "Unimplemented method: %s" method))))
+                 ;; Assume that methods called will signal errors if anything goes wrong, so
+                 ;; ignore return values.
+                 do (if (functionp method)
+                        (funcall method session (a-get data it))
+                      (warn "Unimplemented method: %s" method))
+                 finally do (setq next-batch (a-get data 'next_batch))))
+
+(cl-defmethod matrix-sync-presence ((session matrix-session) state-changes)
+  "Process presence STATE-CHANGES."
+  ;; TODO: Test this.
+  ;; https://matrix.org/docs/spec/client_server/r0.3.0.html#id294
+  (with-slots (followed-users) session
+    (seq-doseq (change (a-get state-changes 'events))
+      (pcase-let* (((map content) change)
+                   ((map avatar_url currently_active last_active_ago presence user_id) content))
+        (ht-set followed-users user_id (a-list 'avatar_url avatar_url
+                                               'currently_active currently_active
+                                               'last_active_ago last_active_ago
+                                               'presence presence))))))
 
 (cl-defmethod matrix-sync-rooms ((session matrix-session) rooms)
   "Process ROOMS from sync response on SESSION."
@@ -305,19 +323,6 @@ Set access_token and device_id in session."
                     (`(join . ,_) (matrix-sync-join session room))
                     (`(invite .  ,_) (matrix-log "Would process room invites: %s" room))
                     (`(leave . ,_) (matrix-log "Would process room leaves: %s" room)))))
-
-(cl-defmethod matrix-sync-presence ((session matrix-session) state-changes)
-  "Process presence STATE-CHANGES."
-  ;; TODO: Test this.
-  ;; https://matrix.org/docs/spec/client_server/r0.3.0.html#id294
-  (with-slots (followed-users) session
-    (seq-doseq (change state-changes)
-      (pcase-let* (((map content) change)
-                   ((map avatar_url currently_active last_active_ago presence user_id) content))
-        (ht-set followed-users user_id (a-list 'avatar_url avatar_url
-                                               'currently_active currently_active
-                                               'last_active_ago last_active_ago
-                                               'presence presence))))))
 
 (cl-defmethod matrix-sync-join ((session matrix-session) join)
   "Sync JOIN, a list of joined rooms, on SESSION."
@@ -338,10 +343,14 @@ Set access_token and device_id in session."
                       (cl-loop for param in params
                                for method = (intern (concat "matrix-sync-" (symbol-name param)))
                                do (if (functionp method)
-                                      ;; If the event array is empty, the function will be called anyway, so ignore its return value.
+                                      ;; If the event array is empty, the function will be
+                                      ;; called anyway, so ignore its return value.
                                       (funcall method room (a-get joined-room param))
                                     ;; `warn' seems to return non-nil.  Convenient.
-                                    (warn "Unimplemented method: %s" method-name)))))))
+                                    (warn "Unimplemented method: %s" method-name))
+                               ;; Always return t for now, so that we think the sync succeeded
+                               ;; and we can set next_batch in `matrix-sync-callback'.
+                               finally return t)))))
 
 (cl-defmethod matrix-sync-state ((room matrix-room) state)
   "Sync STATE in ROOM."
@@ -398,10 +407,17 @@ maximum number of events to return (default 10)."
       (seq-doseq (event events)
         (push event ephemeral)))))
 
-(cl-defmethod matrix-sync-account_data ((room matrix-room) account-data)
+(cl-defmethod matrix-sync-account_data ((session matrix-session) data)
+  "Sync ACCOUNT-DATA in SESSION."
+  (with-slots (account-data) session
+    (pcase-let (((map events) data))
+      (seq-doseq (event events)
+        (push event account-data)))))
+
+(cl-defmethod matrix-sync-account_data ((room matrix-room) data)
   "Sync ACCOUNT-DATA in ROOM."
   (with-slots (account-data) room
-    (pcase-let (((map events) account-data))
+    (pcase-let (((map events) data))
       (seq-doseq (event events)
         (push event account-data)))))
 
