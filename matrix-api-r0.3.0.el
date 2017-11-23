@@ -40,11 +40,12 @@
 ;;;; Macros
 
 (defmacro matrix-defclass (name superclasses slots &rest options-and-doc)
-  "Identical to `defclass', except adds optional `:instance-initform' argument to each slot.
-This should be a sexp that will be evaluated in the context of
-the object's slots (using `with-slots') when it is
-initialized (like Python's __init__ method)."
-  ;; TODO: Default :initform to nil.
+  "Identical to `defclass', except...
+adds nil initforms.  Also adds optional `:instance-initform'
+argument to each slot.  This should be a sexp that will be
+evaluated in the context of the object's slots (using
+`with-slots') when it is initialized (like Python's __init__
+method)."
   (declare (indent defun))
   (let* ((slot-inits (-non-nil (--map (let ((name (car it))
                                             (initer (plist-get (cdr it) :instance-initform)))
@@ -54,6 +55,10 @@ initialized (like Python's __init__ method)."
          (slot-names (mapcar #'car slots))
          (around-fn-name (intern (concat (symbol-name name) "-initialize")))
          (docstring (format "Inititalize instance of %s." name)))
+    ;; Add nil initforms
+    (cl-loop for (slot . attrs) in slots
+             unless (plist-get attrs :initform)
+             do (nconc attrs (list :initform nil)))
     `(progn
        (defclass ,name ,superclasses ,slots ,@options-and-doc)
        (when (> (length ',slot-inits) 0)
@@ -84,11 +89,9 @@ automatically, and other keys are allowed."
 
 (matrix-defclass matrix-session ()
   ((user :initarg :user
-         :initform nil
          :type string
          :documentation "The fully qualified user ID, e.g. @user:matrix.org.")
    (server :initarg :server
-           :initform nil
            :instance-initform (nth 2 (s-match (rx "@" (group (1+ (not (any ":"))))
                                                   ":" (group (1+ anything)))
                                               user))
@@ -114,24 +117,20 @@ automatically, and other keys are allowed."
     :type string
     :documentation "A display name to assign to the newly-created device.  Ignored if device_id corresponds to a known device.")
    (access-token :initarg :access-token
-                 :initform nil
                  :documentation "API access_token.")
    (txn-id :initarg :txn-id
            :initform 0
            :type integer
            :documentation "Transaction ID.  Defaults to 0 and should be automatically incremented for each request.")
-   (rooms :initform nil
-          :initarg :rooms
+   (rooms :initarg :rooms
           :type list
           :documentation "List of room objects user has joined.")
-   (account-data :documentation "The private data that this user has attached to this account."
-                 :initform nil)
+   (account-data :documentation "The private data that this user has attached to this account.")
    (followed-users :initform (ht)
                    :initarg :followed-users
                    :type hash-table
                    :documentation "Hash table of user IDs whose presence this user wants to follow.")
-   (next-batch :initform nil
-               :type string
+   (next-batch :type string
                :documentation "The batch token to supply in the since param of the next /sync request."))
   :allow-nil-initform t)
 
@@ -142,27 +141,17 @@ automatically, and other keys are allowed."
             :type matrix-session)
    (id :documentation "Fully-qualified room ID."
        :initarg :id
-       :type string
-       :initform nil)
+       :type string)
    (members :documentation "List of room members, as user objects."
-            :type list
-            :initform nil)
-   (state :documentation "Updates to the state, between the time indicated by the since parameter, and the start of the timeline (or all state up to the start of the timeline, if since is not given, or full_state is true)."
-          :initform nil)
+            :type list)
+   (state :documentation "Updates to the state, between the time indicated by the since parameter, and the start of the timeline (or all state up to the start of the timeline, if since is not given, or full_state is true).")
    (timeline :documentation "List of timeline events."
-             :type list
-             :initform nil)
-   (prev-batch :documentation "A token that can be supplied to to the from parameter of the rooms/{roomId}/messages endpoint."
-               ;; :type string
-               :initform nil)
-   (last-full-sync :documentation "The oldest \"since\" token for which the room has been synced completely."
-                   :initform nil)
-   (ephemeral :documentation "The ephemeral events in the room that aren't recorded in the timeline or state of the room. e.g. typing."
-              :initform nil)
-   (account-data :documentation "The private data that this user has attached to this room."
-                 :initform nil)
-   (unread-notifications :documentation "Counts of unread notifications for this room."
-                         :initform nil))
+             :type list)
+   (prev-batch :documentation "A token that can be supplied to to the from parameter of the rooms/{roomId}/messages endpoint.")
+   (last-full-sync :documentation "The oldest \"since\" token for which the room has been synced completely.")
+   (ephemeral :documentation "The ephemeral events in the room that aren't recorded in the timeline or state of the room. e.g. typing.")
+   (account-data :documentation "The private data that this user has attached to this room.")
+   (unread-notifications :documentation "Counts of unread notifications for this room."))
   :allow-nil-initform t)
 
 ;;;; Functions
