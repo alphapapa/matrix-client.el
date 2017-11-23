@@ -268,10 +268,11 @@ like."
    (let* ((timestamp (matrix-client-event-data-timestamp data))
           (action (pcase membership
                     ("join" (progn
+                              ;; FIXME: Probably don't need all of content.
                               (push (cons user-id content) room-membership)
                               "Joined"))
                     ("leave" (progn
-                               ;; FIXME: Remove user from room-membership
+                               (cl-delete user-id room-membership :test #'string= :key #'car)
                                "Left"))
                     (_ (format "Unknown membership message: %s" membership))))
           (msg (propertize (format "%s: %s (%s)" action display-name user-id)
