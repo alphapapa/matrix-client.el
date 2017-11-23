@@ -182,7 +182,10 @@ like."
                  (metadata) (message) (matrix-image-url))
        (setq metadata (format "%s %s> "
                               (format-time-string "[%T]" (seconds-to-time timestamp))
-                              display-name))
+                              (if (and matrix-client-hide-own-name
+                                       (equal display-name own-display-name))
+                                  ""
+                                display-name)))
        (setq message (string-trim
                       ;; Trim messages because HTML ones can have extra newlines
                       (pcase msgtype

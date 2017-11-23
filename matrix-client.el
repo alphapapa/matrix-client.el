@@ -98,6 +98,14 @@ ad-hoc 'org.matrix.custom.html' messages that Vector emits."
   "Mark rooms with new messages as modified, and unmark them when their buffers are seen."
   :type 'boolean)
 
+(defcustom matrix-client-hide-own-name nil
+  "Hide your own username in room buffers.
+Since you already know your name, you might want to hide your
+name to make your own messages stand out more.  Or, you might
+prefer to keep your name visible so you can see what your display
+name is in each room."
+  :type 'boolean)
+
 (defvar matrix-client-event-handlers '()
   "An alist of (type . function) handler definitions for various matrix types.
 
