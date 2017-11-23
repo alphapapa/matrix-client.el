@@ -293,7 +293,7 @@ Unset access_token and device_id in session."
 (cl-defmethod matrix-sync ((session matrix-session) &key full-state set-presence (timeout 30))
   ;; https://matrix.org/docs/spec/client_server/r0.2.0.html#id126
 
-  ;; TODO: Can we just set the :complete arg to `request' to `matrix-sync' so that it will be
+  ;; MAYBE: Can we just set the :complete arg to `request' to `matrix-sync' so that it will be
   ;; called repeatedly?  Or should we call `matrix-sync' again in the success callback?  Do we
   ;; want to stop syncing if there's an error?
 
