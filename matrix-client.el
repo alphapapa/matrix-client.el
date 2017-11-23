@@ -235,6 +235,8 @@ Otherwise, use the room name or alias."
 (defvar matrix-client-after-connect-hooks nil
   "A list of functions to run when a new Matrix Client connection occurs.")
 
+(defvar matrix-client-initial-sync nil)
+
 (require 'matrix-client-handlers)
 (require 'matrix-client-modes)
 
@@ -251,6 +253,8 @@ Otherwise, use the room name or alias."
     (unless (oref con :token)
       (matrix-client-login con username))
     (unless (oref con :running)
+      ;; Disable notifications for first sync
+      (setq matrix-client-initial-sync t)
       (matrix-client-start-watchdog con nil 120)
       (matrix-client-inject-event-listeners con)
       (matrix-client-handlers-init con)
@@ -394,7 +398,9 @@ and password."
         :last-event-ts (float-time))
       (matrix-client-start-watchdog con)
       (matrix-sync con next nil matrix-client-event-poll-timeout
-                   (apply-partially #'matrix-client-sync-handler con)))))
+                   (apply-partially #'matrix-client-sync-handler con)))
+    (when matrix-client-initial-sync
+      (setq matrix-client-initial-sync nil))))
 
 (cl-defmethod matrix-client-room-event ((room matrix-client-room) event)
   "Handle state events from a sync."

@@ -25,8 +25,7 @@
 
 ;;;; Variables
 
-(defvar matrix-client-notify-hook
-  '(matrix-client-notify)
+(defvar matrix-client-notify-hook nil
   "List of functions called for events.
 Each is called with the event-type and the event data.")
 
@@ -37,10 +36,14 @@ Automatically trimmed to last 20 notifications.")
 ;;;; Functions
 
 (defun matrix-client-notify (event-type data &rest rest)
-  "Notify for an event of EVENT-TYPE with DATA."
-  (let ((fn (intern-soft (concat "matrix-client-notify-" event-type))))
-    (when (functionp fn)
-      (apply #'funcall fn data rest))))
+  "Run notify hooks and built-in notificataion for an event of EVENT-TYPE with DATA.
+Optional REST of args are also applied to hooks and function."
+  (unless matrix-client-initial-sync
+    (run-hook-with-args 'matrix-client-notify-hook event-type data rest)
+    ;; Run built-in notification for this event type
+    (let ((fn (intern-soft (concat "matrix-client-notify-" event-type))))
+      (when (functionp fn)
+        (apply #'funcall fn data rest)))))
 
 ;; MAYBE: Use a macro to define the handlers, because they have to
 ;; define their arg lists in a certain way, and the macro would take
