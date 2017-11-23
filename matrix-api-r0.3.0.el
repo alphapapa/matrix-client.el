@@ -290,8 +290,17 @@ Unset access_token and device_id in session."
 
 ;;;;; Sync
 
-(cl-defmethod matrix-sync ((session matrix-session) &key full-state set-presence timeout)
+(cl-defmethod matrix-sync ((session matrix-session) &key full-state set-presence (timeout 30))
   ;; https://matrix.org/docs/spec/client_server/r0.2.0.html#id126
+
+  ;; TODO: Can we just set the :complete arg to `request' to `matrix-sync' so that it will be
+  ;; called repeatedly?  Or should we call `matrix-sync' again in the success callback?  Do we
+  ;; want to stop syncing if there's an error?
+
+  ;; NOTE: I guess we should stop syncing if there's an error, because otherwise, if next-batch
+  ;; doesn't get updated, it will call sync repeatedly to get the same batch of data that's
+  ;; failing, and likely enter an infinite loop (an asynchronous one, at least).  So we'll call
+  ;; `matrix-sync' again in the success callback.
   (with-slots (access-token next-batch) session
     (matrix-get session 'sync
                 (a-list 'since next-batch
@@ -311,7 +320,14 @@ Unset access_token and device_id in session."
                  do (if (functionp method)
                         (funcall method session (a-get data it))
                       (warn "Unimplemented method: %s" method))
-                 finally do (setq next-batch (a-get data 'next_batch))))
+                 finally do (progn
+                              (setq next-batch (a-get data 'next_batch))
+                              ;; Call self again to wait for more data.  But don't do this if
+                              ;; `matrix-synchronous' is set, which would cause an infinite
+                              ;; loop.  It should only be set when testing, in which case we
+                              ;; sync manually.
+                              (unless matrix-synchronous
+                                (matrix-sync session)))))
 
 (cl-defmethod matrix-sync-presence ((session matrix-session) state-changes)
   "Process presence STATE-CHANGES."
