@@ -275,6 +275,7 @@ like."
                                (cl-delete user-id room-membership :test #'string= :key #'car)
                                "Left"))
                     (_ (format "Unknown membership message: %s" membership))))
+          ;; FIXME: display-name may be nil on "Left" events.
           (msg (propertize (format "%s: %s (%s)" action display-name user-id)
                            'timestamp timestamp
                            'face 'matrix-client-metadata)))
