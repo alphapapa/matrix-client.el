@@ -282,8 +282,7 @@ Set access_token and device_id in session."
   :body (cl-loop for it in '(rooms presence account_data to_device device_lists)
                  for method = (intern (concat "matrix-sync-" (symbol-name it)))
                  always (if (functionp method)
-                            (unless (funcall method session (a-get data it))
-                              (setq failure t))
+                            (funcall method session (a-get data it))
                           (warn "Unimplemented method: %s" method))))
 
 (cl-defmethod matrix-sync-rooms ((session matrix-session) rooms)
