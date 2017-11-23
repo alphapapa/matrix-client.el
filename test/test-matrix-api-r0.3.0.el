@@ -36,12 +36,14 @@
 
   (it "Can log in and get an access_token"
     (matrix-login matrix-test-session matrix-test-password)
+
     (expect (oref matrix-test-session access-token)
             :to-match (rx (1+ alnum))))
 
   (it "Can do initial sync"
     (spy-on #'matrix-sync-callback :and-call-through)
     (matrix-sync matrix-test-session)
+
     (expect #'matrix-sync-callback :to-have-been-called)
     (expect (oref matrix-test-session next-batch) :to-be-truthy))
 
@@ -54,6 +56,7 @@
       (matrix-create-room matrix-test-session)
       ;; Used to forget the room later
       (push (car (oref matrix-test-session rooms)) matrix-test-joined-rooms)
+
       (expect (length (oref matrix-test-session rooms))
               :to-be-greater-than matrix-rooms-initial-length))
 
@@ -62,6 +65,7 @@
       (it "Can send messages to a room"
         (spy-on #'matrix-send-message-callback :and-call-through)
         (matrix-send-message (car (oref matrix-test-session rooms)) "Test message.")
+
         (expect #'matrix-send-message-callback :to-have-been-called))
 
       (it "Can sync messages from a room"
@@ -69,6 +73,7 @@
         ;; or messages.  Maybe we need to do two sessions, and sync
         ;; previous messages in the next one.
         (matrix-sync matrix-test-session)
+
         (expect (length (oref (car (oref matrix-test-session rooms)) timeline))
                 :to-be-greater-than 0)
         (expect (pcase-let* (((eieio rooms) matrix-test-session)
@@ -86,6 +91,7 @@
 
     (it "Can leave a room"
       (matrix-leave (car (oref matrix-test-session rooms)))
+
       (expect (length (oref matrix-test-session rooms))
               :to-equal matrix-rooms-initial-length))
 
@@ -109,6 +115,7 @@
   (it "Can log out"
     (spy-on #'matrix-logout-callback :and-call-through)
     (matrix-logout matrix-test-session)
+
     (expect #'matrix-logout-callback :to-have-been-called)
     (with-slots (access-token device-id) matrix-test-session
       (expect access-token :to-be nil)

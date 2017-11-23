@@ -240,7 +240,8 @@ set, will be called if the request fails."
       (matrix-log "REQUEST: %s" (a-list 'url url
                                         'method method
                                         'data data
-                                        'callback callback))
+                                        'callback callback
+                                        'timeout timeout))
       (pcase method
         ("GET" (request url
                         :type method
@@ -332,12 +333,21 @@ requests, and we make a new request."
   ;; doesn't get updated, it will call sync repeatedly to get the same batch of data that's
   ;; failing, and likely enter an infinite loop (an asynchronous one, at least).  So we'll call
   ;; `matrix-sync' again in the success callback.
+
+  ;; FIXME: Need to handle gaps according to the API: "Normally, all new events which are
+  ;; visible to the client will appear in the response to the /sync API. However, if a large
+  ;; number of events arrive between calls to /sync, a \"limited\" timeline is returned,
+  ;; containing only the most recent message events. A state \"delta\" is also returned,
+  ;; summarising any state changes in the omitted part of the timeline. The client may
+  ;; therefore end up with \"gaps\" in its knowledge of the message timeline. The client can
+  ;; fill these gaps using the /rooms/<room_id>/messages API. This situation looks like this:"
   (with-slots (access-token next-batch) session
     (matrix-get session 'sync
                 (a-list 'since next-batch
                         'full_state full-state
                         'set_presence set-presence
-                        'timeout timeout)
+                        ;; Convert timeout to milliseconds
+                        'timeout (* timeout 1000))
                 #'matrix-sync-callback
                 :complete-callback #'matrix-sync-complete-callback
                 ;; Add 5 seconds to timeout to give server a bit of grace period before we
