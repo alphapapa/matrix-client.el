@@ -456,10 +456,10 @@ SESSION has no access token, consider the session logged-out."
       (seq-doseq (event events)
         (push event state)))))
 
-(cl-defmethod matrix-sync-timeline ((room matrix-room) timeline-sync)
-  "Sync TIMELINE-SYNC in ROOM."
+(cl-defmethod matrix-sync-timeline ((room matrix-room) data)
+  "Sync timeline DATA in ROOM."
   (with-slots (id timeline prev-batch) room
-    (pcase-let (((map events limited prev_batch) timeline-sync))
+    (pcase-let (((map events limited prev_batch) data))
       (seq-doseq (event events)
         (push event timeline))
       (setq prev-batch prev_batch)
