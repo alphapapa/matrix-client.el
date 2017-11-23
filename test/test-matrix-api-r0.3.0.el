@@ -39,6 +39,11 @@
     (expect (oref matrix-test-session access-token)
             :to-match (rx (1+ alnum))))
 
+  (it "Can do initial sync"
+    (spy-on #'matrix-sync-callback :and-call-through)
+    (matrix-sync matrix-test-session)
+    (expect #'matrix-sync-callback :to-have-been-called))
+
   (describe "Rooms"
 
     (before-all

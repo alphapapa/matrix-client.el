@@ -421,6 +421,16 @@ maximum number of events to return (default 10)."
       (seq-doseq (event events)
         (push event account-data)))))
 
+(cl-defmethod matrix-sync-to_device ((session matrix-session) data)
+  "Sync to_device data in SESSION."
+  ;; FIXME: Implement.
+  (matrix-log "Received to_device data: %s" data))
+
+(cl-defmethod matrix-sync-device_lists ((session matrix-session) data)
+  "Sync device_lists data in SESSION."
+  ;; FIXME: Implement.
+  (matrix-log "Received device_lists data: %s" data))
+
 (cl-defmethod matrix-sync-unread_notifications ((room matrix-room) unread-notifications)
   "Sync UNREAD-NOTIFICATIONS in ROOM."
   (pcase-let (((map highlight_count notification_count) unread-notifications))
