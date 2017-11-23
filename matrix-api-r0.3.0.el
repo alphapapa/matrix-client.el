@@ -164,7 +164,7 @@ automatically, and other keys are allowed."
 
 ;;;; Functions
 
-(cl-defun matrix-log (message &rest args)
+(defun matrix-log (message &rest args)
   "Log MESSAGE with ARGS to Matrix log buffer and return non-nil.
 MESSAGE and ARGS should be a string and list of strings for
 `format'."
@@ -172,6 +172,13 @@ MESSAGE and ARGS should be a string and list of strings for
     (insert (apply #'format message args) "\n")
     ;; Returning t is more convenient than nil, which is returned by `message'.
     t))
+
+(defun matrix-warn (message &rest args)
+  "Log MESSAGE with ARGS to Matrix log buffer and signal warning with same MESSAGE.
+MESSAGE and ARGS should be a string and list of strings for
+`format'."
+  (apply #'matrix-log message args)
+  (apply #'warn message args))
 
 (defun matrix-get (&rest args)
   "Call `matrix-request' with ARGS for a \"GET\" request."
@@ -270,9 +277,7 @@ set, will be called if the request fails."
 (matrix-defcallback request-error matrix-session
   "Callback function for request error."
   :slots (user)
-  :body (let ((msg (format "REQUEST ERROR: %s: %s" user data)))
-          (warn msg)
-          (matrix-log msg)))
+  :body (matrix-warn "REQUEST ERROR: %s: %s" user data))
 
 ;;;;; Login/logout
 
@@ -376,7 +381,7 @@ requests, and we make a new request."
                  ;; ignore return values.
                  do (if (functionp method)
                         (funcall method session (a-get data param))
-                      (warn "Unimplemented method: %s" method))
+                      (matrix-warn "Unimplemented method: %s" method))
                  finally do (setq next-batch (a-get data 'next_batch))))
 
 (matrix-defcallback sync-complete matrix-session
@@ -394,10 +399,8 @@ SESSION has no access token, consider the session logged-out."
              ;; sync manually.
              (when access-token
                (matrix-sync session))))
-          (_ (let ((msg (format "SYNC FAILED: %s  NOT STARTING NEW SYNC REQUEST.  API SHOULD BE CONSIDERED DISCONNECTED."
-                                (upcase (symbol-name symbol-status)))))
-               (warn msg)
-               (matrix-log msg)))))
+          (_ (matrix-warn "SYNC FAILED: %s  NOT STARTING NEW SYNC REQUEST.  API SHOULD BE CONSIDERED DISCONNECTED."
+                          (upcase (symbol-name symbol-status))))))
 
 (cl-defmethod matrix-sync-presence ((session matrix-session) state-changes)
   "Process presence STATE-CHANGES."
@@ -443,7 +446,7 @@ SESSION has no access token, consider the session logged-out."
                                       ;; called anyway, so ignore its return value.
                                       (funcall method room (a-get joined-room param))
                                     ;; `warn' seems to return non-nil.  Convenient.
-                                    (warn "Unimplemented method: %s" method-name))
+                                    (matrix-warn "Unimplemented method: %s" method-name))
                                ;; Always return t for now, so that we think the sync succeeded
                                ;; and we can set next_batch in `matrix-sync-callback'.
                                finally return t)))))
@@ -465,9 +468,7 @@ SESSION has no access token, consider the session logged-out."
       (setq prev-batch prev_batch)
       (when limited
         ;; FIXME: Handle this for real.
-        (let ((msg (format "ROOM TIMELINE WAS LIMITED: %s" id)))
-          (matrix-log msg)
-          (warn msg))))))
+        (matrix-warn "ROOM TIMELINE WAS LIMITED: %s" id)))))
 
 (cl-defmethod matrix-messages ((session matrix-session) room-id
                                &key (direction "b") limit)
