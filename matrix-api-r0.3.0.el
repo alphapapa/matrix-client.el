@@ -19,6 +19,7 @@
 
 (require 'a)
 (require 'dash)
+(require 'ht)
 (require 'json)
 (require 'request)
 (require 's)
@@ -118,6 +119,10 @@ Defaults to 0 and should be automatically incremented for each request.")
           :initarg :rooms
           :type list
           :documentation "List of room objects user has joined.")
+   (followed-users :initform (ht)
+                   :initarg :followed-users
+                   :type hash-table
+                   :documentation "Hash table of user IDs whose presence this user wants to follow.")
    (next-batch :initform nil
                :type string
                :documentation "The batch token to supply in the since param of the next /sync request."))
@@ -284,6 +289,19 @@ Set access_token and device_id in session."
                  always (if (functionp method)
                             (funcall method session (a-get data it))
                           (warn "Unimplemented method: %s" method))))
+
+(cl-defmethod matrix-sync-presence ((session matrix-session) state-changes)
+  "Process presence STATE-CHANGES."
+  ;; TODO: Test this.
+  ;; https://matrix.org/docs/spec/client_server/r0.3.0.html#id294
+  (with-slots (followed-users) session
+    (seq-doseq (change state-changes)
+      (pcase-let* (((map content) change)
+                   ((map avatar_url currently_active last_active_ago presence user_id) content))
+        (ht-set followed-users user_id (a-list 'avatar_url avatar_url
+                                               'currently_active currently_active
+                                               'last_active_ago last_active_ago
+                                               'presence presence))))))
 
 (cl-defmethod matrix-sync-rooms ((session matrix-session) rooms)
   "Process ROOMS from sync response on SESSION."
