@@ -641,6 +641,16 @@ Add new room to SESSION."
   :slots (id)
   :body (matrix-log "FORGOT ROOM: %s" id))
 
+(cl-defmethod matrix-typing ((room matrix-room) (typing t))
+  "Send TYPING notification to ROOM.
+TYPING should be t or nil."
+  (pcase-let* (((eieio id session) room)
+               ((eieio user) session)
+               (endpoint (format "rooms/%s/typing/%s" id user))
+               (data (a-list 'typing typing
+                             'timeout 30000)))
+    (matrix-put session endpoint data #'ignore)))
+
 ;;;; Footer
 
 (provide 'matrix-api-r0.3.0)
