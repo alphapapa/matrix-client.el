@@ -474,6 +474,8 @@ SESSION has no access token, consider the session logged-out."
   "Request messages for ROOM-ID in SESSION.
 DIRECTION must be \"b\" (the default) or \"f\".  LIMIT is the
 maximum number of events to return (default 10)."
+  ;; MAYBE: Increase the default limit.  The API default is 10, but if we have to fetch
+  ;; messages to fill gaps, retrieving 10 at a time seems like a very small number.
   (pcase-let* (((eieio rooms) session)
                (room (object-assoc room-id :id rooms))
                ((eieio prev-batch) room))
