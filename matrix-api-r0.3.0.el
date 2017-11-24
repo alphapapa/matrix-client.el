@@ -144,12 +144,22 @@ automatically, and other keys are allowed."
    (id :documentation "Fully-qualified room ID."
        :initarg :id
        :type string)
+   (avatar :initarg :avatar)
+   (typers :initarg :typers
+           ;; MAYBE: Not sure if we need this, haven't gotten this far yet.
+           )
+   (name :initarg :name
+         :type string)
+   (topic :initarg :topic
+          :type string)
    (aliases :initarg :aliases)
    (members :documentation "List of room members, as user objects."
             :type list)
    (state :documentation "Updates to the state, between the time indicated by the since parameter, and the start of the timeline (or all state up to the start of the timeline, if since is not given, or full_state is true).")
    (timeline :documentation "List of timeline events."
              :type list)
+   (timeline-new :documentation "List of new timeline events.  Clients may clear this list by calling `matrix-clear-timeline'."
+                 :type list)
    (prev-batch :documentation "A token that can be supplied to to the from parameter of the rooms/{roomId}/messages endpoint.")
    (last-full-sync :documentation "The oldest \"since\" token for which the room has been synced completely.")
    (ephemeral :documentation "The ephemeral events in the room that aren't recorded in the timeline or state of the room. e.g. typing.")
@@ -158,6 +168,8 @@ automatically, and other keys are allowed."
    (hook :initarg :hook
          :documentation "List of functions called when room is updated.  Function is called with one argument, this room object.")
    (extra :initarg :extra
+          ;; FIXME: Need clean way to do this.
+          :initform (matrix-client-room-extra)
           :documentation "Reserved for users of the library, who may store whatever they want here."))
   :allow-nil-initform t)
 
@@ -192,6 +204,28 @@ MESSAGE and ARGS should be a string and list of strings for
   "Call `matrix-request' with ARGS for a \"PUT\" request."
   (nconc args (list :method 'put))
   (apply #'matrix-request args))
+
+(cl-defmethod matrix-user-displayname ((room matrix-room) user-id)
+  "Return display name for USER-ID in ROOM."
+  (pcase-let* (((eieio members) room)
+               (user (a-get members user-id))
+               (displayname (a-get user 'displayname)))
+    (or displayname
+        user-id)))
+
+(defun matrix-client-ng-linkify-urls (text)
+  "Return TEXT with URLs in it made clickable."
+  (with-temp-buffer
+    (insert text)
+    (goto-char (point-min))
+    (cl-loop while (re-search-forward (rx bow "http" (optional "s") "://" (1+ (not space))) nil 'noerror)
+             do (make-text-button (match-beginning 0) (match-end 0)
+                                  'mouse-face 'highlight
+                                  'face 'link
+                                  'help-echo (match-string 0)
+                                  'action #'browse-url-at-mouse
+                                  'follow-link t))
+    (buffer-string)))
 
 ;;;; Methods
 
@@ -425,10 +459,11 @@ SESSION has no access token, consider the session logged-out."
   "Process ROOMS from sync response on SESSION."
   ;; https://matrix.org/docs/spec/client_server/r0.3.0.html#id167
   (cl-loop for room in rooms
-           always (pcase room
-                    (`(join . ,_) (matrix-sync-join session room))
-                    (`(invite .  ,_) (matrix-log "Would process room invites: %s" room))
-                    (`(leave . ,_) (matrix-log "Would process room leaves: %s" room)))))
+           do (progn
+                (pcase room
+                  (`(join . ,_) (matrix-sync-join session room))
+                  (`(invite .  ,_) (matrix-log "Would process room invites: %s" room))
+                  (`(leave . ,_) (matrix-log "Would process room leaves: %s" room))))))
 
 (cl-defmethod matrix-sync-join ((session matrix-session) join)
   "Sync JOIN, a list of joined rooms, on SESSION."
@@ -455,7 +490,10 @@ SESSION has no access token, consider the session logged-out."
                                     (matrix-warn "Unimplemented method: %s" method-name))
                                ;; Always return t for now, so that we think the sync succeeded
                                ;; and we can set next_batch in `matrix-sync-callback'.
-                               finally return t)))))
+                               finally return t)
+                      ;; Run client hooks
+                      (run-hook-with-args 'matrix-room-update-hook room)
+                      t))))
 
 (cl-defmethod matrix-sync-state ((room matrix-room) state)
   "Sync STATE in ROOM."
@@ -465,20 +503,21 @@ SESSION has no access token, consider the session logged-out."
       (seq-doseq (event events)
         (push event state)))))
 
-(defvar matrix-sync-timeline-hook nil
-  "List of functions called for new timeline events.
-Each function is called with ROOM and EVENT.")
+;; (defvar matrix-sync-timeline-hook nil
+;;   "List of functions called for new timeline events.
+;; Each function is called with ROOM and EVENT.")
 
 (cl-defmethod matrix-sync-timeline ((room matrix-room) data)
   "Sync timeline DATA in ROOM."
-  (with-slots* (((id session timeline prev-batch last-full-sync) room)
+  (with-slots* (((id session timeline timeline-new prev-batch last-full-sync) room)
                 ((next-batch) session))
     (pcase-let (((map events limited prev_batch) data))
       (seq-doseq (event events)
         (push event timeline)
+        (push event timeline-new)
         (run-hook-with-args 'matrix-sync-timeline-hook room event))
       (setq prev-batch prev_batch)
-      (if (and limited last-full-sync)
+      (if (and (not (equal limited :json-false)) last-full-sync)
           ;; Timeline is limited and we have a token to fill to: fill the gap.  If
           ;; `last-full-sync' is nil, this should mean that we are doing an initial sync, and
           ;; since we have no previous "since" token to fetch up to, we do not bother to fetch
@@ -492,6 +531,30 @@ Each function is called with ROOM and EVENT.")
         (matrix-log "ROOM %s FULLY SYNCED." id)
         (setq last-full-sync next-batch)))))
 
+(cl-defmethod matrix-event--m.room.name ((room matrix-room) event)
+  "Process m.room.name EVENT in ROOM."
+  (with-slots (name) room
+    (setq name (a-get* event 'content 'name))
+    (run-hook-with-args 'matrix-room-metadata-hook room)))
+
+(defvar matrix-room-metadata-hook nil
+  "List of functions called when a room's metadata is updated.
+Each function is called with one argument, the room object that
+was updated.")
+
+(defvar matrix-room-update-hook nil
+  ;; FIXME: Rename to matrix-room-timeline-hook
+  "List of functions called when a room's timeline is updated.
+Each function is called with one argument, the room object that
+was updated.")
+
+
+
+(cl-defmethod matrix-clear-timeline ((room matrix-room))
+  "Clear ROOM's `timeline-new' list."
+  (with-slots (timeline-new) room
+    (setq timeline-new nil)))
+
 (cl-defmethod matrix-messages ((room matrix-room)
                                &key (direction "b") (limit 100))
   "Request messages for ROOM-ID in SESSION.
@@ -499,7 +562,7 @@ DIRECTION must be \"b\" (the default) or \"f\".  LIMIT is the
 maximum number of events to return (default 10)."
   ;; TODO: As written, this may only work going backward.  Needs testing.
   (with-slots (id session prev-batch last-full-sync) room
-    (matrix-get session (format "rooms/%s/messages" room-id)
+    (matrix-get session (format "rooms/%s/messages" id)
                 (a-list 'from prev-batch
                         'to last-full-sync
                         'dir direction
@@ -508,7 +571,7 @@ maximum number of events to return (default 10)."
 
 (matrix-defcallback messages matrix-room
   "Callback for /rooms/{roomID}/messages."
-  :slots (id timeline prev-batch last-full-sync)
+  :slots (id timeline timeline-new prev-batch last-full-sync)
   :body (pcase-let* (((map start end chunk) data))
           ;; NOTE: API docs:
           ;; start: The token the pagination starts from. If dir=b
@@ -517,7 +580,8 @@ maximum number of events to return (default 10)."
           ;; token should be used again to request even earlier
           ;; events.
           (seq-doseq (event chunk)
-            (push event timeline))
+            (push event timeline)
+            (push event timeline-new))
 
           (if (equal end last-full-sync)
               ;; Gap has been filled: clear the last-full-sync token (NOTE: Not sure if this is correct)
