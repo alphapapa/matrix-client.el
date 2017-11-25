@@ -38,7 +38,8 @@ Automatically trimmed to last 20 notifications.")
 (defun matrix-client-notify (event-type data &rest rest)
   "Run notify hooks and built-in notificataion for an event of EVENT-TYPE with DATA.
 Optional REST of args are also applied to hooks and function."
-  (unless matrix-client-initial-sync
+  ;; FIXME: Pass session so we can get its initial-sync-p
+  (unless (oref (car matrix-client-ng-sessions) initial-sync)
     (run-hook-with-args 'matrix-client-notify-hook event-type data rest)
     ;; Run built-in notification for this event type
     (let ((fn (intern-soft (concat "matrix-client-notify-" event-type))))

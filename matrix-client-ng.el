@@ -117,8 +117,10 @@ ad-hoc 'org.matrix.custom.html' messages that Vector emits."
   (declare (debug (sexp body)) (indent defun))
   `(with-slots* (((extra) room)
                  ((buffer) extra))
-     (with-current-buffer buffer
-       ,@body)))
+     (if buffer
+         (with-current-buffer buffer
+           ,@body)
+       (matrix-warn "No buffer for room: %s" room))))
 
 (cl-defmacro matrix-client-ng-defevent (type docstring &key object-slots event-keys content-keys let body)
   "Define a method on `matrix-room' to handle Matrix events of TYPE.
@@ -281,6 +283,17 @@ STRING should have a `timestamp' text-property."
         (matrix-send-message room input)
         (matrix-client-ng-update-last-seen room)))))
 
+(cl-defmethod matrix-client-ng-room-command-join ((room matrix-room) input)
+  "Join room on session.
+INPUT should be, e.g. \"/join #room:matrix.org\"."
+  (pcase-let* (((eieio session) room)
+               (words (s-split (rx (1+ space)) input))
+               (room-id (second words)))
+    ;; Only accept one room
+    (if (> (length words) 2)
+        (user-error "Invalid /join command")
+      (matrix-join-room session room-id))))
+
 (cl-defmethod matrix-client-ng-room-command-me ((room matrix-room) input)
   "Send emote INPUT to ROOM.
 INPUT should begin with \"/me\"."
@@ -310,6 +323,7 @@ INPUT should begin with \"/me\"."
 
 (cl-defmethod matrix-client-ng-setup-room-buffer ((room matrix-room))
   "Prepare and switch to buffer for ROOM-ID, and return room object."
+  ;; XXX: This function seems to abort or something unless it's edebugged.  SIGH.
   (with-room-buffer room
     (use-local-map matrix-client-ng-mode-map)
     ;;  (matrix-client-mode)
@@ -319,6 +333,7 @@ INPUT should begin with \"/me\"."
     ;; FIXME: Reactivate this.
     ;; (when matrix-client-ng-mark-modified-rooms
     ;;   (add-hook 'buffer-list-update-hook #'matrix-client-ng-buffer-list-update-hook 'append 'local))
+    (matrix-log "GOT HERE")
     (erase-buffer)
     (switch-to-buffer (current-buffer))
     ;; FIXME: Remove these or update them.
@@ -470,7 +485,7 @@ Also update prompt with typers."
         (action (pcase membership
                   ("join" "joined")
                   ("left" "left")
-                  (_ _)))
+                  (_ membership)))
         (msg (propertize (format "%s %s" displayname action)
                          'face 'matrix-client-notice
                          'event_id event_id
