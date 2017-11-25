@@ -532,13 +532,14 @@ SESSION has no access token, consider the session logged-out."
                       (run-hook-with-args 'matrix-room-update-hook room)
                       t))))
 
-(cl-defmethod matrix-sync-state ((room matrix-room) state)
-  "Sync STATE in ROOM."
+(cl-defmethod matrix-sync-state ((room matrix-room) data)
+  "Process state DATA in ROOM."
   (with-slots (state) room
-    (pcase-let (((map events) state))
+    (pcase-let (((map events) data))
       ;; events is an array, not a list, so we can't use --each.
       (seq-doseq (event events)
-        (push event state)))))
+        (push event state)
+        (matrix-event room event)))))
 
 ;; (defvar matrix-sync-timeline-hook nil
 ;;   "List of functions called for new timeline events.
@@ -578,7 +579,9 @@ SESSION has no access token, consider the session logged-out."
 
 (cl-defmethod matrix-event-m.room.member ((room matrix-room) event)
   "Process m.room.member EVENT in ROOM."
-  (with-slots (members) room
+  (with-slots (members id) room
+    (matrix-log "m.room.member for ROOM:%s  EVENT:%s" id event)
+
     (pcase-let* (((map ('state_key user-id) content) event)
                  ((map membership displayname avatar_url) content))
       (pcase membership
@@ -586,6 +589,7 @@ SESSION has no access token, consider the session logged-out."
         ("join" (map-put members user-id (a-list 'displayname displayname
                                                  'avatar-url avatar_url)))
         ("leave" (setq members (map-delete members user-id)))))
+    ;; FIXME: Don't think we need this hook, the client can just process the event from timeline-new.
     (run-hook-with-args 'matrix-event-m.room.member-hook room event)))
 
 (cl-defmethod matrix-event-m.room.name ((room matrix-room) event)

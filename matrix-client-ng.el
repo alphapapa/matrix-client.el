@@ -264,6 +264,19 @@ INPUT should begin with \"/me\"."
   (let ((emote (s-join " " (cdr (s-split-words input)))))
     (matrix-send-message room emote :msgtype "m.emote")))
 
+(cl-defmethod matrix-client-ng-room-command-who ((room matrix-room) input)
+  "Print list of users to ROOM."
+  (with-slots (members) room
+    (matrix-client-ng-insert room (propertize (format "Room members: %s"
+                                                      (--> members
+                                                           (--map (a-get (cdr it) 'displayname) it)
+                                                           (--sort (string-collate-lessp it other nil 'ignore-case)
+                                                                   it)
+                                                           (s-join ", " it)))
+                                              'timestamp (time-to-seconds)
+                                              'face 'matrix-client-notice))
+    (matrix-client-ng-update-last-seen room)))
+
 (defun matrix-client-ng-delete-backward-char (n &optional kill-flag)
   "Delete backward unless the point is at the prompt or other read-only text."
   (interactive "p\nP")
