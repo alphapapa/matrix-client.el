@@ -85,6 +85,23 @@ automatically, and other keys are allowed."
        (with-slots ,slots ,instance
          ,body))))
 
+;;;; Functions
+
+(defun funcall-when (fn &rest args)
+  "If FN is a function, return result of applying ARGS to it, otherwise nil."
+  (let ((fn (intern-soft fn)))
+    (when (functionp fn)
+      (apply fn args))))
+
+(defmacro funcall-if (fn-name args else)
+  "If FN-NAME is a function, return result of applying ARGS to it, otherwise ELSE.
+FN-NAME should be a string."
+  `(let ((fn (intern-soft ,fn-name)))
+     (if (functionp fn)
+         (apply fn ,@args)
+       ,else)))
+(put 'funcall-if 'lisp-indent-function 2)
+
 ;;;; Classes
 
 (matrix-defclass matrix-session ()
@@ -169,9 +186,16 @@ automatically, and other keys are allowed."
          :documentation "List of functions called when room is updated.  Function is called with one argument, this room object.")
    (extra :initarg :extra
           ;; FIXME: Need clean way to do this.
-          :initform (matrix-client-room-extra)
+          :initform (matrix-room-extra)
           :documentation "Reserved for users of the library, who may store whatever they want here."))
   :allow-nil-initform t)
+
+(cl-defmethod matrix-user-displayname ((room matrix-room) user-id)
+  "Return display name for USER-ID in ROOM."
+  (pcase-let* (((eieio members) room)
+               ((map (user-id user)) members)
+               ((map displayname) user))
+    (or displayname user-id)))
 
 ;;;; Functions
 
@@ -205,27 +229,7 @@ MESSAGE and ARGS should be a string and list of strings for
   (nconc args (list :method 'put))
   (apply #'matrix-request args))
 
-(cl-defmethod matrix-user-displayname ((room matrix-room) user-id)
-  "Return display name for USER-ID in ROOM."
-  (pcase-let* (((eieio members) room)
-               (user (a-get members user-id))
-               (displayname (a-get user 'displayname)))
-    (or displayname
-        user-id)))
 
-(defun matrix-client-ng-linkify-urls (text)
-  "Return TEXT with URLs in it made clickable."
-  (with-temp-buffer
-    (insert text)
-    (goto-char (point-min))
-    (cl-loop while (re-search-forward (rx bow "http" (optional "s") "://" (1+ (not space))) nil 'noerror)
-             do (make-text-button (match-beginning 0) (match-end 0)
-                                  'mouse-face 'highlight
-                                  'face 'link
-                                  'help-echo (match-string 0)
-                                  'action #'browse-url-at-mouse
-                                  'follow-link t))
-    (buffer-string)))
 
 ;;;; Methods
 
@@ -481,12 +485,10 @@ SESSION has no access token, consider the session logged-out."
                                                                    :id room-id)
                                                       rooms)))))
                       (cl-loop for param in params
-                               for method = (intern (concat "matrix-sync-" (symbol-name param)))
-                               do (if (functionp method)
-                                      ;; If the event array is empty, the function will be
-                                      ;; called anyway, so ignore its return value.
-                                      (funcall method room (a-get joined-room param))
-                                    ;; `warn' seems to return non-nil.  Convenient.
+                               ;; If the event array is empty, the function will be
+                               ;; called anyway, so ignore its return value.
+                               do (funcall-if (concat "matrix-sync-" (symbol-name param))
+                                      (room (a-get joined-room param))
                                     (matrix-warn "Unimplemented method: %s" method-name))
                                ;; Always return t for now, so that we think the sync succeeded
                                ;; and we can set next_batch in `matrix-sync-callback'.
@@ -515,7 +517,8 @@ SESSION has no access token, consider the session logged-out."
       (seq-doseq (event events)
         (push event timeline)
         (push event timeline-new)
-        (run-hook-with-args 'matrix-sync-timeline-hook room event))
+        ;; Run API handler for event.
+        (matrix-event room event))
       (setq prev-batch prev_batch)
       (if (and (not (equal limited :json-false)) last-full-sync)
           ;; Timeline is limited and we have a token to fill to: fill the gap.  If
@@ -531,7 +534,26 @@ SESSION has no access token, consider the session logged-out."
         (matrix-log "ROOM %s FULLY SYNCED." id)
         (setq last-full-sync next-batch)))))
 
-(cl-defmethod matrix-event--m.room.name ((room matrix-room) event)
+(cl-defmethod matrix-event ((room matrix-room) event)
+  "Process EVENT in ROOM."
+  (pcase-let* (((map type) event))
+    (funcall-if (concat "matrix-event-" type)
+        (room event)
+      (matrix-log "Unimplemented handler for event %s in room %s." type (oref room id)))))
+
+(cl-defmethod matrix-event-m.room.member ((room matrix-room) event)
+  "Process m.room.member EVENT in ROOM."
+  (with-slots (members) room
+    (pcase-let* (((map (state_key user-id) content) event)
+                 ((map membership displayname avatar_url) content))
+      (pcase membership
+        ;; TODO: Support all membership changes: invite, join, knock, leave, ban.
+        ("join" (map-put members user-id (a-list 'displayname displayname
+                                                 'avatar-url avatar_url)))
+        ("leave" (setq members (map-delete members user-id)))))
+    (run-hook-with-args 'matrix-event-m.room.member-hook room event)))
+
+(cl-defmethod matrix-event-m.room.name ((room matrix-room) event)
   "Process m.room.name EVENT in ROOM."
   (with-slots (name) room
     (setq name (a-get* event 'content 'name))
