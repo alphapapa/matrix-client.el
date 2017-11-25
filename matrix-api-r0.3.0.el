@@ -426,18 +426,14 @@ requests, and we make a new request."
   "Callback function for successful sync request."
   ;; https://matrix.org/docs/spec/client_server/r0.3.0.html#id167
   :slots (rooms next-batch initial-sync-p)
-  :body (cl-loop initially do (matrix-log "STARTING SYNC CALLBACK")
-                 for param in '(rooms presence account_data to_device device_lists)
+  :body (cl-loop for param in '(rooms presence account_data to_device device_lists)
                  ;; Assume that methods called will signal errors if anything goes wrong, so
                  ;; ignore return values.
-                 do (progn
-                      (matrix-log "SYNCING PARAM: %s"  param)
-                      (funcall-if (concat "matrix-sync-" (symbol-name param))
-                          (list session (a-get data param))
-                        (matrix-log "Unimplemented API method: %s" fn-name)))
+                 do (funcall-if (concat "matrix-sync-" (symbol-name param))
+                        (list session (a-get data param))
+                      (matrix-log "Unimplemented API method: %s" fn-name))
                  finally do (progn
                               (setq initial-sync-p nil)
-                              (matrix-log "SYNC FINISHED")
                               (setq next-batch (a-get data 'next_batch))
                               ;; Start polling
                               (matrix-log "POLLING...")
@@ -493,7 +489,7 @@ SESSION has no access token, consider the session logged-out."
            (progn
              (matrix-log "POLLING...")
              (matrix-sync session))
-         (matrix-log "NO ACCESS TOKEN: NOT POLLING"))))
+         (matrix-warn "NO ACCESS TOKEN: NOT POLLING"))))
     (_ (matrix-warn "SYNC FAILED: %s  NOT STARTING NEW SYNC REQUEST.  API SHOULD BE CONSIDERED DISCONNECTED."
                     (upcase (symbol-name symbol-status))))))
 
@@ -544,10 +540,9 @@ SESSION has no access token, consider the session logged-out."
                            ;; Always return t for now, so that we think the sync succeeded
                            ;; and we can set next_batch in `matrix-sync-callback'.
                            finally return t)
-                  (matrix-log "got here 1")
                   ;; Run client hooks
                   (run-hook-with-args 'matrix-room-update-hook room)
-                  (matrix-log "got here 2")
+                  ;; FIXME: Shouldn't matter if we return t anymore.
                   t))))
 
 (cl-defmethod matrix-sync-state ((room matrix-room) data)
@@ -585,7 +580,7 @@ SESSION has no access token, consider the session logged-out."
             (matrix-messages room))
         ;; Timeline is not limited: save the not-yet-updated next-batch token.  If the next
         ;; timeline is limited, we use this token to know when we have filled the timeline gap.
-        (matrix-log "ROOM %s FULLY SYNCED what." id)
+        (matrix-log "ROOM %s FULLY SYNCED." id)
         (setq last-full-sync next-batch)))))
 
 (cl-defmethod matrix-event ((room matrix-room) event)
@@ -593,7 +588,7 @@ SESSION has no access token, consider the session logged-out."
   (pcase-let* (((map type) event))
     (funcall-if (concat "matrix-event-" type)
         (list room event)
-      (matrix-log "Unimplemented API handler for event %s in room %s WHAT." type (oref room id)))))
+      (matrix-log "Unimplemented API handler for event %s in room %s." type (oref room id)))))
 
 (cl-defmethod matrix-event-m.room.member ((room matrix-room) event)
   "Process m.room.member EVENT in ROOM."

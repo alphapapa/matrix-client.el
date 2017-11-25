@@ -115,12 +115,12 @@ ad-hoc 'org.matrix.custom.html' messages that Vector emits."
 
 (defmacro with-room-buffer (room &rest body)
   (declare (debug (sexp body)) (indent defun))
-  `(with-slots* (((extra) room)
+  `(with-slots* (((extra id) room)
                  ((buffer) extra))
      (if buffer
          (with-current-buffer buffer
            ,@body)
-       (matrix-warn "No buffer for room: %s" room))))
+       (matrix-warn "No buffer for room: %s" id))))
 
 (cl-defmacro matrix-client-ng-defevent (type docstring &key object-slots event-keys content-keys let body)
   "Define a method on `matrix-room' to handle Matrix events of TYPE.
@@ -333,12 +333,8 @@ INPUT should begin with \"/me\"."
     ;; FIXME: Reactivate this.
     ;; (when matrix-client-ng-mark-modified-rooms
     ;;   (add-hook 'buffer-list-update-hook #'matrix-client-ng-buffer-list-update-hook 'append 'local))
-    (matrix-log "GOT HERE A")
-    ;; FIXME: ignore-errors probably unnecessary
-    (ignore-errors (erase-buffer))
-    (matrix-log "GOT HERE B")
+    (erase-buffer)
     (switch-to-buffer (current-buffer))
-    (matrix-log "GOT HERE C")
     ;; FIXME: Remove these or update them.
     ;; (set (make-local-variable 'matrix-client-room-connection) con)
     (setq-local matrix-client-ng-room room))
@@ -505,11 +501,9 @@ Also update prompt with typers."
                 ((buffer) extra))
     ;; Make buffer if necessary
     (unless buffer
-      (matrix-log "NO BUFFER FOR ROOM %s" id)
       (setq buffer (get-buffer-create (matrix-client-ng-display-name room)))
       (matrix-client-ng-setup-room-buffer room))
     ;; Process new events
-    (matrix-log "PROCESSING EVENTS FOR ROOM %s" id)
     (seq-doseq (event timeline-new)
       (pcase-let* (((map type) event))
         (funcall-if (concat "matrix-client-ng-" type)
