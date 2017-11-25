@@ -490,8 +490,8 @@ SESSION has no access token, consider the session logged-out."
              (matrix-log "POLLING...")
              (matrix-sync session))
          (matrix-warn "NO ACCESS TOKEN: NOT POLLING"))))
-    (_ (matrix-warn "SYNC FAILED: %s  NOT STARTING NEW SYNC REQUEST.  API SHOULD BE CONSIDERED DISCONNECTED."
-                    (upcase (symbol-name symbol-status))))))
+    (_ (matrix-warn "SYNC FAILED: %s  API MAY BE DISCONNECTED."
+                    symbol-status))))
 
 (cl-defmethod matrix-sync-presence ((session matrix-session) state-changes)
   "Process presence STATE-CHANGES."
@@ -751,12 +751,23 @@ added."
          (endpoint (format "join/%s"
                            (url-hexify-string room-id))))
     (matrix-post session endpoint nil
-                 #'matrix-join-room-callback)))
+                 #'matrix-join-room-callback
+                 :error-callback #'matrix-join-room-error-callback)))
 
 (matrix-defcallback join-room matrix-session
   "Callback for join-room."
   ;; Just log it, because it will be handled on the next sync.
   :body (matrix-log "JOINED ROOM: %s" (a-get data 'room_id)))
+
+(matrix-defcallback join-room-error matrix-session
+  "Error callback for join-room."
+  ;; Just log it, because it will be handled on the next sync.
+  :body (let* ((code (request-response-status-code response))
+               (url (request-response-url response))
+               (room-id (url-unhex-string (-last-item (s-split "/" url)))))
+          (pcase code
+            (404 (matrix-warn "Room not found: %s" room-id))
+            (_ (matrix-warn "Error joining room: %s" response)))))
 
 (cl-defmethod matrix-send-message ((room matrix-room) message &key (msgtype "m.text"))
   "Send MESSAGE of MSGTYPE to ROOM."
@@ -778,7 +789,7 @@ added."
   ;; For now, just log it, because we'll get it back when we sync anyway.
   :slots (id)
   :body (matrix-log "Message \"%s\" sent to room %s. Event ID: %s"
-                    id message (a-get data 'event_id)))
+                    message id (a-get data 'event_id)))
 
 (cl-defmethod matrix-leave ((room matrix-room))
   "Leave room."
