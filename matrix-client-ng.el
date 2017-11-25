@@ -8,6 +8,8 @@
 
 ;;;; Requirements
 
+(require 'ov)
+
 (require 'matrix-api-r0.3.0)
 (require 'matrix-notifications)
 
@@ -46,6 +48,23 @@ EVENT should be the `event' variable from the
 (defvar matrix-client-ng-show-images
   ;; FIXME: Copy defcustom.
   nil)
+
+(defvar matrix-client-ng-mark-modified-rooms t)
+
+(defvar matrix-client-ng-input-prompt "▶ ")
+
+(defcustom matrix-client-ng-render-presence t
+  "Show presence changes in the main buffer windows."
+  :type 'boolean)
+
+(defcustom matrix-client-ng-render-membership t
+  "Show membership changes in the main buffer windows."
+  :type 'boolean)
+
+(defcustom matrix-client-ng-render-html (featurep 'shr)
+  "Render HTML messages in buffers. These are currently the
+ad-hoc 'org.matrix.custom.html' messages that Vector emits."
+  :type 'boolean)
 
 ;;;; Macros
 
@@ -163,7 +182,7 @@ STRING should have a `timestamp' text-property."
                             (goto-char pos)))
       (insert (propertize (concat "\n" string)
                           'read-only t))
-      (unless (matrix-client-buffer-visible-p)
+      (unless (matrix-client-ng-buffer-visible-p)
         (set-buffer-modified-p t)))))
 
 (cl-defmethod matrix-client-ng-display-name ((room matrix-room))
@@ -182,8 +201,9 @@ STRING should have a `timestamp' text-property."
     (visual-line-mode 1)
     (setq buffer-undo-list t)
     ;; Unset buffer's modified status when it's selected
-    (when matrix-client-mark-modified-rooms
-      (add-hook 'buffer-list-update-hook #'matrix-client-buffer-list-update-hook 'append 'local))
+    ;; FIXME: Reactivate this.
+    ;; (when matrix-client-ng-mark-modified-rooms
+    ;;   (add-hook 'buffer-list-update-hook #'matrix-client-ng-buffer-list-update-hook 'append 'local))
     (erase-buffer)
     (switch-to-buffer (current-buffer)))
   (matrix-client-ng-insert-prompt room)
@@ -214,7 +234,7 @@ STRING should have a `timestamp' text-property."
       (ov (point) (point)
           'before-string (concat (propertize "\n"
                                              'face '(:height 0.1))
-                                 matrix-client-input-prompt)
+                                 matrix-client-ng-input-prompt)
           'matrix-client-prompt t))))
 
 ;;;;; Metadata
@@ -240,8 +260,8 @@ Also update prompt with typers."
                    (prompt (if (> (length typers) 0)
                                (concat (propertize (concat "Typing: " typers-string)
                                                    'face 'font-lock-comment-face)
-                                       "\n" matrix-client-input-prompt)
-                             matrix-client-input-prompt)))
+                                       "\n" matrix-client-ng-input-prompt)
+                             matrix-client-ng-input-prompt)))
         (ov-set ov 'before-string prompt)
         (setq header-line-format (concat avatar (format "%s: %s" name topic)))))))
 
@@ -276,7 +296,7 @@ Also update prompt with typers."
                          (pcase msgtype
                            ("m.emote"
                             (concat "* " body))
-                           ((guard (and matrix-client-render-html (string= "org.matrix.custom.html" format)))
+                           ((guard (and matrix-client-ng-render-html (string= "org.matrix.custom.html" format)))
                             (with-temp-buffer
                               (insert formatted_body)
                               (goto-char (point-min))
@@ -341,7 +361,7 @@ Also update prompt with typers."
                   (_ _)))
         (msg (propertize (format "%s %s" displayname action)
                          'face 'matrix-client-notice
-                         'event_id event-id
+                         'event_id event_id
                          'sender sender
                          'timestamp timestamp)))
   ;; MAYBE: Get displayname from API room object's membership list.
@@ -395,6 +415,13 @@ Also update prompt with typers."
                                   'action #'browse-url-at-mouse
                                   'follow-link t))
     (buffer-string)))
+
+(defun matrix-client-ng-buffer-visible-p (&optional buffer)
+  "Return non-nil if BUFFER is currently visible.
+If BUFFER is nil, use the current buffer."
+  (let ((buffer (or buffer (current-buffer))))
+    (or (eq buffer (window-buffer (selected-window)))
+        (get-buffer-window buffer))))
 
 ;;;; Footer
 
