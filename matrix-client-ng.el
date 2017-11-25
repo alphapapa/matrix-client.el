@@ -44,7 +44,7 @@ EVENT should be the `event' variable from the
 
 (defvar matrix-client-ng-mode-map
   (let ((map (make-sparse-keymap)))
-    (define-key map (kbd "RET") 'matrix-client-ng-send-active-line)
+    (define-key map (kbd "RET") 'matrix-client-ng-send-input)
     (define-key map (kbd "DEL") 'matrix-client-ng-delete-backward-char)
     map)
   "Keymap for `matrix-client-mode'.")
@@ -241,19 +241,10 @@ STRING should have a `timestamp' text-property."
         (car aliases)
         id)))
 
-(defun matrix-client-ng-send-active-line ()
-  "Send the current message-line text after running it through input-filters."
+(defun matrix-client-ng-send-input ()
+  "Send current input to current room."
   (interactive)
-  (goto-char (point-max))
-
-  ;; TODO: Make the prompt character customizable, and probably use
-  ;; text-properties or an overlay to find it.
   (goto-char (ov-end (car (ov-in 'matrix-client-prompt t))))
-
-  ;; MAYBE: Just delete the text and store it in a var instead of
-  ;; killing it to the kill-ring.  On the one hand, it's a nice
-  ;; backup, but some users might prefer not to clutter the kill-ring
-  ;; with every message they send.
   (kill-line)
   (pcase-let* ((room matrix-client-ng-room)
                ((eieio session) room)
@@ -267,11 +258,11 @@ STRING should have a `timestamp' text-property."
         (matrix-send-message room input)
         (matrix-client-ng-update-last-seen room)))))
 
-;; (defvar matrix-client-ng-room-commands
-;;   (ht ("/join" #'ignore)
-;;       ("/leave" #'ignore)
-;;       ("/me" #'ignore)
-;;       ("/who" #'ignore)))
+(cl-defmethod matrix-client-ng-room-command-me ((room matrix-room) input)
+  "Send emote INPUT to ROOM.
+INPUT should begin with \"/me\"."
+  (let ((emote (s-join " " (cdr (s-split-words input)))))
+    (matrix-send-message room emote :msgtype "m.emote")))
 
 (defun matrix-client-ng-delete-backward-char (n &optional kill-flag)
   "Delete backward unless the point is at the prompt or other read-only text."

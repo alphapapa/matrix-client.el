@@ -717,14 +717,14 @@ Add new room to SESSION."
                                         :id room_id)))
           (push room rooms)))
 
-(cl-defmethod matrix-send-message ((room matrix-room) message)
-  "Send MESSAGE to ROOM."
+(cl-defmethod matrix-send-message ((room matrix-room) message &key (msgtype "m.text"))
+  "Send MESSAGE of MSGTYPE to ROOM."
   ;; https://matrix.org/docs/spec/client_server/r0.3.0.html#id182
   (with-slots* (((id session) room)
                 ((txn-id) session))
     ;; Use `with-slots*' instead of `pcase-let*' so we can `incf' the txn-id.
     (let* ((type "m.room.message")
-           (content (a-list 'msgtype "m.text"
+           (content (a-list 'msgtype msgtype
                             'body message))
            (txn-id (cl-incf txn-id))
            (endpoint (format "rooms/%s/send/%s/%s"
