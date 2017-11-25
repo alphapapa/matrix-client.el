@@ -42,10 +42,10 @@ EVENT should be the `event' variable from the
 
 ;;;; Variables
 
-(defvar matrix-client-mode-map
+(defvar matrix-client-ng-mode-map
   (let ((map (make-sparse-keymap)))
-    (define-key map (kbd "RET") 'matrix-client-send-active-line)
-    (define-key map (kbd "DEL") 'matrix-client-delete-backward-char)
+    (define-key map (kbd "RET") 'matrix-client-ng-send-active-line)
+    (define-key map (kbd "DEL") 'matrix-client-ng-delete-backward-char)
     map)
   "Keymap for `matrix-client-mode'.")
 
@@ -241,11 +241,50 @@ STRING should have a `timestamp' text-property."
         (car aliases)
         id)))
 
+(defun matrix-client-ng-send-active-line ()
+  "Send the current message-line text after running it through input-filters."
+  (interactive)
+  (goto-char (point-max))
+
+  ;; TODO: Make the prompt character customizable, and probably use
+  ;; text-properties or an overlay to find it.
+  (goto-char (ov-end (car (ov-in 'matrix-client-prompt t))))
+
+  ;; MAYBE: Just delete the text and store it in a var instead of
+  ;; killing it to the kill-ring.  On the one hand, it's a nice
+  ;; backup, but some users might prefer not to clutter the kill-ring
+  ;; with every message they send.
+  (kill-line)
+  (pcase-let* ((room matrix-client-ng-room)
+               ((eieio session) room)
+               (input (pop kill-ring))
+               (first-word (car (s-split-words input))))
+    (funcall-if (concat "matrix-client-ng-room-command-" first-word)
+        ;; Special command
+        (list room input)
+      (progn
+        ;; Normal message
+        (matrix-send-message room input)
+        (matrix-client-ng-update-last-seen room)))))
+
+;; (defvar matrix-client-ng-room-commands
+;;   (ht ("/join" #'ignore)
+;;       ("/leave" #'ignore)
+;;       ("/me" #'ignore)
+;;       ("/who" #'ignore)))
+
+(defun matrix-client-ng-delete-backward-char (n &optional kill-flag)
+  "Delete backward unless the point is at the prompt or other read-only text."
+  (interactive "p\nP")
+  (unless (get-text-property (- (point) 2) 'read-only)
+    (call-interactively #'delete-backward-char n kill-flag)))
+
 ;;;;; Setup
 
 (cl-defmethod matrix-client-ng-setup-room-buffer ((room matrix-room))
   "Prepare and switch to buffer for ROOM-ID, and return room object."
   (with-room-buffer room
+    (use-local-map matrix-client-ng-mode-map)
     ;;  (matrix-client-mode)
     (visual-line-mode 1)
     (setq buffer-undo-list t)
@@ -254,14 +293,12 @@ STRING should have a `timestamp' text-property."
     ;; (when matrix-client-ng-mark-modified-rooms
     ;;   (add-hook 'buffer-list-update-hook #'matrix-client-ng-buffer-list-update-hook 'append 'local))
     (erase-buffer)
-    (switch-to-buffer (current-buffer)))
+    (switch-to-buffer (current-buffer))
+    ;; FIXME: Remove these or update them.
+    ;; (set (make-local-variable 'matrix-client-room-connection) con)
+    (setq-local matrix-client-ng-room room))
   (matrix-client-ng-insert-prompt room)
-  (matrix-client-ng-insert-last-seen room)
-
-  ;; FIXME: Remove these or update them.
-  ;; (set (make-local-variable 'matrix-client-room-connection) con)
-  ;; (set (make-local-variable 'matrix-client-room-object) room-obj)
-  )
+  (matrix-client-ng-insert-last-seen room))
 
 (cl-defmethod matrix-client-ng-insert-last-seen ((room matrix-room))
   "Insert last-seen overlay into ROOM's buffer."

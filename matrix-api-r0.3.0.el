@@ -314,7 +314,7 @@ set, will be called if the request fails."
 (matrix-defcallback request-error matrix-session
   "Callback function for request error."
   :slots (user)
-  :body (matrix-warn "REQUEST ERROR: %s: %s" user data))
+  :body (matrix-warn "REQUEST ERROR:%s  RESPONSE:%s" error-thrown response))
 
 ;;;;; Login/logout
 
