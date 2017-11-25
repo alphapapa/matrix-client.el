@@ -36,7 +36,8 @@ Is transformed to:
 \(with-slots (id session) room
   (with-slots (user) session
     user))"
-  (declare (indent defun))
+  (declare (debug (listp body))
+           (indent defun))
   (cl-loop for (slots object) in (reverse slots-objects)
            do (setq body `((with-slots ,slots ,object ,@body)))
            finally return (car body)))

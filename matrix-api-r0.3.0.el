@@ -96,9 +96,10 @@ automatically, and other keys are allowed."
 (defmacro funcall-if (fn-name args else)
   "If FN-NAME is a function, return result of applying ARGS to it, otherwise ELSE.
 FN-NAME should be a string."
+  (declare (debug (form listp form)))
   `(let ((fn (intern-soft ,fn-name)))
      (if (functionp fn)
-         (apply fn ,@args)
+         (apply fn ,args)
        ,else)))
 (put 'funcall-if 'lisp-indent-function 2)
 
@@ -425,7 +426,7 @@ requests, and we make a new request."
                  ;; ignore return values.
                  do (if (functionp method)
                         (funcall method session (a-get data param))
-                      (matrix-warn "Unimplemented method: %s" method))
+                      (matrix-warn "Unimplemented API method: %s" method))
                  finally do (setq next-batch (a-get data 'next_batch))))
 
 (matrix-defcallback sync-complete matrix-session
@@ -488,8 +489,8 @@ SESSION has no access token, consider the session logged-out."
                                ;; If the event array is empty, the function will be
                                ;; called anyway, so ignore its return value.
                                do (funcall-if (concat "matrix-sync-" (symbol-name param))
-                                      (room (a-get joined-room param))
-                                    (matrix-warn "Unimplemented method: %s" method-name))
+                                      (list room (a-get joined-room param))
+                                    (matrix-warn "Unimplemented API method: %s" method-name))
                                ;; Always return t for now, so that we think the sync succeeded
                                ;; and we can set next_batch in `matrix-sync-callback'.
                                finally return t)
@@ -538,13 +539,13 @@ SESSION has no access token, consider the session logged-out."
   "Process EVENT in ROOM."
   (pcase-let* (((map type) event))
     (funcall-if (concat "matrix-event-" type)
-        (room event)
+        (list room event)
       (matrix-log "Unimplemented handler for event %s in room %s." type (oref room id)))))
 
 (cl-defmethod matrix-event-m.room.member ((room matrix-room) event)
   "Process m.room.member EVENT in ROOM."
   (with-slots (members) room
-    (pcase-let* (((map (state_key user-id) content) event)
+    (pcase-let* (((map ('state_key user-id) content) event)
                  ((map membership displayname avatar_url) content))
       (pcase membership
         ;; TODO: Support all membership changes: invite, join, knock, leave, ban.

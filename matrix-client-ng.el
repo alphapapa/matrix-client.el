@@ -50,10 +50,11 @@ EVENT should be the `event' variable from the
 ;;;; Macros
 
 (defmacro with-room-buffer (room &rest body)
-  (declare (indent defun))
+  (declare (debug (sexp body)) (indent defun))
   `(with-slots* (((extra) room)
                  ((buffer) extra))
-     ,@body))
+     (with-current-buffer buffer
+       ,@body)))
 
 (cl-defmacro matrix-client-ng-defevent (type docstring &key object-slots event-keys content-keys let body)
   "Define a method on `matrix-room' to handle Matrix events of TYPE.
@@ -91,7 +92,7 @@ method without it."
   (let ((method-name (intern (concat "matrix-client-ng-" (symbol-name type))))
         (slots (cl-loop for (object . slots) in object-slots
                         collect (list slots object))))
-    `(cl-defmethod ,method-name ((room matrix-room event))
+    `(cl-defmethod ,method-name ((room matrix-room) event)
        ,docstring
        (with-slots* ,slots
          (pcase-let* (((map content event_id sender origin_server_ts type unsigned ,@event-keys) event)
@@ -109,19 +110,18 @@ method without it."
 
 (add-hook 'matrix-room-update-hook #'matrix-client-ng-update)
 
-(defun matrix-client-ng ()
+(defun matrix-client-ng (user password)
   "Matrix Client NG"
-  (interactive)
+  (interactive (list (user (read-string "User ID: "))
+                     (password (read-passwd "Password: "))))
   (if matrix-client-ng-sessions
       ;; TODO: Already have active session: display list of buffers
       ;; FIXME: If login fails, it still shows as active.
       (message "Already active")
     ;; Start new session
     ;; MAYBE: Use auth functions for credentials
-    (when-let ((user (read-string "User ID: "))
-               (password (read-passwd "Password: "))
-               (session (matrix-session :user user))
-               (matrix-synchronous t))
+    (let ((session (matrix-session :user user))
+          (matrix-synchronous t))
       ;; FIXME: Use a callback instead of sync
       (when (matrix-login session password)
         (push session matrix-client-ng-sessions)
@@ -132,7 +132,8 @@ method without it."
   "Unplug from the Matrix."
   (interactive)
   ;; MAYBE: Delete buffers.
-  (seq-do #'matrix-logout matrix-client-ng-sessions))
+  (seq-do #'matrix-logout matrix-client-ng-sessions)
+  (setq matrix-client-ng-sessions nil))
 
 ;;;; Rooms
 
@@ -176,19 +177,18 @@ STRING should have a `timestamp' text-property."
 
 (cl-defmethod matrix-client-ng-setup-room-buffer ((room matrix-room))
   "Prepare and switch to buffer for ROOM-ID, and return room object."
-  (with-slots* (((extra) room)
-                ((buffer) extra))
-    (with-current-buffer buffer
-      ;;  (matrix-client-mode)
-      (visual-line-mode 1)
-      (setq buffer-undo-list t)
-      ;; Unset buffer's modified status when it's selected
-      (when matrix-client-mark-modified-rooms
-        (add-hook 'buffer-list-update-hook #'matrix-client-buffer-list-update-hook 'append 'local))
-      (erase-buffer))
-    (matrix-client-ng-insert-prompt room)
-    (matrix-client-ng-insert-last-seen room)
-    (switch-to-buffer buffer))
+  (with-room-buffer room
+    ;;  (matrix-client-mode)
+    (visual-line-mode 1)
+    (setq buffer-undo-list t)
+    ;; Unset buffer's modified status when it's selected
+    (when matrix-client-mark-modified-rooms
+      (add-hook 'buffer-list-update-hook #'matrix-client-buffer-list-update-hook 'append 'local))
+    (erase-buffer)
+    (switch-to-buffer (current-buffer)))
+  (matrix-client-ng-insert-prompt room)
+  (matrix-client-ng-insert-last-seen room)
+
   ;; FIXME: Remove these or update them.
   ;; (set (make-local-variable 'matrix-client-room-connection) con)
   ;; (set (make-local-variable 'matrix-client-room-object) room-obj)
@@ -253,7 +253,7 @@ Also update prompt with typers."
     (cl-loop for method = (intern (concat "matrix-client-ng-" (symbol-name type)))
              do (if (functionp method)
                     (funcall method room event)
-                  (matrix-warn "Unimplemented method: %s" method)))))
+                  (matrix-warn "Unimplemented client method: %s" method)))))
 
 (matrix-client-ng-defevent m.room.message
   "Process m.room.message EVENT in ROOM."
@@ -339,7 +339,8 @@ Also update prompt with typers."
                   ("join" "joined")
                   ("left" "left")
                   (_ _)))
-        (msg (propertize (format "%s %s")
+        (msg (propertize (format "%s %s" displayname action)
+                         'face 'matrix-client-notice
                          'event_id event-id
                          'sender sender
                          'timestamp timestamp)))
@@ -360,8 +361,8 @@ Also update prompt with typers."
     (seq-doseq (event timeline-new)
       (pcase-let* (((map type) event))
         (funcall-if (concat "matrix-client-ng-" type)
-            (room event)
-          (matrix-warn "Unimplemented method: %s" method))))
+            (list room event)
+          (matrix-warn "Unimplemented client method: %s" method))))
     ;; Clear new events
     (matrix-clear-timeline room)
     ;; TODO: Update other room things: header, avatar, typers, topic, name, aliases, etc.
