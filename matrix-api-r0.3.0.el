@@ -195,8 +195,7 @@ FN-NAME should be a string, and is available in the ELSE form as `fn-name'."
 (cl-defmethod matrix-user-displayname ((room matrix-room) user-id)
   "Return display name for USER-ID in ROOM."
   (pcase-let* (((eieio members) room)
-               ((map (user-id user)) members)
-               ((map displayname) user))
+               (displayname (a-get* members user-id 'displayname)))
     (or displayname user-id)))
 
 ;;;; Functions
