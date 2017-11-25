@@ -42,6 +42,13 @@ EVENT should be the `event' variable from the
 
 ;;;; Variables
 
+(defvar matrix-client-mode-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map (kbd "RET") 'matrix-client-send-active-line)
+    (define-key map (kbd "DEL") 'matrix-client-delete-backward-char)
+    map)
+  "Keymap for `matrix-client-mode'.")
+
 (defvar matrix-client-ng-sessions nil
   "List of active sessions.")
 
@@ -65,6 +72,44 @@ EVENT should be the `event' variable from the
   "Render HTML messages in buffers. These are currently the
 ad-hoc 'org.matrix.custom.html' messages that Vector emits."
   :type 'boolean)
+
+;;;;; Faces
+
+(defface matrix-client-metadata
+  '((((class color) (background light)) (:foreground "#000088" :weight bold))
+    (((class color) (background dark)) (:foreground "#4444FF" :weight bold))
+    (t (:weight bold)))
+  "Face for chat metadata properties."
+  :group 'matrix-client)
+
+(defface matrix-client-own-metadata
+  '((((class color) (background light)) (:foreground "#268bd2" :weight bold))
+    (((class color) (background dark)) (:foreground "#268bd2" :weight bold))
+    (t (:weight bold)))
+  "Face for user's own chat metadata properties."
+  :group 'matrix-client)
+
+(defface matrix-client-own-messages
+  '((((class color) (background light)) (:foreground "#586e75" :weight bold :slant italic))
+    (((class color) (background dark)) (:foreground "#586e75" :weight bold :slant italic))
+    (t (:weight bold :slant italic)))
+  "Face for user's own chat messages."
+  :group 'matrix-client)
+
+(defface matrix-client-notice
+  '((t :inherit font-lock-comment-face))
+  "Face for notices."
+  :group 'matrix-client)
+
+(defface matrix-client-notice-metadata
+  '((t :inherit font-lock-comment-face))
+  "Face for notices."
+  :group 'matrix-client)
+
+(defface matrix-client-last-seen
+  '((t (:inherit 'highlight :height 0.1)))
+  "Face for last-seen overlay."
+  :group 'matrix-client)
 
 ;;;; Macros
 
@@ -139,13 +184,17 @@ method without it."
       (message "Already active")
     ;; Start new session
     ;; MAYBE: Use auth functions for credentials
-    (let ((session (matrix-session :user user))
-          (matrix-synchronous t))
-      ;; FIXME: Use a callback instead of sync
-      (when (matrix-login session password)
-        (push session matrix-client-ng-sessions)
-        (matrix-sync session)
-        (message "Jacked in to %s.  Syncing..." (oref session server))))))
+    (let ((session (matrix-session :user user)))
+      (matrix-login session password))))
+
+(cl-defmethod matrix-client-ng-login-hook ((session matrix-session))
+  "Callback for successful login.
+Add session to sessions list and run initial sync."
+  (push session matrix-client-ng-sessions)
+  (matrix-sync session)
+  (message "Jacked in to %s.  Syncing..." (oref session server)))
+
+(add-hook 'matrix-login-hook #'matrix-client-ng-login-hook)
 
 (defun matrix-client-ng-disconnect ()
   "Unplug from the Matrix."
@@ -270,10 +319,9 @@ Also update prompt with typers."
 (cl-defmethod matrix-client-ng-timeline ((room matrix-room) event)
   "Process EVENT in ROOM."
   (pcase-let* (((map type) event))
-    (cl-loop for method = (intern (concat "matrix-client-ng-" (symbol-name type)))
-             do (if (functionp method)
-                    (funcall method room event)
-                  (matrix-warn "Unimplemented client method: %s" method)))))
+    (funcall-if (concat "matrix-client-ng-" (symbol-name type))
+        (list room event)
+      (matrix-warn "Unimplemented client method: %s" fn-name))))
 
 (matrix-client-ng-defevent m.room.message
   "Process m.room.message EVENT in ROOM."
@@ -382,7 +430,7 @@ Also update prompt with typers."
       (pcase-let* (((map type) event))
         (funcall-if (concat "matrix-client-ng-" type)
             (list room event)
-          (matrix-warn "Unimplemented client method: %s" method))))
+          (matrix-warn "Unimplemented client method: %s" fn-name))))
     ;; Clear new events
     (matrix-clear-timeline room)
     ;; TODO: Update other room things: header, avatar, typers, topic, name, aliases, etc.

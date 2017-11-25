@@ -95,9 +95,10 @@ automatically, and other keys are allowed."
 
 (defmacro funcall-if (fn-name args else)
   "If FN-NAME is a function, return result of applying ARGS to it, otherwise ELSE.
-FN-NAME should be a string."
+FN-NAME should be a string, and is available in the ELSE form as `fn-name'."
   (declare (debug (form listp form)))
-  `(let ((fn (intern-soft ,fn-name)))
+  `(let ((fn-name ,fn-name)
+         (fn (intern-soft ,fn-name)))
      (if (functionp fn)
          (apply fn ,args)
        ,else)))
@@ -230,8 +231,6 @@ MESSAGE and ARGS should be a string and list of strings for
   (nconc args (list :method 'put))
   (apply #'matrix-request args))
 
-
-
 ;;;; Methods
 
 ;;;;; Request
@@ -337,7 +336,8 @@ Set access_token and device_id in session."
   :slots (access-token device-id)
   :body (pcase-let* (((map access_token device_id) data))
           (setq access-token access_token
-                device-id device_id)))
+                device-id device_id)
+          (run-hook-with-args 'matrix-login-hook session)))
 
 (cl-defmethod matrix-logout ((session matrix-session))
   "Log out of SESSION."
@@ -426,7 +426,7 @@ requests, and we make a new request."
                  ;; ignore return values.
                  do (if (functionp method)
                         (funcall method session (a-get data param))
-                      (matrix-warn "Unimplemented API method: %s" method))
+                      (matrix-warn "Unimplemented API method: %s" fn-name))
                  finally do (setq next-batch (a-get data 'next_batch))))
 
 (matrix-defcallback sync-complete matrix-session
@@ -434,18 +434,52 @@ requests, and we make a new request."
 If sync was successful or timed-out, make a new sync request.  If
 SESSION has no access token, consider the session logged-out."
   :slots (access-token)
-  :body (pcase symbol-status
-          ((or 'success 'timeout)
-           (matrix-log "SYNC COMPLETE: %s.  Making new sync request..." symbol-status)
-           (unless matrix-synchronous
-             ;; Call self again to wait for more data.  But don't do this if
-             ;; `matrix-synchronous' is set, which would cause an infinite
-             ;; loop.  It should only be set when testing, in which case we
-             ;; sync manually.
-             (when access-token
-               (matrix-sync session))))
-          (_ (matrix-warn "SYNC FAILED: %s  NOT STARTING NEW SYNC REQUEST.  API SHOULD BE CONSIDERED DISCONNECTED."
-                          (upcase (symbol-name symbol-status))))))
+  :body ;; (pcase symbol-status
+  ;;   ('success
+  ;;    (matrix-log "SYNC SUCCESS.")
+  ;;    (unless matrix-synchronous
+  ;;      ;; Call self again to wait for more data.  But don't do this if
+  ;;      ;; `matrix-synchronous' is set, which would cause an infinite
+  ;;      ;; loop.  It should only be set when testing, in which case we
+  ;;      ;; sync manually.
+  ;;      (matrix-log "NOT SYNCHRONOUS")
+  ;;      (when access-token
+  ;;        (matrix-log "POLLING...")
+  ;;        (matrix-sync session))))
+  ;;   ('timeout
+  ;;    (matrix-log "SYNC TIMED OUT.")
+  ;;    (unless matrix-synchronous
+  ;;      ;; Call self again to wait for more data.  But don't do this if
+  ;;      ;; `matrix-synchronous' is set, which would cause an infinite
+  ;;      ;; loop.  It should only be set when testing, in which case we
+  ;;      ;; sync manually.
+  ;;      (matrix-log "NOT SYNCHRONOUS")
+  ;;      (when access-token
+  ;;        (matrix-log "POLLING...")
+  ;;        (matrix-sync session))))
+  ;;   (_ (matrix-warn "SYNC FAILED: %s  NOT STARTING NEW SYNC REQUEST.  API SHOULD BE CONSIDERED DISCONNECTED."
+  ;;                   (upcase (symbol-name symbol-status)))))
+  (pcase symbol-status
+    ('success
+     (matrix-log "SYNC SUCCESS.")
+     (if matrix-synchronous
+         (matrix-log "SYNCHRONOUS: NOT POLLING")
+       (if access-token
+           (progn
+             (matrix-log "POLLING...")
+             (matrix-sync session))
+         (matrix-log "NO ACCESS TOKEN: NOT POLLING"))))
+    ('timeout
+     (matrix-log "SYNC TIMED OUT.")
+     (if matrix-synchronous
+         (matrix-log "SYNCHRONOUS: NOT POLLING")
+       (if access-token
+           (progn
+             (matrix-log "POLLING...")
+             (matrix-sync session))
+         (matrix-log "NO ACCESS TOKEN: NOT POLLING"))))
+    (_ (matrix-warn "SYNC FAILED: %s  NOT STARTING NEW SYNC REQUEST.  API SHOULD BE CONSIDERED DISCONNECTED."
+                    (upcase (symbol-name symbol-status))))))
 
 (cl-defmethod matrix-sync-presence ((session matrix-session) state-changes)
   "Process presence STATE-CHANGES."
@@ -490,7 +524,7 @@ SESSION has no access token, consider the session logged-out."
                                ;; called anyway, so ignore its return value.
                                do (funcall-if (concat "matrix-sync-" (symbol-name param))
                                       (list room (a-get joined-room param))
-                                    (matrix-warn "Unimplemented API method: %s" method-name))
+                                    (matrix-warn "Unimplemented API method: %s" fn-name))
                                ;; Always return t for now, so that we think the sync succeeded
                                ;; and we can set next_batch in `matrix-sync-callback'.
                                finally return t)
