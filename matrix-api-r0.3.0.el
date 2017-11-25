@@ -58,6 +58,7 @@ method)."
     ;; Add nil initforms
     (cl-loop for (slot . attrs) in slots
              unless (plist-get attrs :initform)
+             ;; FIXME: Doesn't work if there are no attrs at all.
              do (nconc attrs (list :initform nil)))
     `(progn
        (defclass ,name ,superclasses ,slots ,@options-and-doc)
@@ -151,7 +152,8 @@ FN-NAME should be a string, and is available in the ELSE form as `fn-name'."
                    :documentation "Hash table of user IDs whose presence this user wants to follow.")
    (next-batch :type string
                :documentation "The batch token to supply in the since param of the next /sync request.")
-   (initial-sync-p)
+   ;; FIXME: After fixing bug in macro, let this be simply (initial-sync-p)
+   (initial-sync-p :initarg :initial-sync-p)
    (extra :initarg :extra
           :documentation "Reserved for users of the library, who may store whatever they want here."))
   :allow-nil-initform t)
@@ -542,8 +544,10 @@ SESSION has no access token, consider the session logged-out."
                            ;; Always return t for now, so that we think the sync succeeded
                            ;; and we can set next_batch in `matrix-sync-callback'.
                            finally return t)
+                  (matrix-log "got here 1")
                   ;; Run client hooks
                   (run-hook-with-args 'matrix-room-update-hook room)
+                  (matrix-log "got here 2")
                   t))))
 
 (cl-defmethod matrix-sync-state ((room matrix-room) data)

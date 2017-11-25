@@ -39,7 +39,7 @@ Automatically trimmed to last 20 notifications.")
   "Run notify hooks and built-in notificataion for an event of EVENT-TYPE with DATA.
 Optional REST of args are also applied to hooks and function."
   ;; FIXME: Pass session so we can get its initial-sync-p
-  (unless (oref (car matrix-client-ng-sessions) initial-sync)
+  (unless (oref (car matrix-client-ng-sessions) initial-sync-p)
     (run-hook-with-args 'matrix-client-notify-hook event-type data rest)
     ;; Run built-in notification for this event type
     (let ((fn (intern-soft (concat "matrix-client-notify-" event-type))))
@@ -56,8 +56,8 @@ DATA should be the `data' variable from the
 `defmatrix-client-handler'.  ROOM should be the room object."
   (pcase-let* (((map content sender event_id) event)
                ((map body) content)
-               (display-name (matrix-client-displayname-from-user-id room sender))
-               (buffer (oref room :buffer))
+               (display-name (matrix-user-displayname room sender))
+               (buffer (oref* room extra buffer))
                (id (notifications-notify :title (format "<b>%s</b>" display-name)
                                          ;; Encode the message as ASCII because dbus-notify
                                          ;; can't handle some Unicode chars.  And

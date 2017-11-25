@@ -333,9 +333,12 @@ INPUT should begin with \"/me\"."
     ;; FIXME: Reactivate this.
     ;; (when matrix-client-ng-mark-modified-rooms
     ;;   (add-hook 'buffer-list-update-hook #'matrix-client-ng-buffer-list-update-hook 'append 'local))
-    (matrix-log "GOT HERE")
-    (erase-buffer)
+    (matrix-log "GOT HERE A")
+    ;; FIXME: ignore-errors probably unnecessary
+    (ignore-errors (erase-buffer))
+    (matrix-log "GOT HERE B")
     (switch-to-buffer (current-buffer))
+    (matrix-log "GOT HERE C")
     ;; FIXME: Remove these or update them.
     ;; (set (make-local-variable 'matrix-client-room-connection) con)
     (setq-local matrix-client-ng-room room))
@@ -498,13 +501,15 @@ Also update prompt with typers."
 
 (cl-defmethod matrix-client-ng-update ((room matrix-room))
   "Update ROOM."
-  (with-slots* (((extra timeline-new) room)
+  (with-slots* (((extra timeline-new id) room)
                 ((buffer) extra))
     ;; Make buffer if necessary
     (unless buffer
+      (matrix-log "NO BUFFER FOR ROOM %s" id)
       (setq buffer (get-buffer-create (matrix-client-ng-display-name room)))
       (matrix-client-ng-setup-room-buffer room))
     ;; Process new events
+    (matrix-log "PROCESSING EVENTS FOR ROOM %s" id)
     (seq-doseq (event timeline-new)
       (pcase-let* (((map type) event))
         (funcall-if (concat "matrix-client-ng-" type)
