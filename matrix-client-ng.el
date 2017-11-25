@@ -99,7 +99,7 @@ Also update prompt with typers."
                            (propertize name 'face 'font-lock-keyword-face)))
                    (ov (car (ov-in 'matrix-client-prompt)))
                    (typers-string (s-join ", " (cl-loop for user across typers
-                                                        collect (matrix-client-displayname-from-user-id room user))))
+                                                        collect (matrix-user-displayname room user))))
                    (prompt (if (> (length typers) 0)
                                (concat (propertize (concat "Typing: " typers-string)
                                                    'face 'font-lock-comment-face)
