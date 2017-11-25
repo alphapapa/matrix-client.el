@@ -39,8 +39,7 @@ to match until the next whitespace character."
 RESCALE-ARGS are passed to `matrix-client-rescale-image'."
   (pcase-let* ((data (progn
                        ;; Disabling multibyte is required for reading binary data.
-                       ;; FIXME: require or autoload this function
-                       (mm-disable-multibyte)
+                       (set-buffer-multibyte nil)
                        ;; Point is where the body starts, after the headers
                        (buffer-substring (point) (point-max))))
                ((eieio buffer) room))
