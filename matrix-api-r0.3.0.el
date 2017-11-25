@@ -320,7 +320,10 @@ set, will be called if the request fails."
 (matrix-defcallback request-error matrix-session
   "Callback function for request error."
   :slots (user)
-  :body (matrix-warn "REQUEST ERROR:%s  RESPONSE:%s" error-thrown response))
+  :body (matrix-warn "REQUEST ERROR:%s  RESPONSE:%s" error-thrown
+                     (a-list 'url (request-response-url response)
+                             'header (request-response-header response)
+                             'data (request-response-data response))))
 
 ;;;;; Login/logout
 
