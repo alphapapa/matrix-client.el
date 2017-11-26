@@ -322,7 +322,7 @@ set, will be called if the request fails."
   :slots (user)
   :body (matrix-warn "REQUEST ERROR:%s  RESPONSE:%s" error-thrown
                      (a-list 'url (request-response-url response)
-                             'header (request-response-header response)
+                             'settings (request-response-settings response)
                              'data (request-response-data response))))
 
 ;;;;; Login/logout
@@ -358,7 +358,10 @@ Set access_token and device_id in session."
   "Callback function for successful logout.
 Unset access_token and device_id in session."
   :slots (access-token device-id)
-  ;; TODO: Do we need to set the device_id to nill?
+  ;; TODO: Do we need to set the device_id to nil?
+
+  ;; FIXME: This doesn't stop outstanding polls, so when one returns,
+  ;; it will raise a warning since the access token is now nil.
   :body (setq access-token nil
               device-id nil))
 

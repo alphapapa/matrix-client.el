@@ -274,6 +274,7 @@ STRING should have a `timestamp' text-property."
   (pcase-let* ((room matrix-client-ng-room)
                ((eieio session) room)
                (input (pop kill-ring))
+               ;; NOTE: A happy accident, `s-split-words' chops off the leading "/".
                (first-word (car (s-split-words input))))
     (funcall-if (concat "matrix-client-ng-room-command-" first-word)
         ;; Special command
@@ -323,7 +324,6 @@ INPUT should begin with \"/me\"."
 
 (cl-defmethod matrix-client-ng-setup-room-buffer ((room matrix-room))
   "Prepare and switch to buffer for ROOM-ID, and return room object."
-  ;; XXX: This function seems to abort or something unless it's edebugged.  SIGH.
   (with-room-buffer room
     (use-local-map matrix-client-ng-mode-map)
     ;;  (matrix-client-mode)
