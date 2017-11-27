@@ -98,6 +98,7 @@ automatically, and other keys are allowed."
   "If FN-NAME is a function, return result of applying ARGS to it, otherwise ELSE.
 FN-NAME should be a string, and is available in the ELSE form as `fn-name'."
   (declare (debug (form listp form)))
+  ;; FIXME: Probably use with-gensyms* here.
   `(let ((fn-name ,fn-name)
          (fn (intern-soft ,fn-name)))
      (if (functionp fn)
@@ -426,6 +427,7 @@ requests, and we make a new request."
                 :complete-callback #'matrix-sync-complete-callback
                 ;; Add 5 seconds to timeout to give server a bit of grace period before we
                 ;; consider it unresponsive.
+                ;; MAYBE: Increase grace period substantially, maybe up to 60 seconds.
                 :timeout (+ timeout 5))))
 
 (matrix-defcallback sync matrix-session
