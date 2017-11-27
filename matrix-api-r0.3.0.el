@@ -297,7 +297,7 @@ set, will be called if the request fails."
       (pcase method
         ("GET" (request url
                         :type method
-                        :headers (a-list 'Authorization (format "Bearer %s" access-token))
+                        :headers (a-list 'Authorization (concat "Bearer " access-token))
                         :params data
                         :parser #'json-read
                         :success callback
@@ -308,7 +308,7 @@ set, will be called if the request fails."
         ((or "POST" "PUT") (request url
                                     :type method
                                     :headers (a-list 'Content-Type "application/json"
-                                                     'Authorization (format "Bearer %s" access-token))
+                                                     'Authorization (concat "Bearer " access-token))
                                     :data (json-encode data)
                                     :parser #'json-read
                                     :success callback
@@ -642,7 +642,7 @@ DIRECTION must be \"b\" (the default) or \"f\".  LIMIT is the
 maximum number of events to return (default 10)."
   ;; TODO: As written, this may only work going backward.  Needs testing.
   (with-slots (id session prev-batch last-full-sync) room
-    (matrix-get session (format "rooms/%s/messages" id)
+    (matrix-get session (concat "rooms/"id"/messages")
                 (a-list 'from prev-batch
                         'to last-full-sync
                         'dir direction
@@ -754,8 +754,7 @@ added."
                       (concat room-id ":" (oref session server))
                     ;; Already has server
                     room-id))
-         (endpoint (format "join/%s"
-                           (url-hexify-string room-id))))
+         (endpoint (concat "join/" (url-hexify-string room-id))))
     (matrix-post session endpoint nil
                  #'matrix-join-room-callback
                  :error-callback #'matrix-join-room-error-callback)))
@@ -785,8 +784,7 @@ added."
            (content (a-list 'msgtype msgtype
                             'body message))
            (txn-id (cl-incf txn-id))
-           (endpoint (format "rooms/%s/send/%s/%s"
-                             id type txn-id)))
+           (endpoint (concat "rooms/"id"/send/"type"/"txn-id)))
       (matrix-put session endpoint content
                   (apply-partially #'matrix-send-message-callback room)))))
 
@@ -801,7 +799,7 @@ added."
   "Leave room."
   ;; https://matrix.org/docs/spec/client_server/r0.3.0.html#id203
   (with-slots (id session) room
-    (let* ((endpoint (format "rooms/%s/leave" id)))
+    (let* ((endpoint (concat "rooms/"id"/leave")))
       (matrix-post session endpoint nil
                    (apply-partially #'matrix-leave-callback room)))))
 
@@ -823,7 +821,7 @@ added."
 
   ;; https://matrix.org/docs/spec/client_server/r0.3.0.html#id204
   (with-slots (id session) room
-    (let* ((endpoint (format "rooms/%s/forget" id)))
+    (let* ((endpoint (concat "rooms/"id"/forget")))
       (matrix-post session endpoint nil
                    (apply-partially #'matrix-forget-callback room)))))
 
@@ -837,7 +835,7 @@ added."
 TYPING should be t or nil."
   (pcase-let* (((eieio id session) room)
                ((eieio user) session)
-               (endpoint (format "rooms/%s/typing/%s" id user))
+               (endpoint (concat "rooms/"id"/typing/"user))
                (data (a-list 'typing typing
                              'timeout 30000)))
     (matrix-put session endpoint data #'ignore)))

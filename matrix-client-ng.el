@@ -24,7 +24,7 @@ EVENT should be the `event' variable from the
                ((eieio extra) room)
                ((eieio buffer) extra)
                (display-name (matrix-user-displayname room sender))
-               (id (notifications-notify :title (format "<b>%s</b>" display-name)
+               (id (notifications-notify :title (concat "<b>"display-name"</b>")
                                          ;; Encode the message as ASCII because dbus-notify
                                          ;; can't handle some Unicode chars.  And
                                          ;; `ignore-errors' doesn't work to ignore errors
@@ -304,7 +304,7 @@ INPUT should begin with \"/me\"."
 (cl-defmethod matrix-client-ng-room-command-who ((room matrix-room) input)
   "Print list of users to ROOM."
   (with-slots (members) room
-    (matrix-client-ng-insert room (propertize (format "Room members: %s"
+    (matrix-client-ng-insert room (propertize (concat "Room members: "
                                                       (--> members
                                                            (--map (a-get (cdr it) 'displayname) it)
                                                            (--sort (string-collate-lessp it other nil 'ignore-case)
@@ -485,7 +485,7 @@ Also update prompt with typers."
                   ("join" "joined")
                   ("left" "left")
                   (_ membership)))
-        (msg (propertize (format "%s %s" displayname action)
+        (msg (propertize (concat displayname " " action)
                          'face 'matrix-client-notice
                          'event_id event_id
                          'sender sender
