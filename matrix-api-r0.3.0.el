@@ -644,7 +644,7 @@ DIRECTION must be \"b\" (the default) or \"f\".  LIMIT is the
 maximum number of events to return (default 10)."
   ;; TODO: As written, this may only work going backward.  Needs testing.
   (with-slots (id session prev-batch last-full-sync) room
-    (matrix-get session (concat "rooms/"id"/messages")
+    (matrix-get session (format$ "rooms/$id/messages")
                 (a-list 'from prev-batch
                         'to last-full-sync
                         'dir direction
@@ -786,7 +786,7 @@ added."
            (content (a-list 'msgtype msgtype
                             'body message))
            (txn-id (cl-incf txn-id))
-           (endpoint (concat "rooms/"id"/send/"type"/"txn-id)))
+           (endpoint (format$ "rooms/$id/send/$type/$txn-id")))
       (matrix-put session endpoint content
                   (apply-partially #'matrix-send-message-callback room)))))
 
@@ -801,7 +801,7 @@ added."
   "Leave room."
   ;; https://matrix.org/docs/spec/client_server/r0.3.0.html#id203
   (with-slots (id session) room
-    (let* ((endpoint (concat "rooms/"id"/leave")))
+    (let* ((endpoint (format$ "rooms/$id/leave")))
       (matrix-post session endpoint nil
                    (apply-partially #'matrix-leave-callback room)))))
 
@@ -823,7 +823,7 @@ added."
 
   ;; https://matrix.org/docs/spec/client_server/r0.3.0.html#id204
   (with-slots (id session) room
-    (let* ((endpoint (concat "rooms/"id"/forget")))
+    (let* ((endpoint (format$ "rooms/$id/forget")))
       (matrix-post session endpoint nil
                    (apply-partially #'matrix-forget-callback room)))))
 
@@ -837,7 +837,7 @@ added."
 TYPING should be t or nil."
   (pcase-let* (((eieio id session) room)
                ((eieio user) session)
-               (endpoint (concat "rooms/"id"/typing/"user))
+               (endpoint (format$ "rooms/$id/typing/$user"))
                (data (a-list 'typing typing
                              'timeout 30000)))
     (matrix-put session endpoint data #'ignore)))

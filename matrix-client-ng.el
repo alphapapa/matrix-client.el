@@ -24,7 +24,7 @@ EVENT should be the `event' variable from the
                ((eieio extra) room)
                ((eieio buffer) extra)
                (display-name (matrix-user-displayname room sender))
-               (id (notifications-notify :title (concat "<b>"display-name"</b>")
+               (id (notifications-notify :title (format$ "<b>$display-name</b>")
                                          ;; Encode the message as ASCII because dbus-notify
                                          ;; can't handle some Unicode chars.  And
                                          ;; `ignore-errors' doesn't work to ignore errors
@@ -169,8 +169,8 @@ method without it."
 ;;;; Classes
 
 (matrix-defclass matrix-room-extra ()
-  ((buffer :initarg :buffer))
-  "Extra data stored in room objects.")
+                 ((buffer :initarg :buffer))
+                 "Extra data stored in room objects.")
 
 ;;;; Mode
 
@@ -210,10 +210,10 @@ Add session to sessions list and run initial sync."
 (cl-defmethod matrix-client-ng-update-last-seen ((room matrix-room) &rest _)
   "Move the last-seen overlay to after the last message in ROOM."
   (with-room-buffer room
-    (when-let ((prompt-ov (car (ov-in 'matrix-client-prompt)))
-               (seen-ov (car (ov-in 'matrix-client-last-seen)))
-               (target-pos (1- (ov-beg prompt-ov))))
-      (ov-move seen-ov target-pos target-pos))))
+                    (when-let ((prompt-ov (car (ov-in 'matrix-client-prompt)))
+                               (seen-ov (car (ov-in 'matrix-client-last-seen)))
+                               (target-pos (1- (ov-beg prompt-ov))))
+                      (ov-move seen-ov target-pos target-pos))))
 
 (cl-defmethod matrix-client-ng-insert ((room matrix-room) string)
   "Insert STRING into ROOM's buffer.
@@ -221,20 +221,20 @@ STRING should have a `timestamp' text-property."
   (let ((inhibit-read-only t)
         (timestamp (get-text-property 0 'timestamp string)))
     (with-room-buffer room
-      (cl-loop initially do (progn
-                              (goto-char (ov-beg (car (ov-in 'matrix-client-prompt t))))
-                              (forward-line -1))
-               for buffer-ts = (get-text-property (point) 'timestamp)
-               until (when buffer-ts
-                       (< buffer-ts timestamp))
-               while (when-let (pos (previous-single-property-change (point) 'timestamp))
-                       (goto-char pos))
-               finally do (when-let (pos (next-single-property-change (point) 'timestamp))
-                            (goto-char pos)))
-      (insert (propertize (concat "\n" string)
-                          'read-only t))
-      (unless (matrix-client-ng-buffer-visible-p)
-        (set-buffer-modified-p t)))))
+                      (cl-loop initially do (progn
+                                              (goto-char (ov-beg (car (ov-in 'matrix-client-prompt t))))
+                                              (forward-line -1))
+                               for buffer-ts = (get-text-property (point) 'timestamp)
+                               until (when buffer-ts
+                                       (< buffer-ts timestamp))
+                               while (when-let (pos (previous-single-property-change (point) 'timestamp))
+                                       (goto-char pos))
+                               finally do (when-let (pos (next-single-property-change (point) 'timestamp))
+                                            (goto-char pos)))
+                      (insert (propertize (concat "\n" string)
+                                          'read-only t))
+                      (unless (matrix-client-ng-buffer-visible-p)
+                        (set-buffer-modified-p t)))))
 
 (cl-defmethod matrix-client-ng-display-name ((room matrix-room))
   "Return display name for ROOM."
@@ -277,12 +277,12 @@ STRING should have a `timestamp' text-property."
                ;; NOTE: A happy accident, `s-split-words' chops off the leading "/".
                (first-word (car (s-split-words input))))
     (funcall-if (concat "matrix-client-ng-room-command-" first-word)
-        ;; Special command
-        (list room input)
-      (progn
-        ;; Normal message
-        (matrix-send-message room input)
-        (matrix-client-ng-update-last-seen room)))))
+                ;; Special command
+                (list room input)
+                (progn
+                  ;; Normal message
+                  (matrix-send-message room input)
+                  (matrix-client-ng-update-last-seen room)))))
 
 (cl-defmethod matrix-client-ng-room-command-join ((room matrix-room) input)
   "Join room on session.
@@ -325,44 +325,44 @@ INPUT should begin with \"/me\"."
 (cl-defmethod matrix-client-ng-setup-room-buffer ((room matrix-room))
   "Prepare and switch to buffer for ROOM-ID, and return room object."
   (with-room-buffer room
-    (use-local-map matrix-client-ng-mode-map)
-    ;;  (matrix-client-mode)
-    (visual-line-mode 1)
-    (setq buffer-undo-list t)
-    ;; Unset buffer's modified status when it's selected
-    ;; FIXME: Reactivate this.
-    ;; (when matrix-client-ng-mark-modified-rooms
-    ;;   (add-hook 'buffer-list-update-hook #'matrix-client-ng-buffer-list-update-hook 'append 'local))
-    (erase-buffer)
-    (switch-to-buffer (current-buffer))
-    ;; FIXME: Remove these or update them.
-    ;; (set (make-local-variable 'matrix-client-room-connection) con)
-    (setq-local matrix-client-ng-room room))
+                    (use-local-map matrix-client-ng-mode-map)
+                    ;;  (matrix-client-mode)
+                    (visual-line-mode 1)
+                    (setq buffer-undo-list t)
+                    ;; Unset buffer's modified status when it's selected
+                    ;; FIXME: Reactivate this.
+                    ;; (when matrix-client-ng-mark-modified-rooms
+                    ;;   (add-hook 'buffer-list-update-hook #'matrix-client-ng-buffer-list-update-hook 'append 'local))
+                    (erase-buffer)
+                    (switch-to-buffer (current-buffer))
+                    ;; FIXME: Remove these or update them.
+                    ;; (set (make-local-variable 'matrix-client-room-connection) con)
+                    (setq-local matrix-client-ng-room room))
   (matrix-client-ng-insert-prompt room)
   (matrix-client-ng-insert-last-seen room))
 
 (cl-defmethod matrix-client-ng-insert-last-seen ((room matrix-room))
   "Insert last-seen overlay into ROOM's buffer."
   (with-room-buffer room
-    (when-let ((prompt-ov (car (ov-in 'matrix-client-prompt)))
-               (target-pos (1- (ov-beg prompt-ov))))
-      (ov target-pos target-pos
-          'before-string (concat "\n" (propertize "\n\n" 'face 'matrix-client-last-seen))
-          'matrix-client-last-seen t))))
+                    (when-let ((prompt-ov (car (ov-in 'matrix-client-prompt)))
+                               (target-pos (1- (ov-beg prompt-ov))))
+                      (ov target-pos target-pos
+                          'before-string (concat "\n" (propertize "\n\n" 'face 'matrix-client-last-seen))
+                          'matrix-client-last-seen t))))
 
 (cl-defmethod matrix-client-ng-insert-prompt ((room matrix-room))
   "Insert prompt into ROOM's buffer."
   (with-room-buffer room
-    (let ((inhibit-read-only t)
-          (ov-sticky-front t))
-      (goto-char (point-max))
-      (insert (propertize "\n" 'read-only t)
-              "\n")
-      (ov (point) (point)
-          'before-string (concat (propertize "\n"
-                                             'face '(:height 0.1))
-                                 matrix-client-ng-input-prompt)
-          'matrix-client-prompt t))))
+                    (let ((inhibit-read-only t)
+                          (ov-sticky-front t))
+                      (goto-char (point-max))
+                      (insert (propertize "\n" 'read-only t)
+                              "\n")
+                      (ov (point) (point)
+                          'before-string (concat (propertize "\n"
+                                                             'face '(:height 0.1))
+                                                 matrix-client-ng-input-prompt)
+                          'matrix-client-prompt t))))
 
 ;;;;; Metadata
 
@@ -378,19 +378,21 @@ Also update prompt with typers."
   (unless (and (boundp 'tabbar-mode) tabbar-mode)
     ;; Disable when tabbar mode is on.  MAYBE: Remove this.
     (with-room-buffer room
-      (pcase-let* (((eieio avatar typers name topic) room)
-                   (name (when name
-                           (propertize name 'face 'font-lock-keyword-face)))
-                   (ov (car (ov-in 'matrix-client-prompt)))
-                   (typers-string (s-join ", " (cl-loop for user across typers
-                                                        collect (matrix-user-displayname room user))))
-                   (prompt (if (> (length typers) 0)
-                               (concat (propertize (concat "Typing: " typers-string)
-                                                   'face 'font-lock-comment-face)
-                                       "\n" matrix-client-ng-input-prompt)
-                             matrix-client-ng-input-prompt)))
-        (ov-set ov 'before-string prompt)
-        (setq header-line-format (concat avatar (format "%s: %s" name topic)))))))
+                      (pcase-let* (((eieio avatar typers name topic) room)
+                                   (name (when name
+                                           (propertize name 'face 'font-lock-keyword-face)))
+                                   (ov (car (ov-in 'matrix-client-prompt)))
+                                   (typers-string (s-join ", " (cl-loop for user across typers
+                                                                        collect (matrix-user-displayname room user))))
+                                   (prompt (if (> (length typers) 0)
+                                               (concat (propertize (concat "Typing: " typers-string)
+                                                                   'face 'font-lock-comment-face)
+                                                       "\n" matrix-client-ng-input-prompt)
+                                             matrix-client-ng-input-prompt)))
+                        (ov-set ov 'before-string prompt)
+                        (setq header-line-format (concat avatar
+                                                         ;; NOTE: Not sure if using `format' with an image-containing string works.
+                                                         (format$ "$name: $topic")))))))
 
 ;;;;; Timeline
 
@@ -398,8 +400,8 @@ Also update prompt with typers."
   "Process EVENT in ROOM."
   (pcase-let* (((map type) event))
     (funcall-if (concat "matrix-client-ng-" (symbol-name type))
-        (list room event)
-      (matrix-warn "Unimplemented client method: %s" fn-name))))
+                (list room event)
+                (matrix-warn "Unimplemented client method: %s" fn-name))))
 
 (matrix-client-ng-defevent m.room.message
   "Process m.room.message EVENT in ROOM."
@@ -410,18 +412,17 @@ Also update prompt with typers."
   :let ( ;; We don't use `matrix-client-event-data-timestamp', because for
         ;; room messages, the origin_server_ts is the actual message time.
         (timestamp (/ origin_server_ts 1000))
+        (timestamp-string (format-time-string "%T" (seconds-to-time timestamp)))
         (displayname (matrix-user-displayname room sender))
         (metadata) (msg) (matrix-image-url))
   :body (when content
           ;; Redacted messages have no content, so we should do nothing for them.
-          (setq metadata (format "%s %s> "
-                                 (format-time-string "[%T]" (seconds-to-time timestamp))
-                                 displayname))
+          (setq metadata (format$ "[$timestamp-string] $displayname> "))
           (setq message (string-trim
                          ;; Trim messages because HTML ones can have extra newlines
                          (pcase msgtype
                            ("m.emote"
-                            (concat "* " body))
+                            (format$ "* $body"))
                            ((guard (and matrix-client-ng-render-html (string= "org.matrix.custom.html" format)))
                             (with-temp-buffer
                               (insert formatted_body)
@@ -485,7 +486,7 @@ Also update prompt with typers."
                   ("join" "joined")
                   ("left" "left")
                   (_ membership)))
-        (msg (propertize (concat displayname " " action)
+        (msg (propertize (format$ "$displayname $action")
                          'face 'matrix-client-notice
                          'event_id event_id
                          'sender sender
@@ -507,8 +508,8 @@ Also update prompt with typers."
     (seq-doseq (event timeline-new)
       (pcase-let* (((map type) event))
         (funcall-if (concat "matrix-client-ng-" type)
-            (list room event)
-          (matrix-warn "Unimplemented client method: %s" fn-name))))
+                    (list room event)
+                    (matrix-warn "Unimplemented client method: %s" fn-name))))
     ;; Clear new events
     (matrix-clear-timeline room)
     ;; TODO: Update other room things: header, avatar, typers, topic, name, aliases, etc.
