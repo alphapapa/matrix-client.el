@@ -111,6 +111,10 @@ FN-NAME should be a string, and is available in the ELSE form as `fn-name'."
 (matrix-defclass matrix-session ()
   ((user :initarg :user
          :type string
+         :instance-initform (unless (string-match-p ":" user)
+                              ;; Server not given: assume matrix.org
+                              (setq user (concat user ":matrix.org"))
+                              (message "Assuming server is matrix.org"))
          :documentation "The fully qualified user ID, e.g. @user:matrix.org.")
    (server :initarg :server
            :instance-initform (nth 2 (s-match (rx "@" (group (1+ (not (any ":"))))
