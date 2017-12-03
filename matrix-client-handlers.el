@@ -180,12 +180,12 @@ like."
      ;; Redacted messages have no content, so we should do nothing for them.
      (pcase-let (((map event_id) data)
                  (metadata) (message) (matrix-image-url))
-       (setq metadata (format "%s %s> "
+       (setq metadata (format "%s %s"
                               (format-time-string "[%T]" (seconds-to-time timestamp))
                               (if (and matrix-client-hide-own-name
                                        (equal display-name own-display-name))
                                   ""
-                                display-name)))
+                                (concat display-name " "))))
        (setq message (string-trim
                       ;; Trim messages because HTML ones can have extra newlines
                       (pcase msgtype
