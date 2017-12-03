@@ -485,23 +485,16 @@ Also update prompt with typers."
 (defun matrix-client-send-active-line ()
   "Send the current message-line text after running it through input-filters."
   (interactive)
-  (goto-char (point-max))
-
-  ;; TODO: Make the prompt character customizable, and probably use
-  ;; text-properties or an overlay to find it.
   (goto-char (ov-end (car (ov-in 'matrix-client-prompt t))))
-
-  ;; MAYBE: Just delete the text and store it in a var instead of
-  ;; killing it to the kill-ring.  On the one hand, it's a nice
-  ;; backup, but some users might prefer not to clutter the kill-ring
-  ;; with every message they send.
-  (kill-line)
-  (let* ((room matrix-client-room-object)
+  (let* ((input (prog1
+                    (buffer-substring-no-properties (point) (point-max))
+                  (delete-region (point) (point-max))))
+         (room matrix-client-room-object)
          (con (oref room :con))
          (input-filters (oref con :input-filters)))
     (cl-reduce 'matrix-client-run-through-input-filter
                input-filters
-               :initial-value (pop kill-ring))
+               :initial-value input)
     (matrix-client-update-last-seen room)))
 
 (defun matrix-client-run-through-input-filter (text filter)
