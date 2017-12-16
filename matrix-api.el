@@ -168,7 +168,7 @@ will be called by `request' when the call completes"
       (funcall callback data))))
 
 (cl-defmethod matrix-send-event ((con matrix-connection) room-id event-type content
-                                 &optional &key async)
+                                 &key async)
   "Send a raw event to the room ROOM-ID.
 EVENT-TYPE is the matrix event type to send (see Matrix spec).
 CONTENT is a `json-encode' compatible list to include in the
