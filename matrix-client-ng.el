@@ -288,32 +288,31 @@ STRING should have a `timestamp' text-property."
 (cl-defmethod matrix-client-ng-display-name ((room matrix-room))
   "Return display name for ROOM."
   ;; https://matrix.org/docs/spec/client_server/r0.3.0.html#id267
-  (with-slots (id name aliases members) room
-    (or name
-        ;; FIXME: The API docs say to use the canonical_alias instead of aliases.
-        (car aliases)
-        (cl-labels ((displaynames-sorted-by-id (members)
-                                               (--> members
-                                                    (cl-sort it #'string< :key #'car)
-                                                    (--map (matrix-user-displayname room (car it))
-                                                           it))
-                                               ))
-          (pcase-let* (((eieio session) room)
-                       ((eieio (user self)) session)
-                       (members (cl-remove self members :key #'car)))
-            (pcase (when members
-                     (length members))
-              (1 (matrix-user-displayname room (caar members)))
-              (2 (s-join ", " (displaynames-sorted-by-id members)))
-              ((pred (< 0)) ;; More than 2
+  (cl-labels ((displaynames-sorted-by-id (members)
+                                         (--> members
+                                              (cl-sort it #'string< :key #'car)
+                                              (--map (matrix-user-displayname room (car it))
+                                                     it))))
+    (with-slots (id name aliases members) room
+      (pcase-let* (((eieio session) room)
+                   ((eieio (user self)) session)
+                   (members (cl-remove self members :test #'string= :key #'car)))
+        (pcase (when members
+                 (length members))
+          (1 (matrix-user-displayname room (caar members)))
+          (2 (s-join ", " (displaynames-sorted-by-id members)))
+          ((or `nil (pred (< 0))) ;; More than 2
+           (or name
+               ;; FIXME: The API docs say to use the canonical_alias instead of aliases.
+               (car aliases)
                (format "%s and %s others"
                        (car (displaynames-sorted-by-id members))
-                       (1- (length members))))
-              (_
-               ;; FIXME: The API says to use names of previous room
-               ;; members if nothing else works, but I don't feel like
-               ;; coding that right now, so we'll just use the room ID.
-               id)))))))
+                       (1- (length members)))))
+          (_
+           ;; FIXME: The API says to use names of previous room
+           ;; members if nothing else works, but I don't feel like
+           ;; coding that right now, so we'll just use the room ID.
+           id))))))
 
 (defun matrix-client-ng-send-input ()
   "Send current input to current room."
