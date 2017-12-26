@@ -541,7 +541,10 @@ Also update prompt with typers."
                          'sender sender
                          'timestamp timestamp)))
   ;; MAYBE: Get displayname from API room object's membership list.
-  :body (matrix-client-ng-insert room msg))
+  :body (progn
+          (matrix-client-ng-insert room msg)
+          (with-room-buffer room
+            (rename-buffer (matrix-client-ng-display-name room)))))
 
 ;;;; Update-room-at-once approach
 
