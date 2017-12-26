@@ -126,10 +126,15 @@ ad-hoc 'org.matrix.custom.html' messages that Vector emits."
   (declare (debug (sexp body)) (indent defun))
   `(with-slots* (((extra id) room)
                  ((buffer) extra))
-     (if buffer
-         (with-current-buffer buffer
-           ,@body)
-       (matrix-warn "No buffer for room: %s" id))))
+     (unless buffer
+       ;; Make buffer if necessary.  This seems like the easiest way
+       ;; to guarantee that the room has a buffer, since it seems
+       ;; unclear what the first received event type for a joined room
+       ;; will be.
+       (setq buffer (get-buffer-create (matrix-client-ng-display-name room)))
+       (matrix-client-ng-setup-room-buffer room))
+     (with-current-buffer buffer
+       ,@body)))
 
 (cl-defmacro matrix-client-ng-defevent (type docstring &key object-slots event-keys content-keys let body)
   "Define a method on `matrix-room' to handle Matrix events of TYPE.
@@ -544,16 +549,12 @@ Also update prompt with typers."
   "Update ROOM."
   (with-slots* (((extra timeline-new id) room)
                 ((buffer) extra))
-    ;; Make buffer if necessary
-    (unless buffer
-      (setq buffer (get-buffer-create (matrix-client-ng-display-name room)))
-      (matrix-client-ng-setup-room-buffer room))
     ;; Process new events
     (seq-doseq (event timeline-new)
       (pcase-let* (((map type) event))
         (funcall-if (concat "matrix-client-ng-" type)
-                    (list room event)
-                    (matrix-warn "Unimplemented client method: %s" fn-name))))
+            (list room event)
+          (matrix-warn "Unimplemented client method: %s" fn-name))))
     ;; Clear new events
     (matrix-clear-timeline room)
     ;; TODO: Update other room things: header, avatar, typers, topic, name, aliases, etc.
