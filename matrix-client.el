@@ -7,7 +7,7 @@
 ;; Keywords: web
 ;; Homepage: http://doc.rix.si/matrix.html
 ;; Package-Version: 0.1.2
-;; Package-Requires: ((emacs "25.1") (dash "2.13.0") (json "1.4") (request "0.2.0") (a "0.1.0") (ov "1.0.6") (s "1.12.0"))
+;; Package-Requires: ((emacs "25.1") (dash "2.13.0") (f "0.17.2") (json "1.4") (request "0.2.0") (a "0.1.0") (ov "1.0.6") (s "1.12.0"))
 
 ;; This file is not part of GNU Emacs.
 
@@ -47,6 +47,7 @@
 (require 'seq)
 
 (require 'dash)
+(require 'f)
 (require 'ov)
 
 (defgroup matrix-client nil
@@ -105,6 +106,14 @@ name to make your own messages stand out more.  Or, you might
 prefer to keep your name visible so you can see what your display
 name is in each room."
   :type 'boolean)
+
+(defcustom matrix-client-save-token nil
+  "Save username and access token upon successful login."
+  :type 'boolean)
+
+(defcustom matrix-client-save-token-file "~/.cache/matrix-client.el.token"
+  "Save username and access token to this file."
+  :type 'file)
 
 (defvar matrix-client-event-handlers '()
   "An alist of (type . function) handler definitions for various matrix types.
@@ -247,7 +256,13 @@ Otherwise, use the room name or alias."
                   (map-elt matrix-client-connections username)
                 (matrix-client-connection matrix-homeserver-base-url
                                           :base-url matrix-homeserver-base-url))))
+    (when-let ((enabled matrix-client-save-token)
+               (saved (matrix-client-load-token)))
+      ;; Use saved token
+      (oset con :username (a-get saved 'username))
+      (oset con :token (a-get saved 'token)))
     (unless (oref con :token)
+      ;; No access token: log in with username and password
       (matrix-client-login con username))
     (unless (oref con :running)
       ;; Disable notifications for first sync
@@ -267,22 +282,27 @@ Otherwise, use the room name or alias."
 If [`matrix-client-use-auth-source'] is non-nil, attempt to log
 in using data from auth-source.  Otherwise, prompt for username
 and password."
-  (let* ((auth-source-creation-prompts (a-list 'username "Matrix identity: "
-                                               'secret "Matrix password for %u (homeserver: %h): "))
-         (found (nth 0 (auth-source-search :max 1
-                                           :host (oref con :base-url)
-                                           :user username
-                                           :require '(:user :secret)
-                                           :create t))))
-    (when (and found
-               (matrix-login-with-password con (plist-get found :user)
-                                           (let ((secret (plist-get found :secret)))
-                                             (if (functionp secret)
-                                                 (funcall secret)
-                                               secret))))
-      (oset con :username (plist-get found :user))
-      (when-let ((save-func (plist-get found :save-function)))
-        (funcall save-func)))))
+  (let* ((username (or username (read-from-minibuffer "Username: ")))
+         (password (read-passwd "Password: ")))
+    (when (matrix-login-with-password con username password)
+      (oset con :username username)
+      (when matrix-client-save-token
+        (matrix-client-save-token con)))))
+
+(cl-defmethod matrix-client-save-token ((con matrix-client-connection))
+  "Save username and access token for connection CON to file."
+  (with-temp-file matrix-client-save-token-file
+    (with-slots (username token) con
+      (prin1 (a-list 'username username
+                     'token token)
+             (current-buffer))))
+  ;; Ensure permissions are safe
+  (chmod matrix-client-save-token-file #o600))
+
+(defun matrix-client-load-token ()
+  "Return saved username and access token from file."
+  (when (f-exists? matrix-client-save-token-file)
+    (read (f-read matrix-client-save-token-file))))
 
 (defun matrix-client-disconnect (&optional connection)
   "Disconnect from CONNECTION or all Matrix connections, killing room buffers."
