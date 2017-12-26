@@ -8,6 +8,7 @@
 
 ;;;; Requirements
 
+(require 'f)
 (require 'ov)
 
 (require 'matrix-api-r0.3.0)
@@ -72,6 +73,14 @@ EVENT should be the `event' variable from the
   "Render HTML messages in buffers. These are currently the
 ad-hoc 'org.matrix.custom.html' messages that Vector emits."
   :type 'boolean)
+
+(defcustom matrix-client-ng-save-token nil
+  "Save username and access token upon successful login."
+  :type 'boolean)
+
+(defcustom matrix-client-ng-save-token-file "~/.cache/matrix-client.el.token"
+  "Save username and access token to this file."
+  :type 'file)
 
 ;;;;; Faces
 
@@ -176,33 +185,68 @@ method without it."
 
 (add-hook 'matrix-room-update-hook #'matrix-client-ng-update)
 
-(defun matrix-client-ng (user password)
+(defun matrix-client-ng (&optional user password access-token)
   "Matrix Client NG"
-  (interactive (list (user (read-string "User ID: "))
-                     (password (read-passwd "Password: "))))
+  (interactive)
   (if matrix-client-ng-sessions
       ;; TODO: Already have active session: display list of buffers
       ;; FIXME: If login fails, it still shows as active.
       (message "Already active")
-    ;; Start new session
-    ;; MAYBE: Use auth functions for credentials
-    (let ((session (matrix-session :user user)))
-      (matrix-login session password))))
+    ;; No existing session
+    (if-let ((enabled matrix-client-ng-save-token)
+             (saved (matrix-client-ng-load-token)))
+        ;; Use saved token
+        ;; FIXME: Change "username" to "user" when we no longer need compatibility with old code
+        (setq user (a-get saved 'username)
+              access-token (a-get saved 'token))
+      ;; Not saved: prompt for username and password
+      (setq user (read-string "User ID: ")
+            password (read-passwd "Password: ")))
+    (if access-token
+        ;; Use saved token and call post-login hook
+        (matrix-client-ng-login-hook (matrix-session :user user
+                                                     :access-token access-token))
+      ;; Log in with username and password
+      (matrix-login (matrix-session :user user)
+                    password))))
 
 (cl-defmethod matrix-client-ng-login-hook ((session matrix-session))
   "Callback for successful login.
 Add session to sessions list and run initial sync."
   (push session matrix-client-ng-sessions)
   (matrix-sync session)
+  (when matrix-client-ng-save-token
+    (matrix-client-ng-save-token session))
   (message "Jacked in to %s.  Syncing..." (oref session server)))
 
 (add-hook 'matrix-login-hook #'matrix-client-ng-login-hook)
 
-(defun matrix-client-ng-disconnect ()
-  "Unplug from the Matrix."
-  (interactive)
+(cl-defmethod matrix-client-ng-save-token ((session matrix-session))
+  "Save username and access token for session SESSION to file."
+  (with-temp-file matrix-client-ng-save-token-file
+    (with-slots (user access-token) session
+      ;; FIXME: Change "username" to "user" when we no longer need compatibility with old code
+      (prin1 (a-list 'username user
+                     'token access-token)
+             (current-buffer))))
+  ;; Ensure permissions are safe
+  (chmod matrix-client-ng-save-token-file #o600))
+
+(defun matrix-client-ng-load-token ()
+  "Return saved username and access token from file."
+  (when (f-exists? matrix-client-ng-save-token-file)
+    (read (f-read matrix-client-ng-save-token-file))))
+
+(defun matrix-client-ng-disconnect (&optional skip-logout)
+  "Unplug from the Matrix.
+If SKIP-LOGOUT is non-nil, don't actually log out from server,
+just clear local session data."
+  (interactive "P")
   ;; MAYBE: Delete buffers.
-  (seq-do #'matrix-logout matrix-client-ng-sessions)
+  (unless skip-logout
+    (seq-do #'matrix-logout matrix-client-ng-sessions)
+    ;; Remove saved token
+    (f-delete matrix-client-ng-save-token-file))
   (setq matrix-client-ng-sessions nil))
 
 ;;;; Rooms
