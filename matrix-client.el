@@ -45,6 +45,7 @@
 (require 'matrix-api)
 (require 'cl-lib)
 (require 'seq)
+(require 'url)
 
 (require 'dash)
 (require 'f)
@@ -216,7 +217,7 @@ Otherwise, use the room name or alias."
                                    ;; Next, if the room is a 1-1 chat, use the other member's name.
                                    (when-let ((username (cl-loop for member in membership
                                                                  ;; Get non-self member
-                                                                 when (not (equal username (map-elt member 'displayname)))
+                                                                 when (not (equal username (car member)))
                                                                  return (or (map-elt member 'displayname)
                                                                             (car member)))))
                                      (if (eq (current-buffer) (get-buffer username))
@@ -284,6 +285,12 @@ in using data from auth-source.  Otherwise, prompt for username
 and password."
   (let* ((username (or username (read-from-minibuffer "Username: ")))
          (password (read-passwd "Password: ")))
+    (unless (string-match-p (rx "@" (1+ (not (any ":"))) ":" (1+ anything))
+                            username)
+      ;; Canonicalize username
+      ;; TODO: "user-id" would be more descriptive than "username"
+      (setq username (format "@%s:%s" username
+                             (url-host (url-generic-parse-url matrix-homeserver-base-url)))))
     (when (matrix-login-with-password con username password)
       (oset con :username username)
       (when matrix-client-save-token

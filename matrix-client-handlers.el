@@ -174,7 +174,7 @@ like."
    (timestamp (/ (a-get* data 'origin_server_ts) 1000))
    (sender (map-elt data 'sender))
    (display-name (matrix-client-displayname-from-user-id room (map-elt data 'sender)))
-   (own-display-name (oref* room :con :username)))
+   (own-user-id (oref* room :con :username)))
 
   ((when content
      ;; Redacted messages have no content, so we should do nothing for them.
@@ -183,7 +183,7 @@ like."
        (setq metadata (format "%s %s"
                               (format-time-string "[%T]" (seconds-to-time timestamp))
                               (if (and matrix-client-hide-own-name
-                                       (equal display-name own-display-name))
+                                       (equal display-name own-user-id))
                                   ""
                                 (concat display-name " "))))
        (setq message (string-trim
@@ -213,7 +213,7 @@ like."
 
        ;; Apply face for own messages
        (let (metadata-face message-face)
-         (cond ((string= display-name own-display-name)
+         (cond ((string= sender own-user-id)
                 (setq metadata-face 'matrix-client-own-metadata
                       message-face 'matrix-client-own-messages))
                ((string= msgtype "m.notice")
@@ -240,11 +240,11 @@ like."
                   do (matrix-client-insert-image room event_id url)))
 
        ;; Move last-seen line if it's our own message
-       (when (equal own-display-name display-name)
+       (when (equal own-user-id sender)
          (matrix-client-update-last-seen room))
 
        ;; Notification
-       (unless (equal own-display-name display-name)
+       (unless (equal own-user-id sender)
          (matrix-client-notify "m.room.message" data :room room))))))
 
 (defun insert-read-only (text &rest extra-props)
