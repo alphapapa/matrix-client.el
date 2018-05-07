@@ -10,7 +10,11 @@
 
 (defcustom matrix-client-image-url-prefixes
   (list (rx bow "http" (optional "s") "://"
-            (or "i.imgur.com" "i.redd.it")
+            (or
+             "i.imgur.com"
+             "i.redd.it"
+             "i.redditmedia.com"
+             )
             "/"))
   "List of regexps matching parts of URLs to images that should be downloaded and displayed.
 Each regexp should match from the beginning of the URL, including
