@@ -129,6 +129,9 @@ connection basis.")
   ((running :initarg :running
             :initform nil
             :documentation "BOOL specifiying if the event listener is currently running.")
+   (connect-ts :initarg :connect-ts
+               :initform nil
+               :documentation "Timestamp when this connection was established.  Used to hide uninteresting events that happened before the user connected.")
    (rooms :initarg :rooms
           :initform nil
           :documentation "List of matrix-room objects")
@@ -256,7 +259,8 @@ Otherwise, use the room name or alias."
          (con (if username
                   (map-elt matrix-client-connections username)
                 (matrix-client-connection matrix-homeserver-base-url
-                                          :base-url matrix-homeserver-base-url))))
+                                          :base-url matrix-homeserver-base-url
+                                          :connect-ts (float-time)))))
     (when-let ((enabled matrix-client-save-token)
                (saved (matrix-client-load-token)))
       ;; Use saved token
