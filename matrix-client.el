@@ -7,7 +7,7 @@
 ;; Keywords: web
 ;; Homepage: http://doc.rix.si/matrix.html
 ;; Package-Version: 0.1.2
-;; Package-Requires: ((emacs "25.1") (dash "2.13.0") (f "0.17.2") (json "1.4") (request "0.2.0") (a "0.1.0") (ov "1.0.6") (s "1.12.0"))
+;; Package-Requires: ((emacs "25.1") (dash "2.13.0") (f "0.17.2") (json "1.4") (request "0.2.0") (a "0.1.0") (ov "1.0.6") (rainbow-identifiers "0.2.2") (s "1.12.0"))
 
 ;; This file is not part of GNU Emacs.
 

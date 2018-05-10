@@ -32,9 +32,15 @@
 ;;; Code:
 
 (require 'browse-url)
+(require 'rainbow-identifiers)
 
 (require 'matrix-client-images)
 (require 'matrix-notifications)
+
+(defcustom matrix-client-rainbow t
+  "Colorize other users' names and messages uniquely.
+Uses the `rainbow-identifiers' package to choose colors.
+Customize that package's options to adjust color selection.")
 
 (cl-defmethod matrix-client-handlers-init ((con matrix-client-connection))
   "Set up all the matrix-client event type handlers.
@@ -165,6 +171,14 @@ like."
                                   'follow-link t))
     (buffer-string)))
 
+(defun matrix-client--user-id-face (user-id)
+  "Return face for USER-ID."
+  (if matrix-client-rainbow
+      (let* ((hash (rainbow-identifiers--hash-function user-id))
+             (face (rainbow-identifiers-cie-l*a*b*-choose-face hash)))
+        face)
+    'default))
+
 (defmatrix-client-handler "m.room.message"
   ((content (map-elt data 'content))
    (msgtype (map-elt content 'msgtype))
@@ -221,9 +235,11 @@ like."
                       message-face 'matrix-client-notice))
                (t
                 (setq metadata-face 'matrix-client-metadata
-                      message-face 'default)))
+                      message-face (matrix-client--user-id-face sender))))
          ;; Use 'append so that link faces are not overridden.
+         ;; Also apply message-face to metadata to colorize username.
          (add-face-text-property 0 (length metadata) metadata-face 'append metadata)
+         (add-face-text-property 0 (length metadata) message-face 'append metadata)
          (add-face-text-property 0 (length message) message-face 'append message))
 
        ;; Insert metadata with message and add text properties
