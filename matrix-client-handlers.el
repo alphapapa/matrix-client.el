@@ -82,9 +82,10 @@ the Matrix spec for more information about its format."
                  (timestamp (matrix-client-event-data-timestamp data))
                  (time-string (format-time-string "[%T]" (seconds-to-time timestamp)))
                  (action (if url "changed" "removed"))
-                 (msg (propertize (format "%s %s %s the room avatar" time-string username action)
-                                  'timestamp timestamp
-                                  'face 'matrix-client-notice)))
+                 (msg (when (> timestamp (oref* room :con :connect-ts))
+                        (propertize (format "%s %s %s the room avatar" time-string username action)
+                                    'timestamp timestamp
+                                    'face 'matrix-client-notice))))
       (if url
           ;; New avatar
           ;; TODO: Maybe display the new avatar in the chat list, like Riot.
@@ -98,7 +99,8 @@ the Matrix spec for more information about its format."
         ;; Avatar removed
         (oset room avatar nil)
         ;; TODO: A function to automatically propertize a string with its related event data would be nice.
-        (matrix-client-insert room msg)
+        (when (> timestamp (oref* room :con :connect-ts))
+          (matrix-client-insert room msg))
         (matrix-client-update-header-line room))
 
       ;; Move last-seen line if it's our own message
@@ -120,7 +122,8 @@ as an async callback when the image is downloaded."
                       (buffer-string))))
       (setq avatar str)
       (matrix-client-update-header-line room)
-      (matrix-client-insert room message))))
+      (when message
+        (matrix-client-insert room message)))))
 
 (defmacro defmatrix-client-handler (msgtype varlist body)
   "Create an matrix-client-handler.
@@ -297,7 +300,8 @@ like."
           (msg (propertize (format "%s: %s (%s)" action display-name user-id)
                            'timestamp timestamp
                            'face 'matrix-client-metadata)))
-     (when matrix-client-render-membership
+     (when (and matrix-client-render-membership
+                (> timestamp (oref* room :con :connect-ts)))
        (matrix-client-insert room msg)))
    (oset room :membership room-membership)
    (matrix-client-update-name room)))
@@ -339,7 +343,8 @@ like."
                                    'timestamp timestamp
                                    'event_id event_id
                                    'face 'matrix-client-metadata)))
-     (matrix-client-insert room message))))
+     (when (> timestamp (oref* room :con :connect-ts))
+       (matrix-client-insert room message)))))
 
 (defmatrix-client-handler "m.room.aliases"
   ((new-alias-list (a-get* data 'content 'aliases)))
@@ -347,7 +352,8 @@ like."
           (message (propertize (format "Room alias changed --> %s" new-alias-list)
                                'timestamp timestamp
                                'face 'matrix-client-metadata)))
-     (matrix-client-insert room message))
+     (when (> timestamp (oref* room :con :connect-ts))
+       (matrix-client-insert room message)))
    (oset room :aliases new-alias-list)
    (matrix-client-update-name room)
    (matrix-client-update-header-line room)))
@@ -358,7 +364,8 @@ like."
           (message (propertize (format "Room topic changed --> %s" topic)
                                'timestamp timestamp
                                'face 'matrix-client-metadata)))
-     (matrix-client-insert room message))
+     (when (> timestamp (oref* room :con :connect-ts))
+       (matrix-client-insert room message)))
    (oset room :topic topic)
    (matrix-client-update-header-line room)))
 
