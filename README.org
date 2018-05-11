@@ -1,8 +1,6 @@
 #+TITLE: matrix-client.el
 
-* Preface
-
-This is a fork of the [[https://home.rix.si/git/rrix/matrix-client][original matrix.el client]], with the intent of maintaining
+This is a fork of the [[http://doc.rix.si/projects/matrix.el.html][original matrix.el client]] with the intent of maintaining
 it further, fixing bugs, and providing long-term goals for the project.
 
 [[https://i.imgur.com/ayHEiFEg.png][https://i.imgur.com/ayHEiFEg.png]]
@@ -44,6 +42,13 @@ may submit it via [[https://github.com/jgkamat/matrix-client-legacy-el/pulls][a 
 A room for discussion is located at [[https://matrix.to/#/#matrix-client-el:matrix.org][#matrix-client-el:matrix.org]]
 
 Development alerts are available at #matrix-client-el-dev:matrix.org.
+
+* Authors
+
+- [[http://whatthefuck.computer/][Ryan Rix]] - Created the initial matrix-client.el.
+- [[https://github.com/alphapapa][alphapapa]] - Images, Performance optimizations, Last seen tracking, and a shiny
+  new backend!
+- [[https://jgkamat.github.io/][jgkamat]] - Maintenance and reviews.
 
 * License
 
