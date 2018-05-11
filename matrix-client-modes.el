@@ -86,5 +86,10 @@
   "Face for last-seen overlay."
   :group 'matrix-client)
 
+(defface matrix-client-date-header
+  '((t (:inherit 'highlight :weight bold)))
+  "Face for date headers."
+  :group 'matrix-client)
+
 (provide 'matrix-client-modes)
 ;;; matrix-client-modes.el ends here
