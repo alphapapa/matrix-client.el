@@ -378,7 +378,7 @@ and password."
       (matrix-client-render-message-line room-obj)
       (matrix-client-insert-last-seen-overlay)
       (when matrix-client-use-tracking
-        (tracking-mode)))
+        (tracking-mode 1)))
     (switch-to-buffer room-buf)
     (set (make-local-variable 'matrix-client-room-connection) con)
     (set (make-local-variable 'matrix-client-room-object) room-obj)
