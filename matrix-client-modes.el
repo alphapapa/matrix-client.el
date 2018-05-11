@@ -34,9 +34,14 @@
 (require 'simple)
 
 (defvar matrix-client-mode-map
-  (let ((map (make-sparse-keymap)))
-    (define-key map (kbd "RET") 'matrix-client-send-active-line)
-    (define-key map (kbd "DEL") 'matrix-client-delete-backward-char)
+  (let ((map (make-sparse-keymap))
+        (mappings '(
+                    "RET" matrix-client-send-active-line
+                    "DEL "matrix-client-delete-backward-char
+                    "M-v" matrix-client-scroll-down
+                    )))
+    (cl-loop for (key fn) on mappings by #'cddr
+             do (define-key map (kbd key) fn))
     map)
   "Keymap for `matrix-client-mode'.")
 

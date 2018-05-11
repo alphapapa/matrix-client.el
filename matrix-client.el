@@ -204,6 +204,9 @@ event-handlers and input-filters.")
    (membership :initarg :membership
                :initform nil
                :documentation "The list of members of the buffer's room.")
+   (start-token :initarg :start-token
+                :initform nil
+                :documentation "The earliest event-id in a room, used to fetch earlier events.")
    (end-token :initarg :end-token
               :initform nil
               :documentation "The most recent event-id in a room, used to push read-receipts to the server.")))
@@ -251,6 +254,9 @@ Otherwise, use the room name or alias."
   "A list of functions to run when a new Matrix Client connection occurs.")
 
 (defvar matrix-client-initial-sync nil)
+
+(defvar matrix-client-quiet nil
+  "Used to silence notifications for non-new events.")
 
 (require 'matrix-client-handlers)
 (require 'matrix-client-modes)
@@ -388,6 +394,45 @@ and password."
       :buffer room-buf)
     room-obj))
 
+(cl-defmethod matrix-client-fetch-history ((room matrix-client-room))
+  "Load earlier messages for ROOM."
+  (with-slots (con start-token id) room
+    (matrix-client-room-banner room "Loading history...")
+    (matrix-get-messages con id
+                         :from start-token
+                         :callback (apply-partially #'matrix-client-fetch-history-handler room))))
+
+(cl-defmethod matrix-client-fetch-history-handler ((room matrix-client-room) data)
+  (pcase-let* (((map start end chunk) data)
+               (matrix-client-quiet t)) ; Silence notifications for old messages
+    (cl-loop for event across chunk
+             do (matrix-client-room-event room event))
+    ;; NOTE: When direction is "b", as it is when fetching earlier messages, the "end" token is the
+    ;; earliest chronologically, so it becomes the room's new "start" token.  Not confusing at
+    ;; all... (maybe API 0.3.0 is better)
+    (oset room :start-token end)
+    (matrix-client-room-banner room nil)))
+
+(defun matrix-client-scroll-down ()
+  "Call `scroll-down-command'.  If point is at the top of the buffer, load history."
+  (interactive)
+  (if (= (line-number-at-pos (point)) 1)
+      (matrix-client-fetch-history matrix-client-room-object)
+    (let ((scroll-error-top-bottom t))
+      (scroll-down-command))))
+
+(cl-defmethod matrix-client-room-banner ((room matrix-client-room) message)
+  "Display MESSAGE in a banner overlay at top of ROOM's buffer.
+If MESSAGE is nil, clear existing message."
+  (with-current-buffer (oref room :buffer)
+    (let ((ov (or (car (ov-in 'matrix-client-banner))
+                  (ov (point-min) (point-min)
+                      'matrix-client-banner t)))
+          (message (when message
+                     (propertize message
+                                 'face 'font-lock-comment-face))))
+      (ov-set ov 'before-string message))))
+
 (cl-defmethod matrix-client-sync-handler ((con matrix-client-connection) data)
   ;; NOTE: This function, in addition to `matrix-client-handlers-init', roughly corresponds with the Python SDK at
   ;; <https://github.com/matrix-org/matrix-python-sdk/blob/master/matrix_client/client.py#L486>.
@@ -405,7 +450,8 @@ and password."
              do (let* ((room-id (symbol-name (car room-data)))
                        (room (or (a-get (oref con :rooms) room-id)
                                  (matrix-client-setup-room con room-id)))
-                       (room-events (cdr room-data)))
+                       (room-events (cdr room-data))
+                       (prev-batch (a-get* room-events 'timeline 'prev_batch)))
                   ;; For some reason, the events are in arrays instead of lists.
                   (cl-loop for event across (a-get* room-events 'ephemeral 'events)
                            ;; e.g. typing
@@ -413,7 +459,8 @@ and password."
                   (cl-loop for event across (a-get* room-events 'state 'events)
                            do (matrix-client-room-event room event))
                   (cl-loop for event across (a-get* room-events 'timeline 'events)
-                           do (matrix-client-room-event room event))))
+                           do (matrix-client-room-event room event))
+                  (oset room :start-token prev-batch)))
 
     ;; FIXME: `matrix-client-invite-room' is unimplemented.  Looking
     ;; at the API <https://matrix.org/docs/spec/client_server/r0.2.0.html#post-matrix-client-r0-rooms-roomid-invite>,
@@ -453,7 +500,8 @@ and password."
   "Insert STRING into ROOM's buffer.
 STRING should have a `timestamp' text-property."
   (let ((inhibit-read-only t)
-        (timestamp (get-text-property 0 'timestamp string)))
+        (timestamp (get-text-property 0 'timestamp string))
+        (event-id (get-text-property 0 'event_id string)))
     (with-current-buffer (oref room :buffer)
       (cl-loop initially do (progn
                               (goto-char (ov-beg (car (ov-in 'matrix-client-prompt t))))
@@ -463,15 +511,22 @@ STRING should have a `timestamp' text-property."
                        (< buffer-ts timestamp))
                while (when-let (pos (previous-single-property-change (point) 'timestamp))
                        (goto-char pos))
-               finally do (when-let (pos (next-single-property-change (point) 'timestamp))
-                            (goto-char pos)))
-      (insert "\n"
-              (propertize string 'read-only t))
-      (unless (matrix-client-buffer-visible-p)
-        (set-buffer-modified-p t)
-        (when matrix-client-use-tracking
-          ;; TODO handle faces when receving highlights
-          (tracking-add-buffer (current-buffer)))))))
+               finally do (if (when buffer-ts
+                                (< buffer-ts timestamp))
+                              (when-let (pos (next-single-property-change (point) 'timestamp))
+                                (goto-char pos))
+                            (forward-char -1)))
+      ;; Ensure event after point doesn't have the same ID
+      (unless (when-let ((pos (next-single-property-change (point) 'timestamp)))
+                (string-equal event-id (get-text-property pos 'event_id)))
+        ;; Insert the message
+        (insert "\n"
+                (propertize string 'read-only t))
+        (unless (matrix-client-buffer-visible-p)
+          (set-buffer-modified-p t)
+          (when matrix-client-use-tracking
+            ;; TODO handle faces when receving highlights
+            (tracking-add-buffer (current-buffer))))))))
 
 (cl-defmethod matrix-client-inject-event-listeners ((con matrix-client-connection))
   "Inject the standard event listeners."

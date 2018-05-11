@@ -35,11 +35,13 @@
 (require 'cl-lib)
 (require 'json)
 (require 'request)
-(require 'matrix-helpers)
 (require 'eieio)
 (require 'map)
 
 (require 'a)
+
+(require 'matrix-helpers)
+(require 'matrix-utils)
 
 (defvar matrix-error-hook nil
   "This is a list of functions to pass Matrix errors to.")
@@ -189,15 +191,30 @@ event.  If ASYNC is non-nil, send the message asynchronously."
                              "body" message)
                      :async t))
 
+(cl-defmethod matrix-get-messages ((con matrix-connection) room-id &key from to (direction "b") limit callback)
+  "Get messages for ROOM-ID.
+
+DIRECTION should be \"b\" (the default) or \"f\".  TO and
+LIMIT (an integer, default 10) are optional.  Request is made
+asynchronously, and CALLBACK is called with the result."
+  ;; NOTE: API version 0.3.0 works differently, so this should be temporary, until we switch to the
+  ;; new API.
+  (let ((path (format "/rooms/%s/messages" room-id))
+        (query-params (matrix--alist "from" from
+                                     "to" to
+                                     "dir" direction
+                                     "limit" limit)))
+    (matrix-send-async con "GET" path nil
+                       query-params nil callback "r0")))
+
 (cl-defmethod matrix-sync ((con matrix-connection) since full-state timeout callback)
   "Start an event poller starting from END-TOKEN.
 It will wait at least TIMEOUT seconds before calling the
 CALLBACK.  After receiving any events it will call CALLBACK with
 those events as its argument."
-  (let ((query-params (a-list "timeout" (int-to-string timeout)
-                              "full_state" (if full-state "true" "false"))))
-    (when since
-      (map-put query-params "since" since))
+  (let ((query-params (matrix--alist "timeout" (int-to-string timeout)
+                                     "full_state" (if full-state "true" "false")
+                                     "since" since)))
     (matrix-send-async con "GET" "/sync" nil
                        query-params nil callback "r0")))
 
