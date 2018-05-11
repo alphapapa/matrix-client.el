@@ -1,56 +1,49 @@
-#+TITLE: [LEGACY] Matrix.el
+#+TITLE: matrix-client.el
 
 * Preface
 
-This is a fork of the [[https://home.rix.si/git/rrix/matrix-client][original matrix.el client]], to attempt to resurrect
-it. It's probably not going to succeed though.
+This is a fork of the [[https://home.rix.si/git/rrix/matrix-client][original matrix.el client]], with the intent of maintaining
+it further, fixing bugs, and providing long-term goals for the project.
 
-Most of the additions I'm going to be adding are going to be for myself only, so
-they'll probably break other people's usage of it.
-
-Ideally, I'll make a *new* matrix.el on the python sdk, but that will have to
-wait for another day.
-
-Below is the original README. Hopefully this helps someone, but it's unlikely.
+[[https://i.imgur.com/ayHEiFEg.png][https://i.imgur.com/ayHEiFEg.png]]
 
 * Installation
 
-=matrix-client= is installable via MELPA. Otherwise you can add this directory to your =load-path=
-and =(require 'matrix-client)=.
+~matrix-client~ can only be installed manually. Simply put this directory onto
+your load path, and ~(require 'matrix-client)~. Once the project achieves a
+sufficiently high quality or demand, it may be submitted to melpa.
 
 * Usage
 
-There are two parts, a low-level API, and a terrible barely-alpha-quality client.
-
 Either deploy your own homeserver or register account on the public homeserver
-https://matrix.org/beta/#/login . After you've done that, =M-x matrix-client= will set you up with
-buffers corresponding to your Matrix rooms. You can join new ones with /join, leave with /leave or
-/part, and hook in to the custom functions provided by =matrix-client=.
+https://matrix.org/beta/#/login . After you've done that, =M-x matrix-client=
+will set you up with buffers corresponding to your Matrix rooms. You can join
+new ones with /join, leave with /leave or /part, and hook in to the custom
+functions provided by =matrix-client=.
 
-=matrix-api= is a low-level API right now; I'm planning to wrap it with high-level API that lets you easily
-per-room events, and that sort of thing, and eventually a full-fledged Matrix client. The API itself
-is pretty tightly based on the official Python API.
+* Configuration
 
-#+BEGIN_SRC emacs-lisp
-(let ((matrix-homeserver-base-url "https://yourhs.org"))
-  (unless matrix-token
-    (matrix-login-with-password "@you:yourhs.org" "[REDACTED]"))
-  (matrix-initial-sync 1)
-  (matrix-send-message "!yourroom:matrix.org" "Test post please ignore"))
-#+END_SRC
+While there are a lot of configuration settings, here are a selection that are
+the most useful:
+
+| Variable                          | Description                           |
+|-----------------------------------+---------------------------------------|
+| ~matrix-client-show-images~       | Control if images are shown inline    |
+| ~matrix-client-render-presence~   | Control display of presence           |
+| ~matrix-client-render-membership~ | Control display of membership changes |
+| ~matrix-client-use-tracking~      | Enable tracking.el integration        |
+
+Many more settings are documented through customize.
 
 * Contributing
 
+Contributions are much appreciated, and what help this project stay afloat! If
+you have an issue, please report it via [[https://github.com/jgkamat/matrix-client-legacy-el/issues][github issues]]. If you have a patch, you
+may submit it via [[https://github.com/jgkamat/matrix-client-legacy-el/pulls][a pull request]].
 
-To submit patches:
-- Clone the repo
-- Create a git branch, code in a branch.
-- When you're done, send me a =git format-patch= style patch
-  - =git format-patch --to ryan@whatthefuck.computer master..HEAD > YOURBRANCHNAME.patch=
-  - Mail that patch to me at [[mailto:ryan@whatthefuck.computer][ryan@whatthefuck.computer]], and I will integrate it.
-    - Or send it to me on Matrix, I'm =@rrix:whatthefuck.computer=
+A room for discussion is located at [[https://matrix.to/#/#matrix-client-el:matrix.org][#matrix-client-el:matrix.org]]
 
-Project Discussion happens in =#ft_kickass:whatthefuck.computer=
+Development alerts are available at #matrix-client-el-dev:matrix.org.
 
 * License
 
