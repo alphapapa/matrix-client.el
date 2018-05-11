@@ -189,6 +189,17 @@ event.  If ASYNC is non-nil, send the message asynchronously."
                              "body" message)
                      :async t))
 
+(cl-defmethod matrix-get-messages ((con matrix-connection) room-id &key from to (direction "b") limit callback)
+  (let ((path (format "/rooms/%s/messages" room-id))
+        (query-params (a-list "from" from
+                              "dir" direction)))
+    (when to
+      (map-put query-params "to" to))
+    (when limit
+      (map-put query-params "limit" limit))
+    (matrix-send-async con "GET" path nil
+                       query-params nil callback "r0")))
+
 (cl-defmethod matrix-sync ((con matrix-connection) since full-state timeout callback)
   "Start an event poller starting from END-TOKEN.
 It will wait at least TIMEOUT seconds before calling the

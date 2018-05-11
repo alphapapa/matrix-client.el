@@ -1,0 +1,48 @@
+
+* Fetch earlier messages
+
+#+BEGIN_SRC elisp
+  (with-current-buffer (get-buffer "Michael")
+    (let* ((room matrix-client-room-object)
+           (callback (lambda (room data)
+                       (with-current-buffer (new-buffer (generate-new-buffer "testing"))
+                         (pp data (current-buffer))))))
+      (matrix-get-messages (oref* room :con) room (oref* room :start-token callback))))
+
+  (defun argh ()
+    (with-current-buffer (get-buffer "Michael")
+      (let* ((room matrix-client-room-object)
+             (con (oref room :con))
+             (id (oref room :id))
+             (from (oref* room :start-token))
+             (callback #'sigh)
+             (callback (apply-partially #'argh-cb room)))
+        (matrix-get-messages con id
+                             :from from
+                             :callback callback))))
+
+  (defun sigh (&rest args)
+    (message "%s" args))
+
+  (defun argh-cb (room data)
+    (with-current-buffer (generate-new-buffer "testing")
+      (pp data (current-buffer))
+      (pop-to-buffer (current-buffer)))
+    (oset room :start-token (a-get* data 'end)))
+
+  (with-current-buffer (get-buffer "Michael")
+    (matrix-client-get-earlier-messages matrix-client-room-object)
+    nil)
+#+END_SRC
+
+** Notes
+
+*** DONE Duplicates are possible if multiple outstanding requests
+CLOSED: [2018-05-10 Thu 21:35]
+:LOGBOOK:
+-  State "DONE"       from "TODO"       [2018-05-10 Thu 21:35]
+:END:
+
+If the user tries to fetch history more than once, before the first attempt has returned, messages will be duplicated.  We need to either track outstanding requests or deduplicate messages.  Deduplicating across all messages in a buffer would seem expensive, but we could probably check the message IDs around point before we insert a message, after we have found the chronologically correct spot.
+
+Solved in =matrix-client-insert=.
