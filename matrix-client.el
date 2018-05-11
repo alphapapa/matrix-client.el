@@ -255,9 +255,6 @@ Otherwise, use the room name or alias."
 
 (defvar matrix-client-initial-sync nil)
 
-(defvar matrix-client-quiet nil
-  "Used to silence notifications for non-new events.")
-
 (require 'matrix-client-handlers)
 (require 'matrix-client-modes)
 
@@ -404,7 +401,7 @@ and password."
 
 (cl-defmethod matrix-client-fetch-history-handler ((room matrix-client-room) data)
   (pcase-let* (((map start end chunk) data)
-               (matrix-client-quiet t)) ; Silence notifications for old messages
+               (matrix-client-enable-notifications nil)) ; Silence notifications for old messages
     (cl-loop for event across chunk
              do (matrix-client-room-event room event))
     ;; NOTE: When direction is "b", as it is when fetching earlier messages, the "end" token is the

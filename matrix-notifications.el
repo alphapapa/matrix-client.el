@@ -23,6 +23,13 @@
 
 (require 'notifications)
 
+;;;; Customization
+
+(defcustom matrix-client-enable-notifications t
+  "Enable notifications for incoming messages."
+  :type 'boolean
+  :group 'matrix-client)
+
 ;;;; Variables
 
 (defvar matrix-client-notify-hook nil
@@ -38,7 +45,8 @@ Automatically trimmed to last 20 notifications.")
 (defun matrix-client-notify (event-type data &rest rest)
   "Run notify hooks and built-in notificataion for an event of EVENT-TYPE with DATA.
 Optional REST of args are also applied to hooks and function."
-  (unless (or matrix-client-initial-sync matrix-client-quiet)
+  (when (and matrix-client-enable-notifications
+             (not matrix-client-initial-sync))
     (run-hook-with-args 'matrix-client-notify-hook event-type data rest)
     ;; Run built-in notification for this event type
     (let ((fn (intern-soft (concat "matrix-client-notify-" event-type))))
