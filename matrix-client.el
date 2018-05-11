@@ -7,7 +7,7 @@
 ;; Keywords: web
 ;; Homepage: http://doc.rix.si/matrix.html
 ;; Package-Version: 0.1.2
-;; Package-Requires: ((emacs "25.1") (dash "2.13.0") (f "0.17.2") (json "1.4") (request "0.2.0") (a "0.1.0") (ov "1.0.6") (rainbow-identifiers "0.2.2") (s "1.12.0"))
+;; Package-Requires: ((emacs "25.1") (dash "2.13.0") (f "0.17.2") (json "1.4") (request "0.2.0") (a "0.1.0") (ov "1.0.6") (rainbow-identifiers "0.2.2") (s "1.12.0") (tracking "2.9"))
 
 ;; This file is not part of GNU Emacs.
 
@@ -50,6 +50,7 @@
 (require 'dash)
 (require 'f)
 (require 'ov)
+(require 'tracking)
 
 (defgroup matrix-client nil
   "Settings for `matrix-client'."
@@ -123,6 +124,10 @@ Each of these receives the raw event as a single DATA argument.
 See `defmatrix-client-handler'. This value is used as the default
 for every `matrix-client-connection' and can be overridden on a
 connection basis.")
+
+(defcustom matrix-client-use-tracking nil
+  "Enable tracking.el support in matrix-client."
+  :type 'boolean)
 
 ;;;###autoload
 (defclass matrix-client-connection (matrix-connection)
@@ -371,7 +376,9 @@ and password."
         (add-hook 'buffer-list-update-hook #'matrix-client-buffer-list-update-hook 'append 'local))
       (erase-buffer)
       (matrix-client-render-message-line room-obj)
-      (matrix-client-insert-last-seen-overlay))
+      (matrix-client-insert-last-seen-overlay)
+      (when matrix-client-use-tracking
+        (tracking-mode)))
     (switch-to-buffer room-buf)
     (set (make-local-variable 'matrix-client-room-connection) con)
     (set (make-local-variable 'matrix-client-room-object) room-obj)
@@ -461,7 +468,10 @@ STRING should have a `timestamp' text-property."
       (insert "\n"
               (propertize string 'read-only t))
       (unless (matrix-client-buffer-visible-p)
-        (set-buffer-modified-p t)))))
+        (set-buffer-modified-p t)
+        (when matrix-client-use-tracking
+          ;; TODO handle faces when receving highlights
+          (tracking-add-buffer (current-buffer)))))))
 
 (cl-defmethod matrix-client-inject-event-listeners ((con matrix-client-connection))
   "Inject the standard event listeners."
