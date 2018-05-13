@@ -561,22 +561,22 @@ STRING should have a `timestamp' text-property."
            (header-pos (matrix-client--get-date-header timestamp))
            (limit (or (matrix--next-property-change header-pos 'matrix-header-day-number)
                       (1- (matrix-client--prompt-position))))
-           (insertion-pos (if-let ((next-pos (matrix--next-property-change header-pos 'timestamp limit)))
+           (insertion-pos (if-let ((next-event-pos (matrix--next-property-change header-pos 'timestamp limit)))
                               ;; Existing messages found beneath header
                               (catch 'stop
-                                (while (< next-pos limit)
-                                  (when (> (get-text-property next-pos 'timestamp) timestamp)
+                                (while (< next-event-pos limit)
+                                  (when (> (get-text-property next-event-pos 'timestamp) timestamp)
                                     ;; Found newer timestamp: insert message here
-                                    (throw 'stop next-pos))
-                                  (setq next-pos (matrix--next-property-change next-pos 'timestamp limit)))
+                                    (throw 'stop next-event-pos))
+                                  (setq next-event-pos (matrix--next-property-change next-event-pos 'timestamp limit)))
                                 ;; No more messages beneath this header: insert message here
-                                next-pos)
+                                next-event-pos)
                             ;; No messages under this header: return limit, which is next header pos or end of buffer
                             limit)))
       (goto-char insertion-pos)
-      ;; Ensure event after point doesn't have the same ID
-      (unless (when-let ((pos (matrix--prev-property-change (point) 'timestamp)))
-                (string-equal event-id (get-text-property pos 'event_id)))
+      ;; Ensure event before point doesn't have the same ID
+      (unless (when-let ((previous-event-pos (matrix--prev-property-change (point) 'timestamp)))
+                (string-equal event-id (get-text-property previous-event-pos 'event_id)))
         ;; Insert the message
         (insert (propertize (concat string "\n") 'read-only t))
         ;; Update tracking
