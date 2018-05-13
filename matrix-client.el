@@ -129,6 +129,12 @@ connection basis.")
   "Enable tracking.el support in matrix-client."
   :type 'boolean)
 
+(defcustom matrix-client-save-outgoing-messages t
+  "Save outgoing messages in kill ring before sending.
+This way, in the event that a message gets lost in transit, the
+user can recover it from the kill ring instead of retyping it."
+  :type 'boolean)
+
 ;;;###autoload
 (defclass matrix-client-connection (matrix-connection)
   ((running :initarg :running
@@ -585,6 +591,8 @@ Also update prompt with typers."
          (room matrix-client-room-object)
          (con (oref room :con))
          (input-filters (oref con :input-filters)))
+    (when matrix-client-save-outgoing-messages
+      (push input kill-ring))
     (cl-reduce 'matrix-client-run-through-input-filter
                input-filters
                :initial-value input)
