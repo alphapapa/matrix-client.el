@@ -168,7 +168,7 @@ like."
     (cl-loop while (re-search-forward (rx bow "http" (optional "s") "://" (1+ (not space))) nil 'noerror)
              do (make-text-button (match-beginning 0) (match-end 0)
                                   'mouse-face 'highlight
-                                  'face 'link
+                                  'face 'matrix-client-link
                                   'help-echo (match-string 0)
                                   'action #'browse-url-at-mouse
                                   'follow-link t))

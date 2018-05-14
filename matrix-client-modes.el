@@ -50,6 +50,11 @@
 
 \\{matrix-client-mode-map}")
 
+(defface matrix-client-link
+  '((t (:inherit link)))
+  "Face for links in messages."
+  :group 'matrix-client)
+
 (defface matrix-client-metadata
   '((((class color) (background light)) (:foreground "#000088" :weight bold))
     (((class color) (background dark)) (:foreground "#4444FF" :weight bold))
