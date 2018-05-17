@@ -806,8 +806,8 @@ added."
   "Callback for send-message."
   ;; For now, just log it, because we'll get it back when we sync anyway.
   :slots (id)
-  :body (matrix-log "Message \"%s\" sent to room %s. Event ID: %s"
-                    message id (a-get data 'event_id)))
+  :body (matrix-log "Message sent to room %s. Event ID: %s  Data: %s"
+                    id (a-get data 'event_id) data))
 
 (cl-defmethod matrix-leave ((room matrix-room))
   "Leave room."
