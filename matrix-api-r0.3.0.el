@@ -446,7 +446,9 @@ requests, and we make a new request."
   "Callback function for successful sync request."
   ;; https://matrix.org/docs/spec/client_server/r0.3.0.html#id167
   :slots (rooms next-batch initial-sync-p)
-  :body (cl-loop for param in '(rooms presence account_data to_device device_lists)
+  :body (cl-loop initially do (matrix-log "SYNC CALLBACK: %s" (matrix-pp-string data))
+
+                 for param in '(rooms presence account_data to_device device_lists)
                  ;; Assume that methods called will signal errors if anything goes wrong, so
                  ;; ignore return values.
                  do (funcall-if (concat "matrix-sync-" (symbol-name param))
