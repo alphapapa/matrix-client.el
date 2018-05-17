@@ -65,6 +65,12 @@ PAIRS should be of the form (SLOT VALUE SLOT VALUE...)."
 
 ;;;; Functions
 
+(defun matrix-pp-string (object)
+  "Return pretty-printed representation of OBJECT as string."
+  (with-temp-buffer
+    (pp object (current-buffer))
+    (buffer-string)))
+
 (defun matrix-client-buffer-list-update-hook ()
   "Set buffer's modified status and move last-seen overlay when focused."
   ;; NOTE: Since this hook is added to the `buffer-list-update-hook', it
