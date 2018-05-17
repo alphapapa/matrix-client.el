@@ -218,7 +218,10 @@ FN-NAME should be a string, and is available in the ELSE form as `fn-name'."
 MESSAGE and ARGS should be a string and list of strings for
 `format'."
   (with-current-buffer (get-buffer-create matrix-log-buffer)
-    (insert "(" (apply #'format message args) ")" "\n\n")
+    (save-excursion
+      (goto-char (point-max))
+      (insert "\n"
+              "(" (apply #'format message args) ")" "\n\n"))
     ;; Returning t is more convenient than nil, which is returned by `message'.
     t))
 
