@@ -463,67 +463,69 @@ Also update prompt with typers."
         (timestamp-string (format-time-string "%T" (seconds-to-time timestamp)))
         (displayname (matrix-user-displayname room sender))
         (metadata) (msg) (matrix-image-url))
-  :body (when content
-          ;; Redacted messages have no content, so we should do nothing for them.
-          (setq metadata (format$ "[$timestamp-string] $displayname> "))
-          (setq message (string-trim
-                         ;; Trim messages because HTML ones can have extra newlines
-                         (pcase msgtype
-                           ("m.emote"
-                            (format$ "* $body"))
-                           ((guard (and matrix-client-ng-render-html (string= "org.matrix.custom.html" format)))
-                            (with-temp-buffer
-                              (insert formatted_body)
-                              (goto-char (point-min))
-                              (while (re-search-forward "\\(<br />\\)+" nil t)
-                                (replace-match "<br />"))
-                              (let ((document (libxml-parse-html-region (point) (point-max))))
-                                (erase-buffer)
-                                (shr-insert-document document)
+  :body (progn
+          (matrix-log "PROCESSING MESSAGE EVENT: %s" (matrix-pp-string event))
+          (when content
+            ;; Redacted messages have no content, so we should do nothing for them.
+            (setq metadata (format$ "[$timestamp-string] $displayname> "))
+            (setq message (string-trim
+                           ;; Trim messages because HTML ones can have extra newlines
+                           (pcase msgtype
+                             ("m.emote"
+                              (format$ "* $body"))
+                             ((guard (and matrix-client-ng-render-html (string= "org.matrix.custom.html" format)))
+                              (with-temp-buffer
+                                (insert formatted_body)
                                 (goto-char (point-min))
-                                (delete-blank-lines)
-                                (buffer-string))))
-                           ("m.image"
-                            (setq matrix-image-url (matrix-transform-mxc-uri (or url thumbnail_url)))
-                            (concat body
-                                    ": "
-                                    (matrix-client-linkify-urls matrix-image-url)))
-                           (_ (matrix-client-ng-linkify-urls body)))))
-          ;; Apply face for own messages
-          (let (metadata-face message-face)
-            (cond ((equal sender user)
-                   (setq metadata-face 'matrix-client-own-metadata
-                         message-face 'matrix-client-own-messages))
-                  ((string= msgtype "m.notice")
-                   (setq metadata-face 'matrix-client-notice-metadata
-                         message-face 'matrix-client-notice))
-                  (t
-                   (setq metadata-face 'matrix-client-metadata
-                         message-face 'default)))
-            ;; Use 'append so that link faces are not overridden.
-            (add-face-text-property 0 (length metadata) metadata-face 'append metadata)
-            (add-face-text-property 0 (length message) message-face 'append message))
+                                (while (re-search-forward "\\(<br />\\)+" nil t)
+                                  (replace-match "<br />"))
+                                (let ((document (libxml-parse-html-region (point) (point-max))))
+                                  (erase-buffer)
+                                  (shr-insert-document document)
+                                  (goto-char (point-min))
+                                  (delete-blank-lines)
+                                  (buffer-string))))
+                             ("m.image"
+                              (setq matrix-image-url (matrix-transform-mxc-uri (or url thumbnail_url)))
+                              (concat body
+                                      ": "
+                                      (matrix-client-linkify-urls matrix-image-url)))
+                             (_ (matrix-client-ng-linkify-urls body)))))
+            ;; Apply face for own messages
+            (let (metadata-face message-face)
+              (cond ((equal sender user)
+                     (setq metadata-face 'matrix-client-own-metadata
+                           message-face 'matrix-client-own-messages))
+                    ((string= msgtype "m.notice")
+                     (setq metadata-face 'matrix-client-notice-metadata
+                           message-face 'matrix-client-notice))
+                    (t
+                     (setq metadata-face 'matrix-client-metadata
+                           message-face 'default)))
+              ;; Use 'append so that link faces are not overridden.
+              (add-face-text-property 0 (length metadata) metadata-face 'append metadata)
+              (add-face-text-property 0 (length message) message-face 'append message))
 
-          ;; Insert metadata with message and add text properties
-          (matrix-client-ng-insert room (propertize (concat metadata message)
-                                                    'timestamp timestamp
-                                                    'displayname displayname
-                                                    'sender sender
-                                                    'event_id event_id))
+            ;; Insert metadata with message and add text properties
+            (matrix-client-ng-insert room (propertize (concat metadata message)
+                                                      'timestamp timestamp
+                                                      'displayname displayname
+                                                      'sender sender
+                                                      'event_id event_id))
 
-          ;; Start image insertion if necessary
-          (when matrix-client-ng-show-images
-            (cl-loop for url in (-non-nil (append (matrix-client-ng--image-urls message)
-                                                  (list matrix-image-url)))
-                     do (matrix-client-ng-insert-image room event_id url)))
+            ;; Start image insertion if necessary
+            (when matrix-client-ng-show-images
+              (cl-loop for url in (-non-nil (append (matrix-client-ng--image-urls message)
+                                                    (list matrix-image-url)))
+                       do (matrix-client-ng-insert-image room event_id url)))
 
-          ;; Move last-seen line if it's our own message
-          (when (equal sender user)
-            (matrix-client-ng-update-last-seen room))
+            ;; Move last-seen line if it's our own message
+            (when (equal sender user)
+              (matrix-client-ng-update-last-seen room))
 
-          ;; Notification
-          (unless (equal sender user)
-            (matrix-client-notify "m.room.message" event :room room))))
+            ;; Notification
+            (unless (equal sender user)
+              (matrix-client-notify "m.room.message" event :room room)))))
 
 (matrix-client-ng-defevent m.room.member
   "Say that member in EVENT joined/left ROOM."
