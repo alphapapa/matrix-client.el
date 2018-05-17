@@ -66,7 +66,12 @@
           :documentation "Matrix access_token")
    (txn-id :initarg :txn-id
            :initform 1
-           :type integer)))
+           :type integer)
+   (outstanding-sync-requests
+    :initarg :outstanding-sync-requests
+    :initform nil
+    :documentation "List of `request' response objects which are outstanding /sync requests.
+There should only be one at a time.")))
 
 (cl-defmethod matrix-login ((con matrix-connection) login-type content)
   "Log in to connection CON using LOGIN-TYPE and return the server response.
@@ -212,11 +217,27 @@ asynchronously, and CALLBACK is called with the result."
 It will wait at least TIMEOUT seconds before calling the
 CALLBACK.  After receiving any events it will call CALLBACK with
 those events as its argument."
-  (let ((query-params (matrix--alist "timeout" (int-to-string timeout)
-                                     "full_state" (if full-state "true" "false")
-                                     "since" since)))
-    (matrix-send-async con "GET" "/sync" nil
-                       query-params nil callback "r0")))
+  ;; Warn if con has outstanding sync requests
+  (oset con :outstanding-sync-requests
+        (cl-loop for req in (oref con :outstanding-sync-requests)
+                 if (request-response-done-p req)
+                 count it into count
+                 else
+                 collect req into reqs
+                 finally do (message "Deleted %s done requests" count)
+                 finally return reqs))
+  (when (oref con :outstanding-sync-requests)
+    (warn "Matrix connection to %s has %s outstanding sync requests; making another\nREQUEST LIST: %s"
+          (oref con :base-url)
+          (length (oref con :outstanding-sync-requests))
+          (oref con :outstanding-sync-requests)))
+  (let* ((query-params (matrix--alist "timeout" (int-to-string timeout)
+                                      "full_state" (if full-state "true" "false")
+                                      "since" since))
+         (response (matrix-send-async con "GET" "/sync" nil
+                                      query-params nil callback "r0")))
+    ;; Add response object to connection's list of outstanding sync requests
+    (push response (oref con :outstanding-sync-requests))))
 
 (cl-defmethod matrix-event-poll ((con matrix-connection) end-token timeout callback)
   "Start an event poller starting from END-TOKEN.
