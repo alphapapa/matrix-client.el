@@ -589,14 +589,15 @@ SESSION has no access token, consider the session logged-out."
         ;; Run API handler for event.
         (matrix-event room event))
       (setq prev-batch prev_batch)
-      (if (and (not (equal limited :json-false)) last-full-sync)
+      (if (and (not (equal limited :json-false))
+               last-full-sync)
           ;; Timeline is limited and we have a token to fill to: fill the gap.  If
           ;; `last-full-sync' is nil, this should mean that we are doing an initial sync, and
           ;; since we have no previous "since" token to fetch up to, we do not bother to fetch
           ;; more messages, even if the timeline is limited.
           ;; MAYBE: Add setting for minimum number of events/messages to initially fetch.
           (progn
-            (matrix-warn "ROOM %s TIMELINE WAS LIMITED: %s.  Trying to fill gap..." id data)
+            (matrix-warn "ROOM %s TIMELINE WAS LIMITED.  Trying to fill gap..." id)
             (matrix-messages room))
         ;; Timeline is not limited: save the not-yet-updated next-batch token.  If the next
         ;; timeline is limited, we use this token to know when we have filled the timeline gap.
