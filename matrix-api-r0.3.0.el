@@ -94,8 +94,8 @@ automatically, and other keys are allowed."
     (when (functionp fn)
       (apply fn args))))
 
-(defmacro funcall-if (fn-name args else)
-  "If FN-NAME is a function, return result of applying ARGS to it, otherwise ELSE.
+(defmacro apply-if-fn (fn-name args else)
+  "If FN-NAME is a function, return result of applying ARGS to it, otherwise eval ELSE form.
 FN-NAME should be a string, and is available in the ELSE form as `fn-name'."
   (declare (debug (form listp form)))
   ;; FIXME: Probably use with-gensyms* here.
@@ -104,7 +104,7 @@ FN-NAME should be a string, and is available in the ELSE form as `fn-name'."
      (if (functionp fn)
          (apply fn ,args)
        ,else)))
-(put 'funcall-if 'lisp-indent-function 2)
+(put 'apply-if-fn 'lisp-indent-function 2)
 
 ;;;; Classes
 
@@ -451,7 +451,7 @@ requests, and we make a new request."
                  for param in '(rooms presence account_data to_device device_lists)
                  ;; Assume that methods called will signal errors if anything goes wrong, so
                  ;; ignore return values.
-                 do (funcall-if (concat "matrix-sync-" (symbol-name param))
+                 do (apply-if-fn (concat "matrix-sync-" (symbol-name param))
                         (list session (a-get data param))
                       (matrix-log "Unimplemented API method: %s" fn-name))
                  finally do (progn
@@ -556,7 +556,7 @@ SESSION has no access token, consider the session logged-out."
                   (cl-loop for param in params
                            ;; If the event array is empty, the function will be
                            ;; called anyway, so ignore its return value.
-                           do (funcall-if (concat "matrix-sync-" (symbol-name param))
+                           do (apply-if-fn (concat "matrix-sync-" (symbol-name param))
                                   (list room (a-get joined-room param))
                                 (matrix-warn "Unimplemented API method: %s" fn-name))
                            ;; Always return t for now, so that we think the sync succeeded
@@ -609,7 +609,7 @@ SESSION has no access token, consider the session logged-out."
 (cl-defmethod matrix-event ((room matrix-room) event)
   "Process EVENT in ROOM."
   (pcase-let* (((map type) event))
-    (funcall-if (concat "matrix-event-" type)
+    (apply-if-fn (concat "matrix-event-" type)
         (list room event)
       (matrix-log "Unimplemented API handler for event %s in room %s." type (oref room id)))))
 

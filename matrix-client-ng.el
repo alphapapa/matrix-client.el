@@ -324,7 +324,7 @@ STRING should have a `timestamp' text-property."
                (input (pop kill-ring))
                ;; NOTE: A happy accident, `s-split-words' chops off the leading "/".
                (first-word (car (s-split-words input))))
-    (funcall-if (concat "matrix-client-ng-room-command-" first-word)
+    (apply-if-fn (concat "matrix-client-ng-room-command-" first-word)
         ;; Special command
         (list room input)
       (progn
@@ -447,7 +447,7 @@ Also update prompt with typers."
 (cl-defmethod matrix-client-ng-timeline ((room matrix-room) event)
   "Process EVENT in ROOM."
   (pcase-let* (((map type) event))
-    (funcall-if (concat "matrix-client-ng-" (symbol-name type))
+    (apply-if-fn (concat "matrix-client-ng-" (symbol-name type))
         (list room event)
       (matrix-warn "Unimplemented client method: %s" fn-name))))
 
@@ -556,7 +556,7 @@ Also update prompt with typers."
     ;; Process new events
     (seq-doseq (event timeline-new)
       (pcase-let* (((map type) event))
-        (funcall-if (concat "matrix-client-ng-" type)
+        (apply-if-fn (concat "matrix-client-ng-" type)
             (list room event)
           (matrix-warn "Unimplemented client method: %s" fn-name))))
     ;; Clear new events
