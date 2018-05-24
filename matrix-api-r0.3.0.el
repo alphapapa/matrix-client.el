@@ -799,7 +799,7 @@ added."
     ;; Use `with-slots*' instead of `pcase-let*' so we can `incf' the txn-id.
     (let* ((type "m.room.message")
            (content (a-list 'msgtype msgtype
-                            'body message))
+                            'body (encode-coding-string message 'utf-8)))
            (txn-id (cl-incf txn-id))
            (endpoint (format$ "rooms/$id/send/$type/$txn-id")))
       (matrix-put session endpoint content
