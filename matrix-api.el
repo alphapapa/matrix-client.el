@@ -188,7 +188,11 @@ event.  If ASYNC is non-nil, send the message asynchronously."
   "Send string MESSAGE to room ROOM-ID."
   (matrix-send-event con room-id "m.room.message"
                      (a-list "msgtype" "m.text"
-                             "body" message)
+                             ;; NOTE: We encode the message with UTF-8.  I'm not sure if this is the
+                             ;; best or right place to do this.  I can't (easily) find out how or if
+                             ;; Emacs and/or `json-encode' encode strings by default, but this seems
+                             ;; to fix <https://github.com/jgkamat/matrix-client-el/issues/44>.
+                             "body" (encode-coding-string message 'utf-8))
                      :async t))
 
 (cl-defmethod matrix-get-messages ((con matrix-connection) room-id &key from to (direction "b") limit callback)
