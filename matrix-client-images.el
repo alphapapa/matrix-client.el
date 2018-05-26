@@ -84,30 +84,33 @@ object made with `create-image'.  This function should be called
 as an async callback when the image is downloaded."
   (with-slots (buffer) room
     (with-current-buffer buffer
-      ;; Starting with last message, search backward to find message
-      (cl-loop initially do (goto-char (point-max))
-               for event_id = (get-text-property (point) 'event_id)
-               until (equal event_id message-id)
-               do (goto-char (previous-single-property-change (point) 'event_id)))
-      ;; Find beginning and end of message text
-      (let* ((beg (point))
-             (end (next-single-property-change beg 'event_id))
-             (inhibit-read-only t)
-             (props (text-properties-at beg))
-             (string (with-temp-buffer
-                       ;; NOTE: These space characters before the newlines
-                       ;; are REQUIRED for some reason.  Without them,
-                       ;; images disappear seemingly at random when
-                       ;; the user scrolls, moves point, or types.
-                       (insert " \n")
-                       (insert-image data)
-                       (insert " \n")
-                       (apply #'propertize (buffer-string) props))))
-        ;; Find URL and insert image after it
-        (goto-char beg)
-        (re-search-forward (regexp-quote url) end)
-        (goto-char (match-end 0))
-        (insert string)
-        (forward-char)))))
+      (let ((orig-point (point-marker)))
+        ;; Starting with last message, search backward to find message
+        (cl-loop initially do (goto-char (point-max))
+                 for event_id = (get-text-property (point) 'event_id)
+                 until (equal event_id message-id)
+                 do (goto-char (previous-single-property-change (point) 'event_id)))
+        ;; Find beginning and end of message text
+        (let* ((beg (point))
+               (end (next-single-property-change beg 'event_id))
+               (inhibit-read-only t)
+               (props (text-properties-at beg))
+               (string (with-temp-buffer
+                         ;; NOTE: These space characters before the newlines
+                         ;; are REQUIRED for some reason.  Without them,
+                         ;; images disappear seemingly at random when
+                         ;; the user scrolls, moves point, or types.
+                         (insert " \n")
+                         (insert-image data)
+                         (insert " \n")
+                         (apply #'propertize (buffer-string) props))))
+          ;; Find URL and insert image after it
+          (goto-char beg)
+          (re-search-forward (regexp-quote url) end)
+          (goto-char (match-end 0))
+          (insert string)
+          ;; Return point
+          (goto-char orig-point)
+          (setq orig-point nil))))))
 
 (provide 'matrix-client-images)
