@@ -43,11 +43,21 @@
                     "RET" matrix-client-send-active-line
                     "DEL "matrix-client-delete-backward-char
                     "M-v" matrix-client-scroll-down
+                    "C-k" matrix-client-kill-line-or-unsent-message
                     )))
     (cl-loop for (key fn) on mappings by #'cddr
              do (define-key map (kbd key) fn))
     map)
   "Keymap for `matrix-client-mode'.")
+
+(defun matrix-client-kill-line-or-unsent-message (&optional message)
+  "Kill current line; with prefix, kill everything after prompt."
+  (interactive "P")
+  (if message
+      (progn
+        (goto-char (matrix-client--prompt-position))
+        (kill-region (point) (point-max)))
+    (call-interactively #'kill-visual-line)))
 
 (defun matrix-client-reply-or-insert (&optional quote-p)
   "If point is on a previous message, begin a reply addressed to its sender.  Otherwise, self-insert.
