@@ -33,9 +33,13 @@
 
 (require 'simple)
 
+(require 'dash)
+
 (defvar matrix-client-mode-map
   (let ((map (make-sparse-keymap))
         (mappings '(
+                    "r" matrix-client-reply-or-insert
+                    "R" (lambda () (interactive) (matrix-client-reply-or-insert t))
                     "RET" matrix-client-send-active-line
                     "DEL "matrix-client-delete-backward-char
                     "M-v" matrix-client-scroll-down
@@ -44,6 +48,41 @@
              do (define-key map (kbd key) fn))
     map)
   "Keymap for `matrix-client-mode'.")
+
+(defun matrix-client-reply-or-insert (&optional quote-p)
+  "If point is on a previous message, begin a reply addressed to its sender.  Otherwise, self-insert.
+With prefix, quote message or selected region of message."
+  (interactive "P")
+  (if (get-text-property (point) 'sender)
+      ;; Start reply
+      (let* ((sender (get-text-property (point) 'sender))
+             (display-name (get-text-property (point) 'display-name))
+             (quote (if quote-p
+                        ;; FIXME: Also quote in HTML format
+                        (--> (if (use-region-p)
+                                 (buffer-substring (region-beginning) (region-end))
+                               (matrix-client--this-message))
+                             (replace-regexp-in-string (rx bol) "> " it)
+                             (concat it "\n\n")
+                             (progn
+                               (remove-text-properties 0 (length it) '(read-only t) it)
+                               it))
+                      ;; Not quoting
+                      "")))
+        ;; FIXME: Insert a link to username, and use a filter to transform to HTML before sending.
+        (goto-char (matrix-client--prompt-position))
+        (insert display-name ": " quote))
+    ;; Do self-insert
+    (setq this-command 'self-insert-command)
+    (call-interactively 'self-insert-command)))
+
+(defun matrix-client--this-message ()
+  "Return message point is on."
+  (let* ((beg (previous-single-property-change (point) 'event_id))
+         (end (next-single-property-change (point) 'event_id))
+         ;; Skip past metadata
+         (message-beg (next-single-property-change beg 'face)))
+    (buffer-substring message-beg end)))
 
 (define-derived-mode matrix-client-mode fundamental-mode "Matrix Client"
   "Major mode for Matrix client buffers.
