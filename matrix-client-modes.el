@@ -44,11 +44,23 @@
                     "DEL "matrix-client-delete-backward-char
                     "M-v" matrix-client-scroll-down
                     "C-k" matrix-client-kill-line-or-unsent-message
+                    [remap indent-for-tab-command] matrix-client-tab
                     )))
     (cl-loop for (key fn) on mappings by #'cddr
-             do (define-key map (kbd key) fn))
+             do (define-key map (cl-typecase key
+                                  (string (kbd key))
+                                  (otherwise key))
+                  fn))
     map)
   "Keymap for `matrix-client-mode'.")
+
+(defun matrix-client-tab ()
+  "If point is before prompt, move point to prompt; otherwise call `indent-for-tab-command'."
+  (interactive)
+  (let ((prompt (matrix-client--prompt-position)))
+    (if (< (point) prompt)
+        (goto-char prompt)
+      (call-interactively #'indent-for-tab-command))))
 
 (defun matrix-client-kill-line-or-unsent-message (&optional message)
   "Kill current line; with prefix, kill everything after prompt."
