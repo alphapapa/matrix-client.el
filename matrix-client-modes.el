@@ -77,25 +77,21 @@ With prefix, quote message or selected region of message."
   (interactive "P")
   (if (get-text-property (point) 'sender)
       ;; Start reply
-      (let* ((sender (get-text-property (point) 'sender))
-             (display-name (get-text-property (point) 'display-name))
-             (quote (if quote-p
-                        ;; FIXME: Also quote in HTML format
-                        (--> (if (use-region-p)
-                                 (buffer-substring (region-beginning) (region-end))
-                               (matrix-client--this-message))
-                             (replace-regexp-in-string (rx bol) "> " it)
-                             (concat it "\n\n")
-                             (progn
-                               (remove-text-properties 0 (length it) '(read-only t) it)
-                               it))
-                      ;; Not quoting
-                      "")))
+      (let ((display-name (get-text-property (point) 'display-name))
+            (quote (if quote-p
+                       ;; FIXME: Also quote in HTML format
+                       (--> (if (use-region-p)
+                                (buffer-substring (region-beginning) (region-end))
+                              (matrix-client--this-message))
+                            (prog1 it (remove-text-properties 0 (length it) '(read-only t) it))
+                            (replace-regexp-in-string (rx bol) "> " it)
+                            (concat it "\n\n"))
+                     ;; Not quoting
+                     "")))
         ;; FIXME: Insert a link to username, and use a filter to transform to HTML before sending.
         (goto-char (matrix-client--prompt-position))
         (insert display-name ": " quote))
     ;; Do self-insert
-    (setq this-command 'self-insert-command)
     (call-interactively 'self-insert-command)))
 
 (defun matrix-client--this-message ()
