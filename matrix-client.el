@@ -663,12 +663,13 @@ Also update prompt with typers."
          (room matrix-client-room-object)
          (con (oref room :con))
          (input-filters (oref con :input-filters)))
-    (when matrix-client-save-outgoing-messages
-      (push input kill-ring))
-    (cl-reduce 'matrix-client-run-through-input-filter
-               input-filters
-               :initial-value input)
-    (matrix-client-update-last-seen room)))
+    (unless (s-blank-str? input)
+      (when matrix-client-save-outgoing-messages
+        (push input kill-ring))
+      (cl-reduce 'matrix-client-run-through-input-filter
+                 input-filters
+                 :initial-value input)
+      (matrix-client-update-last-seen room))))
 
 (defun matrix-client-run-through-input-filter (text filter)
   "Run each TEXT through a single FILTER.  Used by `matrix-client-send-active-line'."
