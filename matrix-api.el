@@ -184,6 +184,12 @@ event.  If ASYNC is non-nil, send the message asynchronously."
       (`nil (matrix-send con "PUT" path content))
       (`t (matrix-send-async con "PUT" path content)))))
 
+(cl-defmethod matrix-get-displayname ((con matrix-connection) user-id callback)
+  "Get displayname for USER-ID and call CALLBACK."
+  (let* ((path (format "/profile/%s/displayname" user-id)))
+    (matrix-send-async con "GET" path
+                       nil nil nil callback)))
+
 (cl-defmethod matrix-send-message ((con matrix-connection) room-id message)
   "Send string MESSAGE to room ROOM-ID."
   (matrix-send-event con room-id "m.room.message"

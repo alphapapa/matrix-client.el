@@ -162,6 +162,9 @@ See `defmatrix-client-handler'.")
    (username :initarg :username
              :initform nil
              :documentation "Your Matrix username.")
+   (displayname :initarg :displayname
+                :initform nil
+                :documentation "User's displayname.")
    (input-filters :initarg :input-filters
                   :initform nil
                   :documentation "List of functions to run input through.
@@ -258,7 +261,8 @@ Otherwise, use the room name or alias."
 (defvar matrix-client-connections '()
   "Alist of (username . connection)")
 
-(defvar matrix-client-after-connect-hooks nil
+(defvar matrix-client-after-connect-hooks
+  '(matrix-client--set-own-displayname)
   "A list of functions to run when a new Matrix Client connection occurs.")
 
 (defvar matrix-client-initial-sync nil)
@@ -330,6 +334,16 @@ and password."
   "Return saved username and access token from file."
   (when (f-exists? matrix-client-save-token-file)
     (read (f-read matrix-client-save-token-file))))
+
+(cl-defmethod matrix-client--set-own-displayname ((con matrix-client-connection))
+  "Get and set own displayname for connection CON."
+  (matrix-get-displayname con (oref con username)
+                          (apply-partially (lambda (con data)
+                                             (with-slots (displayname) con
+                                               (if-let ((name (map-elt data 'displayname)))
+                                                   (setq displayname name)
+                                                 (warn "Unable to get displayname from server"))))
+                                           con)))
 
 (defun matrix-client-disconnect (&optional connection)
   "Disconnect from CONNECTION or all Matrix connections, killing room buffers."
