@@ -572,13 +572,16 @@ STRING should have a `timestamp' text-property."
                                 ;; No more messages beneath this header: insert message here
                                 next-event-pos)
                             ;; No messages under this header: return limit, which is next header pos or end of buffer
-                            limit)))
+                            limit))
+           (non-face-properties (cl-loop for (key val) on (text-properties-at 0 string) by #'cddr
+                                         unless (eq key 'face)
+                                         append (list key val))))
       (goto-char insertion-pos)
       ;; Ensure event before point doesn't have the same ID
       (unless (when-let ((previous-event-pos (matrix--prev-property-change (point) 'timestamp)))
                 (string-equal event-id (get-text-property previous-event-pos 'event_id)))
         ;; Insert the message
-        (insert (propertize (concat string "\n") 'read-only t))
+        (insert (apply #'propertize (concat string "\n") 'read-only t non-face-properties))
         ;; Update tracking
         (unless (matrix-client-buffer-visible-p)
           (set-buffer-modified-p t)

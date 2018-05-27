@@ -40,11 +40,11 @@
         (mappings '(
                     "r" matrix-client-reply-or-insert
                     "R" (lambda () (interactive) (matrix-client-reply-or-insert t))
-                    "RET" matrix-client-send-active-line
+                    "RET" matrix-client-ret
                     "DEL "matrix-client-delete-backward-char
                     "M-v" matrix-client-scroll-down
                     "C-k" matrix-client-kill-line-or-unsent-message
-                    [remap indent-for-tab-command] matrix-client-tab
+                    "TAB" matrix-client-tab
                     )))
     (cl-loop for (key fn) on mappings by #'cddr
              do (define-key map (cl-typecase key
@@ -55,12 +55,33 @@
   "Keymap for `matrix-client-mode'.")
 
 (defun matrix-client-tab ()
-  "If point is before prompt, move point to prompt; otherwise call `indent-for-tab-command'."
+  "If point is before prompt, move point to next event; otherwise call `indent-for-tab-command'."
+  (interactive)
+  (let ((prompt (matrix-client--prompt-position)))
+    (if (< (point) prompt)
+        (when-let ((pos (matrix-client--next-event-pos :limit prompt)))
+          (goto-char pos))
+      (call-interactively #'indent-for-tab-command))))
+
+(defun matrix-client-ret ()
+  "If point is before prompt, move point to prompt; otherwise call `matrix-client-send-active-line'."
   (interactive)
   (let ((prompt (matrix-client--prompt-position)))
     (if (< (point) prompt)
         (goto-char prompt)
-      (call-interactively #'indent-for-tab-command))))
+      (call-interactively #'matrix-client-send-active-line))))
+
+(cl-defun matrix-client--next-event-pos (&key limit backward)
+  "Return position of next event in buffer.  If BACKWARD is non-nil, look backward.
+If LIMIT is non-nil, don't search past it; otherwise determine
+limit automatically."
+  (let ((fn (cl-case backward
+              ('nil #'next-single-property-change)
+              (t #'previous-single-property-change)))
+        (limit (or limit (cl-case backward
+                           (null (matrix-client--prompt-position))
+                           (t (point-min))))))
+    (funcall fn (point) 'event_id nil limit)))
 
 (defun matrix-client-kill-line-or-unsent-message (&optional message)
   "Kill current line; with prefix, kill everything after prompt."
