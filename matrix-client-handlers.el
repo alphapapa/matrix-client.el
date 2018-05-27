@@ -264,7 +264,7 @@ like."
 
        ;; Notification
        (unless (equal own-user-id sender)
-         (matrix-client-notify "m.room.message" data :room room))))))
+         (matrix-client-notify room "m.room.message" data))))))
 
 (defun insert-read-only (text &rest extra-props)
   ;; NOTE: The "m.lightrix.pattern" handler is the only one that uses this now.
