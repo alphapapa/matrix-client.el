@@ -1,5 +1,6 @@
 ;;; matrix-client-handlers.el --- Event handlers for Matrix.org RPC
 
+;; Copyright (C) 2017-2018 Jay Kamat
 ;; Copyright (C) 2015 Ryan Rix
 ;; Author: Ryan Rix <ryan@whatthefuck.computer>
 ;; Maintainer: Ryan Rix <ryan@whatthefuck.computer>

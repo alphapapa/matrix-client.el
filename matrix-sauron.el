@@ -1,8 +1,9 @@
 ;;; matrix-sauron.el --- Sauron integration for the Matrix Client
 
+;; Copyright (C) 2017-2018 Jay Kamat
 ;; Copyright (C) 2015 Ryan Rix
 ;; Author: Ryan Rix <ryan@whatthefuck.computer>
-;; Maintainer: Ryan Rix <ryan@whatthefuck.computer>
+;; Maintainer: Jay Kamat <jaygkamat@gmail.com>
 ;; Created: 21 June 2015
 ;; Keywords: web, comm
 ;; Homepage: https://github.com/jgkamat/matrix-client-el

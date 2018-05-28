@@ -1,5 +1,6 @@
 ;;; matrix-client-images.el --- Image support for
 
+;; Copyright (C) 2017-2018 Adam Porter
 ;; Copyright (C) 2015 Ryan Rix
 ;; Author: Adam Porter <adam@alphapapa.net>
 ;; Maintainer: Jay Kamat <jaygkamat@gmail.com>
