@@ -128,10 +128,6 @@ If BUFFER is nil, use the current buffer."
   (let ((version (or version "api/v1")))
     (format "%s/_matrix/client/%s" matrix-homeserver-base-url version)))
 
-(defun matrix-get (key obj)
-  "Easy JSON accessor, get KEY's value from OBJ."
-  (cdr (assoc key obj)))
-
 (defun matrix-transform-mxc-uri (uri)
   "Turn an MXC content URI in to an HTTP URL."
   (let ((components (split-string uri "/")))

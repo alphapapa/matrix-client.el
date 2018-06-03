@@ -1,3 +1,5 @@
+(require 'subr-x)
+
 (defmacro format$ (string &rest objects)
   "Interpolated `format'.
 Any word in STRING beginning with \"$\" is replaced with the

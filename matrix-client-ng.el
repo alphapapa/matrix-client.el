@@ -6,6 +6,11 @@
 
 ;;; Code:
 
+;; ARGH EMACS 26 WHY
+(unless (fboundp 'if-let)
+  (defalias 'if-let 'if-let*)
+  (defalias 'when-let 'when-let*))
+
 ;;;; Requirements
 
 (require 'f)
@@ -169,7 +174,7 @@ variables.
 It is hoped that using this macro is easier than defining a large
 method without it."
   (declare (indent defun))
-  (let ((method-name (intern (concat "matrix-client-ng-" (symbol-name type))))
+  (let ((method-name (intern (concat "matrix-client-event-" (symbol-name type))))
         (slots (cl-loop for (object . slots) in object-slots
                         collect (list slots object))))
     `(cl-defmethod ,method-name ((room matrix-room) event)
@@ -242,16 +247,19 @@ Add session to sessions list and run initial sync."
   (when (f-exists? matrix-client-ng-save-token-file)
     (read (f-read matrix-client-ng-save-token-file))))
 
-(defun matrix-client-ng-disconnect (&optional skip-logout)
+(defun matrix-client-ng-disconnect (&optional really-logout)
   "Unplug from the Matrix.
 If SKIP-LOGOUT is non-nil, don't actually log out from server,
 just clear local session data."
   (interactive "P")
   ;; MAYBE: Delete buffers.
-  (unless skip-logout
+  (when really-logout
     (seq-do #'matrix-logout matrix-client-ng-sessions)
     ;; Remove saved token
     (f-delete matrix-client-ng-save-token-file))
+  ;; Delete access token
+  (--each matrix-client-ng-sessions
+      (oset it access-token nil))
   (setq matrix-client-ng-sessions nil))
 
 ;;;; Rooms
@@ -447,9 +455,9 @@ Also update prompt with typers."
 (cl-defmethod matrix-client-ng-timeline ((room matrix-room) event)
   "Process EVENT in ROOM."
   (pcase-let* (((map type) event))
-    (apply-if-fn (concat "matrix-client-ng-" (symbol-name type))
+    (apply-if-fn (concat "matrix-client-event-" (symbol-name type))
         (list room event)
-      (matrix-warn "Unimplemented client method: %s" fn-name))))
+      (matrix-log "Unimplemented client method: %s" fn-name))))
 
 (matrix-client-ng-defevent m.room.message
   "Process m.room.message EVENT in ROOM."
@@ -464,7 +472,7 @@ Also update prompt with typers."
         (displayname (matrix-user-displayname room sender))
         (metadata) (msg) (matrix-image-url))
   :body (progn
-          (matrix-log "PROCESSING MESSAGE EVENT: %s" (matrix-pp-string event))
+          (matrix-log "PROCESSING MESSAGE EVENT: \n%s" (matrix-pp-string event))
           (when content
             ;; Redacted messages have no content, so we should do nothing for them.
             (setq metadata (format$ "[$timestamp-string] $displayname> "))
@@ -556,9 +564,9 @@ Also update prompt with typers."
     ;; Process new events
     (seq-doseq (event timeline-new)
       (pcase-let* (((map type) event))
-        (apply-if-fn (concat "matrix-client-ng-" type)
+        (apply-if-fn (concat "matrix-client-event-" type)
             (list room event)
-          (matrix-warn "Unimplemented client method: %s" fn-name))))
+          (matrix-log "Unimplemented client method: %s" fn-name))))
     ;; Clear new events
     (matrix-clear-timeline room)
     ;; TODO: Update other room things: header, avatar, typers, topic, name, aliases, etc.
