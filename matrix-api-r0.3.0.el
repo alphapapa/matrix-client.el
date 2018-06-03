@@ -1,3 +1,6 @@
+;; -*- lexical-binding: t; -*-
+
+
 ;; Here is a playground for implementing the latest version of the
 ;; API, r0.3.0.  Confusingly, "v1" of the API is older and more
 ;; primitive than "r0".  Apparently the API was not considered
@@ -37,6 +40,9 @@
 
 (defvar matrix-synchronous nil
   "When non-nil, run `matrix-request' requests synchronously.")
+
+(defvar matrix-warn-unimplemented nil
+  "Give warnings for unimplemented event handlers.")
 
 ;;;; Macros
 
@@ -82,8 +88,10 @@ automatically, and other keys are allowed."
   (let ((name (intern (concat "matrix-" (symbol-name name) "-callback")))
         (instance (intern (nth 1 (s-match (rx "matrix-" (group (1+ anything)))
                                           (symbol-name type))))))
-    `(cl-defmethod ,name ((,instance ,type) &key data error-thrown symbol-status response
+    `(cl-defmethod ,name ((,instance ,type) &key cbargs status headers data
+                          error url query ; Used primarily for error handling
                           &allow-other-keys)
+       ,docstring
        (with-slots ,slots ,instance
          ,body))))
 
@@ -214,19 +222,18 @@ FN-NAME should be a string, and is available in the ELSE form as `fn-name'."
 
 ;;;; Functions
 
-(defun matrix-log (message &rest args)
+(defun matrix-log (&rest args)
   "Log MESSAGE with ARGS to Matrix log buffer and return non-nil.
 MESSAGE and ARGS should be a string and list of strings for
 `format'."
+  (when (stringp (car args))
+    (setq args (a-list 'args args)))
+  (setq args (cons (cons 'timestamp (format-time-string "%Y-%m-%d %H:%M:%S"))
+                   args))
   (with-current-buffer (get-buffer-create matrix-log-buffer)
     (save-excursion
       (goto-char (point-max))
-      (insert "\n"
-              "("
-              (format-time-string "%Y-%m-%d %H:%M:%S")
-              ": "
-              (apply #'format message args)
-              ")" "\n"))
+      (insert (pp-to-string args) "\n"))
     ;; Returning t is more convenient than nil, which is returned by `message'.
     t))
 
@@ -236,6 +243,10 @@ MESSAGE and ARGS should be a string and list of strings for
 `format'."
   (apply #'matrix-log message args)
   (apply #'warn message args))
+
+(defun matrix-warn-unimplemented (&rest args)
+  (when matrix-warn-unimplemented
+    (apply #'matrix-log args)))
 
 (defun matrix-get (&rest args)
   "Call `matrix-request' with ARGS for a \"GET\" request."
@@ -287,6 +298,7 @@ set, will be called if the request fails."
            ;; (data (map-put data 'txn-id (incf txn-id)))
            (data (map-filter
                   ;; Remove keys with null values
+                  ;; TODO: Benchmark this against cl-loop.
                   (lambda (k v)
                     v)
                   data))
@@ -307,41 +319,68 @@ set, will be called if the request fails."
                                 (_ complete-callback)))
            (method (upcase (symbol-name method)))
            (request-log-level 'debug))
-      (matrix-log "REQUEST: %s" (a-list 'url url
-                                        'method method
-                                        'data data
-                                        ;;  'callback callback
-                                        'timeout timeout))
+      (matrix-log (a-list 'event 'matrix-request
+                          'url url
+                          'method method
+                          'data data
+                          ;;  'callback callback
+                          'timeout timeout))
       (pcase method
-        ("GET" (request url
-                        :type method
-                        :headers (a-list 'Authorization (concat "Bearer " access-token))
-                        :params data
-                        :parser #'json-read
-                        :success callback
-                        :error (apply-partially error-callback session)
-                        :complete complete-callback
-                        :timeout timeout
-                        :sync matrix-synchronous))
-        ((or "POST" "PUT") (request url
-                                    :type method
-                                    :headers (a-list 'Content-Type "application/json"
-                                                     'Authorization (concat "Bearer " access-token))
-                                    :data (json-encode data)
-                                    :parser #'json-read
-                                    :success callback
-                                    :error (apply-partially error-callback session)
-                                    :complete complete-callback
-                                    :timeout timeout
-                                    :sync matrix-synchronous))))))
+        ("GET" ;; (request url
+         ;;          :type method
+         ;;          :headers (a-list 'Authorization (concat "Bearer " access-token))
+         ;;          :params data
+         ;;          :parser #'json-read
+         ;;          :success callback
+         ;;          :error (apply-partially error-callback session)
+         ;;          :complete complete-callback
+         ;;          :timeout timeout
+         ;;          :sync matrix-synchronous)
+         (url-with-retrieve-async url
+           :silent t
+           :inhibit-cookies t
+           :extra-headers (a-list "Authorization" (concat "Bearer " access-token))
+           ;; TODO: Note that `data' is passed as query-params for GET and as JSON-encoded body data for POST.
+           :query data
+           :parser #'json-read
+           ;; TODO: Call `matrix-sync' in success and error callbacks since we don't have :complete.
+           :success callback
+           :error (apply-partially error-callback session)
+           ;; TODO: Handle timeouts
+           ))
+        ((or "POST" "PUT")
+         ;; (request url
+         ;;          :type method
+         ;;          :headers (a-list 'Content-Type "application/json"
+         ;;                           'Authorization (concat "Bearer " access-token))
+         ;;          :data (json-encode data)
+         ;;          :parser #'json-read
+         ;;          :success callback
+         ;;          :error (apply-partially error-callback session)
+         ;;          :complete complete-callback
+         ;;          :timeout timeout
+         ;;          :sync matrix-synchronous)
+         (url-with-retrieve-async url
+           :silent t
+           :inhibit-cookies t
+           :method method
+           :extra-headers (a-list "Content-Type" "application/json"
+                                  "Authorization" (concat "Bearer " access-token))
+           :data (json-encode data)
+           :parser #'json-read
+           ;; TODO: Call `matrix-sync' in success and error callbacks since we don't have :complete.
+           :success callback
+           :error (apply-partially error-callback session)
+           ;; TODO: Handle timeouts
+           ))))))
 
 (matrix-defcallback request-error matrix-session
-  "Callback function for request error."
-  :slots (user)
-  :body (matrix-warn "REQUEST ERROR:%s  RESPONSE:%s" error-thrown
-                     (a-list 'url (request-response-url response)
-                             'settings (request-response-settings response)
-                             'data (request-response-data response))))
+                    "Callback function for request error."
+                    :slots (user)
+                    :body (matrix-warn "REQUEST ERROR:%s  RESPONSE:%s" error
+                                       (pp-to-string (a-list 'url url
+                                                             'query query
+                                                             'data data))))
 
 ;;;;; Login/logout
 
@@ -358,13 +397,16 @@ DEVICE-ID and INITIAL-DEVICE-DISPLAY-NAME."
                  #'matrix-login-callback)))
 
 (matrix-defcallback login matrix-session
-  "Callback function for successful login.
+                    "Callback function for successful login.
 Set access_token and device_id in session."
-  :slots (access-token device-id)
-  :body (pcase-let* (((map access_token device_id) data))
-          (setq access-token access_token
-                device-id device_id)
-          (run-hook-with-args 'matrix-login-hook session)))
+                    :slots (access-token device-id)
+                    :body (pcase-let* (((map access_token device_id) data))
+                            (matrix-log (a-list 'event 'matrix-login-callback
+                                                'data data
+                                                'access_token access_token))
+                            (setq access-token access_token
+                                  device-id device_id)
+                            (run-hook-with-args 'matrix-login-hook session)))
 
 (cl-defmethod matrix-logout ((session matrix-session))
   "Log out of SESSION."
@@ -434,9 +476,11 @@ requests, and we make a new request."
   ;; beginning of the room, in which case I guess the start/end tokens from /messages will be
   ;; the same...?  Or we'll receive fewer messages than the limit...?
 
-  (matrix-log "`matrix-sync' called")
-
   (with-slots (access-token next-batch) session
+    (matrix-log (a-list 'event 'matrix-sync
+                        'access-token access-token
+                        'next-batch next-batch
+                        'timeout timeout))
     (unless access-token
       ;; FIXME: This should never happen.  If it does, maybe we should handle it differently.
       (error "Missing access token for session"))
@@ -450,23 +494,26 @@ requests, and we make a new request."
                 ;; Add 5 seconds to timeout to give server a bit of grace period before we
                 ;; consider it unresponsive.
                 ;; MAYBE: Increase grace period substantially, maybe up to 60 seconds.
-                :timeout (+ timeout 5))))
+                ;; :timeout (+ timeout 5)
+                )))
 
 (matrix-defcallback sync matrix-session
                     "Callback function for successful sync request."
                     ;; https://matrix.org/docs/spec/client_server/r0.3.0.html#id167
                     :slots (rooms next-batch initial-sync-p)
-                    :body (cl-loop initially do (matrix-log "SYNC CALLBACK: %s" (matrix-pp-string data))
-
-                                   for param in '(rooms presence account_data to_device device_lists)
-                                   ;; Assume that methods called will signal errors if anything goes wrong, so
-                                   ;; ignore return values.
-                                   do (apply-if-fn (concat "matrix-sync-" (symbol-name param))
-                                                   (list session (a-get data param))
-                                                   (matrix-log "Unimplemented API method: %s" fn-name))
-                                   finally do (progn
-                                                (setq initial-sync-p nil)
-                                                (setq next-batch (a-get data 'next_batch)))))
+                    :body (progn
+                            (matrix-log (a-list 'type 'matrix-sync-callback
+                                                'data data))
+                            (cl-loop for param in '(rooms presence account_data to_device device_lists)
+                                     ;; Assume that methods called will signal errors if anything goes wrong, so
+                                     ;; ignore return values.
+                                     do (apply-if-fn (concat "matrix-sync-" (symbol-name param))
+                                                     (list session (a-get data param))
+                                                     (matrix-log "Unimplemented API method: %s" fn-name)))
+                            (setq initial-sync-p nil
+                                  next-batch (a-get data 'next_batch))
+                            (matrix-log "Sync callback complete.  Calling sync again...")
+                            (matrix-sync session)))
 
 (matrix-defcallback sync-complete matrix-session
                     "Completion callback function for sync requests.
@@ -542,8 +589,8 @@ SESSION has no access token, consider the session logged-out."
            do (progn
                 (pcase room
                   (`(join . ,_) (matrix-sync-join session room))
-                  (`(invite .  ,_) (matrix-log "Would process room invites: %s" room))
-                  (`(leave . ,_) (matrix-log "Would process room leaves: %s" room))))))
+                  (`(invite .  ,_) (matrix-warn-unimplemented (format$ "Would process room invites: $room")))
+                  (`(leave . ,_) (matrix-warn-unimplemented (format$ "Would process room leaves: %s" room)))))))
 
 (cl-defmethod matrix-sync-join ((session matrix-session) join)
   "Sync JOIN, a list of joined rooms, on SESSION."
@@ -564,8 +611,8 @@ SESSION has no access token, consider the session logged-out."
                            ;; If the event array is empty, the function will be
                            ;; called anyway, so ignore its return value.
                            do (apply-if-fn (concat "matrix-sync-" (symbol-name param))
-                                  (list room (a-get joined-room param))
-                                (matrix-warn "Unimplemented API method: %s" fn-name))
+                                           (list room (a-get joined-room param))
+                                           (matrix-warn-unimplemented "Unimplemented API method: %s" fn-name))
                            ;; Always return t for now, so that we think the sync succeeded
                            ;; and we can set next_batch in `matrix-sync-callback'.
                            finally return t)
@@ -592,6 +639,11 @@ SESSION has no access token, consider the session logged-out."
   (with-slots* (((id session timeline timeline-new prev-batch last-full-sync) room)
                 ((next-batch) session))
     (pcase-let (((map events limited prev_batch) data))
+      (matrix-log (a-list 'event 'matrix-sync-timeline
+                          'room-id id
+                          'prev-batch prev-batch
+                          'last-full-sync last-full-sync
+                          'data data))
       (seq-doseq (event events)
         (push event timeline)
         (push event timeline-new)
@@ -606,11 +658,11 @@ SESSION has no access token, consider the session logged-out."
           ;; more messages, even if the timeline is limited.
           ;; MAYBE: Add setting for minimum number of events/messages to initially fetch.
           (progn
-            (matrix-warn "ROOM %s TIMELINE WAS LIMITED.  Trying to fill gap..." id)
+            (matrix-log "Limited timeline.  Calling `matrix-messages'...")
             (matrix-messages room))
         ;; Timeline is not limited: save the not-yet-updated next-batch token.  If the next
         ;; timeline is limited, we use this token to know when we have filled the timeline gap.
-        (matrix-log "ROOM %s FULLY SYNCED." id)
+        (matrix-log "Room fully synced.")
         (setq last-full-sync next-batch)))))
 
 (cl-defmethod matrix-event ((room matrix-room) event)
@@ -623,7 +675,7 @@ SESSION has no access token, consider the session logged-out."
 (cl-defmethod matrix-event-m.room.member ((room matrix-room) event)
   "Process m.room.member EVENT in ROOM."
   (with-slots (members id) room
-    (matrix-log "m.room.member for ROOM:%s  EVENT:%s" id event)
+    ;; (matrix-log "m.room.member for ROOM:%s  EVENT:\n%s" id (pp-to-string event))
 
     (pcase-let* (((map ('state_key user-id) content) event)
                  ((map membership displayname avatar_url) content))
@@ -674,28 +726,34 @@ maximum number of events to return (default 10)."
                 (apply-partially #'matrix-messages-callback room))))
 
 (matrix-defcallback messages matrix-room
-  "Callback for /rooms/{roomID}/messages."
-  :slots (id timeline timeline-new prev-batch last-full-sync)
-  :body (pcase-let* (((map start end chunk) data))
-          ;; NOTE: API docs:
-          ;; start: The token the pagination starts from. If dir=b
-          ;; this will be the token supplied in from.
-          ;; end: The token the pagination ends at. If dir=b this
-          ;; token should be used again to request even earlier
-          ;; events.
-          (seq-doseq (event chunk)
-            (push event timeline)
-            (push event timeline-new))
+                    "Callback for /rooms/{roomID}/messages."
+                    :slots (id timeline timeline-new prev-batch last-full-sync)
+                    :body (pcase-let* (((map start end chunk) data))
 
-          (if (equal end last-full-sync)
-              ;; Gap has been filled: clear the last-full-sync token (NOTE: Not sure if this is correct)
-              (progn
-                (matrix-log "MESSAGES CALLBACK for ROOM: %s: gap is filled: %s" id data)
-                (setq last-full-sync nil))
-            ;; Gap not yet filled: continue filling
-            (matrix-log "MESSAGES CALLBACK for ROOM: %s: gap NOT filled: %s" id data)
-            (setq prev-batch end)
-            (matrix-messages room))))
+                            (matrix-log (a-list 'type 'matrix-messages-callback
+                                                'room-id id
+                                                'data data
+                                                'prev-batch prev-batch
+                                                'last-full-sync last-full-sync))
+                            ;; NOTE: API docs:
+                            ;; start: The token the pagination starts from. If dir=b
+                            ;; this will be the token supplied in from.
+                            ;; end: The token the pagination ends at. If dir=b this
+                            ;; token should be used again to request even earlier
+                            ;; events.
+                            (seq-doseq (event chunk)
+                              (push event timeline)
+                              (push event timeline-new))
+
+                            (if (equal end last-full-sync)
+                                ;; Gap has been filled: clear the last-full-sync token (NOTE: Not sure if this is correct)
+                                (progn
+                                  (matrix-log "Gap is filled")
+                                  (setq last-full-sync nil))
+                              ;; Gap not yet filled: continue filling
+                              (matrix-log "Gap not filled" id data)
+                              (setq prev-batch end)
+                              (matrix-messages room))))
 
 (cl-defmethod matrix-sync-ephemeral ((room matrix-room) ephemeral)
   "Sync EPHEMERAL in ROOM."

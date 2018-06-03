@@ -210,8 +210,8 @@ method without it."
         (setq user (a-get saved 'username)
               access-token (a-get saved 'token))
       ;; Not saved: prompt for username and password
-      (setq user (read-string "User ID: ")
-            password (read-passwd "Password: ")))
+      (setq user (or user (read-string "User ID: "))
+            password (or password (read-passwd "Password: "))))
     (if access-token
         ;; Use saved token and call post-login hook
         (matrix-client-ng-login-hook (matrix-session :user user
@@ -233,9 +233,11 @@ Add session to sessions list and run initial sync."
 
 (cl-defmethod matrix-client-ng-save-token ((session matrix-session))
   "Save username and access token for session SESSION to file."
+  ;; TODO: Check if file exists; if so, ensure it has a proper header so we know it's ours.
   (with-temp-file matrix-client-ng-save-token-file
     (with-slots (user access-token) session
       ;; FIXME: Change "username" to "user" when we no longer need compatibility with old code
+      ;; FIXME: Change token to access-token for clarity.
       (prin1 (a-list 'username user
                      'token access-token)
              (current-buffer))))
@@ -259,7 +261,7 @@ just clear local session data."
     (f-delete matrix-client-ng-save-token-file))
   ;; Delete access token
   (--each matrix-client-ng-sessions
-      (oset it access-token nil))
+    (oset it access-token nil))
   (setq matrix-client-ng-sessions nil))
 
 ;;;; Rooms
@@ -434,21 +436,21 @@ Also update prompt with typers."
   (unless (and (boundp 'tabbar-mode) tabbar-mode)
     ;; Disable when tabbar mode is on.  MAYBE: Remove this.
     (with-room-buffer room
-      (pcase-let* (((eieio avatar typers name topic) room)
-                   (name (when name
-                           (propertize name 'face 'font-lock-keyword-face)))
-                   (ov (car (ov-in 'matrix-client-prompt)))
-                   (typers-string (s-join ", " (cl-loop for user across typers
-                                                        collect (matrix-user-displayname room user))))
-                   (prompt (if (> (length typers) 0)
-                               (concat (propertize (concat "Typing: " typers-string)
-                                                   'face 'font-lock-comment-face)
-                                       "\n" matrix-client-ng-input-prompt)
-                             matrix-client-ng-input-prompt)))
-        (ov-set ov 'before-string prompt)
-        (setq header-line-format (concat avatar
-                                         ;; NOTE: Not sure if using `format' with an image-containing string works.
-                                         (format$ "$name: $topic")))))))
+                      (pcase-let* (((eieio avatar typers name topic) room)
+                                   (name (when name
+                                           (propertize name 'face 'font-lock-keyword-face)))
+                                   (ov (car (ov-in 'matrix-client-prompt)))
+                                   (typers-string (s-join ", " (cl-loop for user across typers
+                                                                        collect (matrix-user-displayname room user))))
+                                   (prompt (if (> (length typers) 0)
+                                               (concat (propertize (concat "Typing: " typers-string)
+                                                                   'face 'font-lock-comment-face)
+                                                       "\n" matrix-client-ng-input-prompt)
+                                             matrix-client-ng-input-prompt)))
+                        (ov-set ov 'before-string prompt)
+                        (setq header-line-format (concat avatar
+                                                         ;; NOTE: Not sure if using `format' with an image-containing string works.
+                                                         (format$ "$name: $topic")))))))
 
 ;;;;; Timeline
 
@@ -456,104 +458,104 @@ Also update prompt with typers."
   "Process EVENT in ROOM."
   (pcase-let* (((map type) event))
     (apply-if-fn (concat "matrix-client-event-" (symbol-name type))
-        (list room event)
-      (matrix-log "Unimplemented client method: %s" fn-name))))
+                 (list room event)
+                 (matrix-warn-unimplemented (format$ "Unimplemented client method: $fn-name")))))
 
 (matrix-client-ng-defevent m.room.message
-  "Process m.room.message EVENT in ROOM."
-  :object-slots ((room session)
-                 (session user))
-  :event-keys (thumbnail_url url)
-  :content-keys (body format formatted_body msgtype)
-  :let ( ;; We don't use `matrix-client-event-data-timestamp', because for
-        ;; room messages, the origin_server_ts is the actual message time.
-        (timestamp (/ origin_server_ts 1000))
-        (timestamp-string (format-time-string "%T" (seconds-to-time timestamp)))
-        (displayname (matrix-user-displayname room sender))
-        (metadata) (msg) (matrix-image-url))
-  :body (progn
-          (matrix-log "PROCESSING MESSAGE EVENT: \n%s" (matrix-pp-string event))
-          (when content
-            ;; Redacted messages have no content, so we should do nothing for them.
-            (setq metadata (format$ "[$timestamp-string] $displayname> "))
-            (setq message (string-trim
-                           ;; Trim messages because HTML ones can have extra newlines
-                           (pcase msgtype
-                             ("m.emote"
-                              (format$ "* $body"))
-                             ((guard (and matrix-client-ng-render-html (string= "org.matrix.custom.html" format)))
-                              (with-temp-buffer
-                                (insert formatted_body)
-                                (goto-char (point-min))
-                                (while (re-search-forward "\\(<br />\\)+" nil t)
-                                  (replace-match "<br />"))
-                                (let ((document (libxml-parse-html-region (point) (point-max))))
-                                  (erase-buffer)
-                                  (shr-insert-document document)
-                                  (goto-char (point-min))
-                                  (delete-blank-lines)
-                                  (buffer-string))))
-                             ("m.image"
-                              (setq matrix-image-url (matrix-transform-mxc-uri (or url thumbnail_url)))
-                              (concat body
-                                      ": "
-                                      (matrix-client-linkify-urls matrix-image-url)))
-                             (_ (matrix-client-ng-linkify-urls body)))))
-            ;; Apply face for own messages
-            (let (metadata-face message-face)
-              (cond ((equal sender user)
-                     (setq metadata-face 'matrix-client-own-metadata
-                           message-face 'matrix-client-own-messages))
-                    ((string= msgtype "m.notice")
-                     (setq metadata-face 'matrix-client-notice-metadata
-                           message-face 'matrix-client-notice))
-                    (t
-                     (setq metadata-face 'matrix-client-metadata
-                           message-face 'default)))
-              ;; Use 'append so that link faces are not overridden.
-              (add-face-text-property 0 (length metadata) metadata-face 'append metadata)
-              (add-face-text-property 0 (length message) message-face 'append message))
+                           "Process m.room.message EVENT in ROOM."
+                           :object-slots ((room session)
+                                          (session user))
+                           :event-keys (thumbnail_url url)
+                           :content-keys (body format formatted_body msgtype)
+                           :let ( ;; We don't use `matrix-client-event-data-timestamp', because for
+                                 ;; room messages, the origin_server_ts is the actual message time.
+                                 (timestamp (/ origin_server_ts 1000))
+                                 (timestamp-string (format-time-string "%T" (seconds-to-time timestamp)))
+                                 (displayname (matrix-user-displayname room sender))
+                                 (metadata) (msg) (matrix-image-url))
+                           :body (progn
+                                   ;; (matrix-log "PROCESSING MESSAGE EVENT: \n%s" (matrix-pp-string event))
+                                   (when content
+                                     ;; Redacted messages have no content, so we should do nothing for them.
+                                     (setq metadata (format$ "[$timestamp-string] $displayname> "))
+                                     (setq message (string-trim
+                                                    ;; Trim messages because HTML ones can have extra newlines
+                                                    (pcase msgtype
+                                                      ("m.emote"
+                                                       (format$ "* $body"))
+                                                      ((guard (and matrix-client-ng-render-html (string= "org.matrix.custom.html" format)))
+                                                       (with-temp-buffer
+                                                         (insert formatted_body)
+                                                         (goto-char (point-min))
+                                                         (while (re-search-forward "\\(<br />\\)+" nil t)
+                                                           (replace-match "<br />"))
+                                                         (let ((document (libxml-parse-html-region (point) (point-max))))
+                                                           (erase-buffer)
+                                                           (shr-insert-document document)
+                                                           (goto-char (point-min))
+                                                           (delete-blank-lines)
+                                                           (buffer-string))))
+                                                      ("m.image"
+                                                       (setq matrix-image-url (matrix-transform-mxc-uri (or url thumbnail_url)))
+                                                       (concat body
+                                                               ": "
+                                                               (matrix-client-linkify-urls matrix-image-url)))
+                                                      (_ (matrix-client-ng-linkify-urls body)))))
+                                     ;; Apply face for own messages
+                                     (let (metadata-face message-face)
+                                       (cond ((equal sender user)
+                                              (setq metadata-face 'matrix-client-own-metadata
+                                                    message-face 'matrix-client-own-messages))
+                                             ((string= msgtype "m.notice")
+                                              (setq metadata-face 'matrix-client-notice-metadata
+                                                    message-face 'matrix-client-notice))
+                                             (t
+                                              (setq metadata-face 'matrix-client-metadata
+                                                    message-face 'default)))
+                                       ;; Use 'append so that link faces are not overridden.
+                                       (add-face-text-property 0 (length metadata) metadata-face 'append metadata)
+                                       (add-face-text-property 0 (length message) message-face 'append message))
 
-            ;; Insert metadata with message and add text properties
-            (matrix-client-ng-insert room (propertize (concat metadata message)
-                                                      'timestamp timestamp
-                                                      'displayname displayname
-                                                      'sender sender
-                                                      'event_id event_id))
+                                     ;; Insert metadata with message and add text properties
+                                     (matrix-client-ng-insert room (propertize (concat metadata message)
+                                                                               'timestamp timestamp
+                                                                               'displayname displayname
+                                                                               'sender sender
+                                                                               'event_id event_id))
 
-            ;; Start image insertion if necessary
-            (when matrix-client-ng-show-images
-              (cl-loop for url in (-non-nil (append (matrix-client-ng--image-urls message)
-                                                    (list matrix-image-url)))
-                       do (matrix-client-ng-insert-image room event_id url)))
+                                     ;; Start image insertion if necessary
+                                     (when matrix-client-ng-show-images
+                                       (cl-loop for url in (-non-nil (append (matrix-client-ng--image-urls message)
+                                                                             (list matrix-image-url)))
+                                                do (matrix-client-ng-insert-image room event_id url)))
 
-            ;; Move last-seen line if it's our own message
-            (when (equal sender user)
-              (matrix-client-ng-update-last-seen room))
+                                     ;; Move last-seen line if it's our own message
+                                     (when (equal sender user)
+                                       (matrix-client-ng-update-last-seen room))
 
-            ;; Notification
-            (unless (equal sender user)
-              (matrix-client-notify "m.room.message" event :room room)))))
+                                     ;; Notification
+                                     (unless (equal sender user)
+                                       (matrix-client-notify "m.room.message" event :room room)))))
 
 (matrix-client-ng-defevent m.room.member
-  "Say that member in EVENT joined/left ROOM."
-  :event-keys (state_key)
-  :content-keys (displayname membership)
-  :let ((timestamp (matrix-client-ng-event-timestamp event))
-        (action (pcase membership
-                  ("join" "joined")
-                  ("left" "left")
-                  (_ membership)))
-        (msg (propertize (format$ "$displayname $action")
-                         'face 'matrix-client-notice
-                         'event_id event_id
-                         'sender sender
-                         'timestamp timestamp)))
-  ;; MAYBE: Get displayname from API room object's membership list.
-  :body (progn
-          (matrix-client-ng-insert room msg)
-          (with-room-buffer room
-            (rename-buffer (matrix-client-ng-display-name room)))))
+                           "Say that member in EVENT joined/left ROOM."
+                           :event-keys (state_key)
+                           :content-keys (displayname membership)
+                           :let ((timestamp (matrix-client-ng-event-timestamp event))
+                                 (action (pcase membership
+                                           ("join" "joined")
+                                           ("left" "left")
+                                           (_ membership)))
+                                 (msg (propertize (format$ "$displayname $action")
+                                                  'face 'matrix-client-notice
+                                                  'event_id event_id
+                                                  'sender sender
+                                                  'timestamp timestamp)))
+                           ;; MAYBE: Get displayname from API room object's membership list.
+                           :body (progn
+                                   (matrix-client-ng-insert room msg)
+                                   (with-room-buffer room
+                                                     (rename-buffer (matrix-client-ng-display-name room)))))
 
 ;;;; Update-room-at-once approach
 
@@ -565,8 +567,8 @@ Also update prompt with typers."
     (seq-doseq (event timeline-new)
       (pcase-let* (((map type) event))
         (apply-if-fn (concat "matrix-client-event-" type)
-            (list room event)
-          (matrix-log "Unimplemented client method: %s" fn-name))))
+                     (list room event)
+                     (matrix-warn-unimplemented (format$ "Unimplemented client method: $fn-name")))))
     ;; Clear new events
     (matrix-clear-timeline room)
     ;; TODO: Update other room things: header, avatar, typers, topic, name, aliases, etc.
