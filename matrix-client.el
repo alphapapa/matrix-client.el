@@ -50,6 +50,7 @@
 (require 'dash)
 (require 'f)
 (require 'ov)
+(require 's)
 (require 'tracking)
 
 (require 'matrix-utils)
