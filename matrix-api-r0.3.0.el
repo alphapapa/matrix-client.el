@@ -35,6 +35,11 @@
 
 ;;;; Variables
 
+(defvar matrix-log nil
+  "Enable logging to `matrix-log-buffer'.
+NOTE: This can log sensitive data, such as passwords and access
+tokens.  Logs should be sanitized before sharing.")
+
 (defvar matrix-log-buffer "*matrix-log*"
   "Name of buffer used by `matrix-log'.")
 
@@ -231,16 +236,17 @@ The sync error handler should increase this for consecutive errors, up to a maxi
   "Log MESSAGE with ARGS to Matrix log buffer and return non-nil.
 MESSAGE and ARGS should be a string and list of strings for
 `format'."
-  (when (stringp (car args))
-    (setq args (a-list 'args args)))
-  (setq args (cons (cons 'timestamp (format-time-string "%Y-%m-%d %H:%M:%S"))
-                   args))
-  (with-current-buffer (get-buffer-create matrix-log-buffer)
-    (save-excursion
-      (goto-char (point-max))
-      (insert (pp-to-string args) "\n"))
-    ;; Returning t is more convenient than nil, which is returned by `message'.
-    t))
+  (when matrix-log
+    (when (stringp (car args))
+      (setq args (a-list 'args args)))
+    (push (cons 'timestamp (format-time-string "%Y-%m-%d %H:%M:%S"))
+          args)
+    (with-current-buffer (get-buffer-create matrix-log-buffer)
+      (save-excursion
+        (goto-char (point-max))
+        (insert (pp-to-string args) "\n"))))
+  ;; Returning t is more convenient than nil, which is returned by `message'.
+  t)
 
 (defun matrix-warn (message &rest args)
   "Log MESSAGE with ARGS to Matrix log buffer and signal warning with same MESSAGE.
@@ -319,12 +325,11 @@ set, will be called if the request fails."
            (method (upcase (cl-typecase method
                              (string method)
                              (symbol (symbol-name method))))))
+      ;; NOTE: This can log sensitive data in the `data' var, e.g. passwords and access tokens
       (matrix-log (a-list 'event 'matrix-request
                           'url url
                           'method method
                           'data data
-                          ;; 'success success
-                          ;; 'error error
                           'timeout timeout))
       (pcase method
         ("GET" (url-with-retrieve-async url
@@ -375,9 +380,7 @@ DEVICE-ID and INITIAL-DEVICE-DISPLAY-NAME."
 Set access_token and device_id in session."
   :slots (access-token device-id)
   :body (pcase-let* (((map access_token device_id) data))
-          (matrix-log (a-list 'event 'matrix-login-callback
-                              'data data
-                              'access_token access_token))
+          (matrix-log (a-list 'event 'matrix-login-callback))
           (setq access-token access_token
                 device-id device_id)
           (run-hook-with-args 'matrix-login-hook session)))
@@ -452,7 +455,6 @@ requests, and we make a new request."
 
   (with-slots (access-token next-batch) session
     (matrix-log (a-list 'event 'matrix-sync
-                        'access-token access-token
                         'next-batch next-batch
                         'timeout timeout))
     (unless access-token
