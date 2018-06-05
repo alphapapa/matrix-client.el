@@ -82,13 +82,15 @@ the Matrix spec for more information about its format."
       (if url
           ;; New avatar
           ;; TODO: Maybe display the new avatar in the chat list, like Riot.
-          (request (matrix-transform-mxc-uri url)
-                   :parser (apply-partially #'matrix-client-parse-image room :max-width 32 :max-height 32)
-                   :success (apply-partially #'matrix-client-room-avatar-callback
-                                             :room room
-                                             :message msg
-                                             :max-width 32
-                                             :max-height 32))
+          (url-with-retrieve-async (matrix-transform-mxc-uri url)
+            :silent t
+            :inhibit-cookies t
+            :parser (apply-partially #'matrix-client-parse-image room :max-width 32 :max-height 32)
+            :success (apply-partially #'matrix-client-room-avatar-callback
+                                      :room room
+                                      :message msg
+                                      :max-width 32
+                                      :max-height 32))
         ;; Avatar removed
         (oset room avatar nil)
         ;; TODO: A function to automatically propertize a string with its related event data would be nice.

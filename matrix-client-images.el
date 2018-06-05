@@ -27,12 +27,14 @@ to match until the next whitespace character."
 
 (cl-defmethod matrix-client-insert-image ((room matrix-client-room) message-id url)
   "Download image from URL and insert it at message MESSAGE-ID in ROOM."
-  (request url
-           :parser (apply-partially #'matrix-client-parse-image room)
-           :success (apply-partially #'matrix-client-insert-image-callback
-                                     :room room
-                                     :message-id message-id
-                                     :url url)))
+  (url-with-retrieve-async url
+    :silent t
+    :inhibit-cookies t
+    :parser (apply-partially #'matrix-client-parse-image room)
+    :success (apply-partially #'matrix-client-insert-image-callback
+                              :room room
+                              :message-id message-id
+                              :url url)))
 
 (cl-defmethod matrix-client-parse-image ((room matrix-client-room) &rest rescale-args)
   "Parse image from current HTTP response buffer and return image object.
