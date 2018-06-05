@@ -459,7 +459,7 @@ Also update prompt with typers."
   (pcase-let* (((map type) event))
     (apply-if-fn (concat "matrix-client-event-" (symbol-name type))
                  (list room event)
-                 (matrix-warn-unimplemented (format$ "Unimplemented client method: $fn-name")))))
+                 (matrix-unimplemented (format$ "Unimplemented client method: $fn-name")))))
 
 (matrix-client-ng-defevent m.room.message
                            "Process m.room.message EVENT in ROOM."
@@ -568,7 +568,7 @@ Also update prompt with typers."
       (pcase-let* (((map type) event))
         (apply-if-fn (concat "matrix-client-event-" type)
                      (list room event)
-                     (matrix-warn-unimplemented (format$ "Unimplemented client method: $fn-name")))))
+                     (matrix-unimplemented (format$ "Unimplemented client method: $fn-name")))))
     ;; Clear new events
     (matrix-clear-timeline room)
     ;; TODO: Update other room things: header, avatar, typers, topic, name, aliases, etc.

@@ -244,7 +244,7 @@ MESSAGE and ARGS should be a string and list of strings for
   (apply #'matrix-log message args)
   (apply #'warn message args))
 
-(defun matrix-warn-unimplemented (&rest args)
+(defun matrix-unimplemented (&rest args)
   (when matrix-warn-unimplemented
     (apply #'matrix-log args)))
 
@@ -509,7 +509,7 @@ requests, and we make a new request."
                                      ;; ignore return values.
                                      do (apply-if-fn (concat "matrix-sync-" (symbol-name param))
                                                      (list session (a-get data param))
-                                                     (matrix-log "Unimplemented API method: %s" fn-name)))
+                                                     (matrix-unimplemented (format$ "Unimplemented API method: $fn-name"))))
                             (setq initial-sync-p nil
                                   next-batch (a-get data 'next_batch))
                             (matrix-log "Sync callback complete.  Calling sync again...")
@@ -589,8 +589,8 @@ SESSION has no access token, consider the session logged-out."
            do (progn
                 (pcase room
                   (`(join . ,_) (matrix-sync-join session room))
-                  (`(invite .  ,_) (matrix-warn-unimplemented (format$ "Would process room invites: $room")))
-                  (`(leave . ,_) (matrix-warn-unimplemented (format$ "Would process room leaves: %s" room)))))))
+                  (`(invite .  ,_) (matrix-unimplemented (format$ "Would process room invites: $room")))
+                  (`(leave . ,_) (matrix-unimplemented (format$ "Would process room leaves: %s" room)))))))
 
 (cl-defmethod matrix-sync-join ((session matrix-session) join)
   "Sync JOIN, a list of joined rooms, on SESSION."
@@ -612,7 +612,7 @@ SESSION has no access token, consider the session logged-out."
                            ;; called anyway, so ignore its return value.
                            do (apply-if-fn (concat "matrix-sync-" (symbol-name param))
                                            (list room (a-get joined-room param))
-                                           (matrix-warn-unimplemented "Unimplemented API method: %s" fn-name))
+                                           (matrix-unimplemented (format$ "Unimplemented API method: $fn-name")))
                            ;; Always return t for now, so that we think the sync succeeded
                            ;; and we can set next_batch in `matrix-sync-callback'.
                            finally return t)
@@ -669,8 +669,8 @@ SESSION has no access token, consider the session logged-out."
   "Process EVENT in ROOM."
   (pcase-let* (((map type) event))
     (apply-if-fn (concat "matrix-event-" type)
-        (list room event)
-      (matrix-log "Unimplemented API handler for event %s in room %s." type (oref room id)))))
+                 (list room event)
+                 (matrix-unimplemented (format$ "Unimplemented API handler for event $type in room %s." (oref room id))))))
 
 (cl-defmethod matrix-event-m.room.member ((room matrix-room) event)
   "Process m.room.member EVENT in ROOM."
