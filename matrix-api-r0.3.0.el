@@ -250,15 +250,18 @@ MESSAGE and ARGS should be a string and list of strings for
 
 (defun matrix-get (&rest args)
   "Call `matrix-request' with ARGS for a \"GET\" request."
+  (declare (indent defun))
   (apply #'matrix-request args ))
 
 (defun matrix-post (&rest args)
   "Call `matrix-request' with ARGS for a \"POST\" request."
+  (declare (indent defun))
   (nconc args (list :method 'post))
   (apply #'matrix-request args))
 
 (defun matrix-put (&rest args)
   "Call `matrix-request' with ARGS for a \"PUT\" request."
+  (declare (indent defun))
   (nconc args (list :method 'put))
   (apply #'matrix-request args))
 
@@ -279,14 +282,7 @@ encoded to JSON.  CALLBACK should be a method specialized on
 `matrix-session', whose subsequent arguments are defined in
 accordance with the `request' package's API.  ERROR-CALLBACK, if
 set, will be called if the request fails."
-
-  ;; TODO: Add general completion callback that retries requests if they timeout.  e.g. if a
-  ;; message-send request times out, we should retry it at least once, and then give an error.
-  ;; We should check the API docs to see if there's a recommended timeout value for requests
-  ;; like that.
-
-  ;; TODO: Use request's :status-code argument to handle error responses more precisely.
-
+  (declare (indent defun))
   (with-slots (api-url-prefix access-token txn-id) session
     (let* ((url (url-encode-url
                  (concat api-url-prefix (cl-typecase endpoint
