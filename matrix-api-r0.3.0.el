@@ -173,6 +173,11 @@ FN-NAME should be a string, and is available in the ELSE form as `fn-name'."
                :documentation "The batch token to supply in the since param of the next /sync request.")
    ;; FIXME: After fixing bug in macro, let this be simply (initial-sync-p)
    (initial-sync-p :initarg :initial-sync-p)
+   (sync-retry-delay :initform 0
+                     :initarg :sync-retry-delay
+                     :type integer
+                     :documentation "When a /sync request fails, wait this long before syncing again.
+The sync error handler should increase this for consecutive errors, up to a maximum, and the success handler should reset it to 0.")
    (extra :initarg :extra
           :documentation "Reserved for users of the library, who may store whatever they want here."))
   :allow-nil-initform t)
@@ -269,13 +274,12 @@ MESSAGE and ARGS should be a string and list of strings for
 
 ;;;;; Request
 
-(cl-defmethod matrix-request ((session matrix-session) endpoint data callback
-                              &optional &key (method 'get) (error-callback #'matrix-request-error-callback)
-                              complete-callback timeout)
+(cl-defmethod matrix-request ((session matrix-session) endpoint &key data success
+                              (method "GET") (error #'matrix-request-error-callback) timeout)
   "Make request to ENDPOINT on SESSION with DATA and call CALLBACK on success.
-Request is made asynchronously.  METHOD should be a symbol,
-`get' (the default) or `post'.  ENDPOINT may be a string or
-symbol and should represent the final part of the API
+Request is made asynchronously.  METHOD should be a symbol or
+string, `get' (the default) or `post' (it will be upcased).  ENDPOINT may be a string
+or symbol and should represent the final part of the API
 URL (e.g. for \"/_matrix/client/r0/login\", it should be
 \"login\".  DATA should be an alist which will be automatically
 encoded to JSON.  CALLBACK should be a method specialized on
@@ -298,26 +302,29 @@ set, will be called if the request fails."
                   (lambda (k v)
                     v)
                   data))
-           (callback (cl-typecase callback
-                       ;; If callback is a symbol, apply session to
-                       ;; it.  If it's an already-partially-applied
-                       ;; function, use it as-is.
-                       ;; FIXME: Add to docstring.
-                       (symbolp (apply-partially callback session))
-                       (t callback)))
-           (complete-callback (pcase complete-callback
-                                ;; If complete-callback is a symbol, apply session to
-                                ;; it.  If it's an already-partially-applied
-                                ;; function, use it as-is.
-                                ;; FIXME: Add to docstring.
-                                (`nil nil)
-                                ((pred symbolp) (apply-partially complete-callback session))
-                                (_ complete-callback)))
-           (method (upcase (symbol-name method))))
+           (success (cl-typecase success
+                      ;; If success is a symbol, apply session to
+                      ;; it.  If it's an already-partially-applied
+                      ;; function, use it as-is.
+                      ;; FIXME: Add to docstring.
+                      (symbol (apply-partially success session))
+                      (t success)))
+           (error (cl-typecase error
+                    ;; If error is a symbol, apply session to
+                    ;; it.  If it's an already-partially-applied
+                    ;; function, use it as-is.
+                    ;; FIXME: Add to docstring.
+                    (symbol (apply-partially error session))
+                    (t error)))
+           (method (upcase (cl-typecase method
+                             (string method)
+                             (symbol (symbol-name method))))))
       (matrix-log (a-list 'event 'matrix-request
                           'url url
                           'method method
                           'data data
+                          ;; 'success success
+                          ;; 'error error
                           'timeout timeout))
       (pcase method
         ("GET" (url-with-retrieve-async url
@@ -326,8 +333,8 @@ set, will be called if the request fails."
                  :extra-headers (a-list "Authorization" (concat "Bearer " access-token))
                  :query data
                  :parser #'json-read
-                 :success callback
-                 :error (apply-partially error-callback session)))
+                 :success success
+                 :error error))
         ((or "POST" "PUT") (url-with-retrieve-async url
                              :silent t
                              :inhibit-cookies t
@@ -336,13 +343,13 @@ set, will be called if the request fails."
                                                     "Authorization" (concat "Bearer " access-token))
                              :data (json-encode data)
                              :parser #'json-read
-                             :success callback
-                             :error (apply-partially error-callback session)))))))
+                             :success success
+                             :error error))))))
 
 (matrix-defcallback request-error matrix-session
   "Callback function for request error."
   :slots (user)
-  :body (matrix-warn (a-list 'event matrix-request-error-callback
+  :body (matrix-warn (a-list 'event 'matrix-request-error-callback
                              'error error
                              'url url
                              'query query
@@ -355,12 +362,13 @@ set, will be called if the request fails."
 Session should already have its USER slot set, and optionally its
 DEVICE-ID and INITIAL-DEVICE-DISPLAY-NAME."
   (with-slots (user device-id initial-device-display-name) session
-    (matrix-post session 'login (a-list 'type "m.login.password"
-                                        'user user
-                                        'password password
-                                        'device_id device-id
-                                        'initial_device_display_name initial-device-display-name)
-                 #'matrix-login-callback)))
+    (matrix-post session 'login
+      :data (a-list 'type "m.login.password"
+                    'user user
+                    'password password
+                    'device_id device-id
+                    'initial_device_display_name initial-device-display-name)
+      :success #'matrix-login-callback)))
 
 (matrix-defcallback login matrix-session
   "Callback function for successful login.
@@ -377,8 +385,8 @@ Set access_token and device_id in session."
 (cl-defmethod matrix-logout ((session matrix-session))
   "Log out of SESSION."
   (with-slots (user device-id initial-device-display-name) session
-    (matrix-post session 'logout nil
-                 #'matrix-logout-callback)))
+    (matrix-post session 'logout
+      :success #'matrix-logout-callback)))
 
 (matrix-defcallback logout matrix-session
   "Callback function for successful logout.
@@ -450,21 +458,23 @@ requests, and we make a new request."
     (unless access-token
       ;; FIXME: This should never happen.  If it does, maybe we should handle it differently.
       (error "Missing access token for session"))
-    (matrix-get session 'sync (a-list 'since next-batch
-                                      'full_state full-state
-                                      'set_presence set-presence
-                                      ;; Convert timeout to milliseconds
-                                      'timeout (* timeout 1000))
-                #'matrix-sync-callback
-                ;; Add 5 seconds to timeout to give server a bit of grace period before we
-                ;; consider it unresponsive.
-                ;; MAYBE: Increase grace period substantially, maybe up to 60 seconds.
-                :timeout (+ timeout 5))))
+    (matrix-get session 'sync
+      :data (a-list 'since next-batch
+                    'full_state full-state
+                    'set_presence set-presence
+                    ;; Convert timeout to milliseconds
+                    'timeout (* timeout 1000))
+      :success #'matrix-sync-callback
+      :error #'matrix-sync-error-callback
+      ;; Add 5 seconds to timeout to give server a bit of grace period before we
+      ;; consider it unresponsive.
+      ;; MAYBE: Increase grace period substantially, maybe up to 60 seconds.
+      :timeout (+ timeout 5))))
 
 (matrix-defcallback sync matrix-session
   "Callback function for successful sync request."
   ;; https://matrix.org/docs/spec/client_server/r0.3.0.html#id167
-  :slots (rooms next-batch initial-sync-p)
+  :slots (rooms next-batch initial-sync-p sync-retry-delay)
   :body (progn
           (matrix-log (a-list 'type 'matrix-sync-callback
                               'data data))
@@ -475,63 +485,21 @@ requests, and we make a new request."
                           (list session (a-get data param))
                         (matrix-unimplemented (format$ "Unimplemented API method: $fn-name"))))
           (setq initial-sync-p nil
-                next-batch (a-get data 'next_batch))
+                next-batch (a-get data 'next_batch)
+                sync-retry-delay 0)
           (matrix-log "Sync callback complete.  Calling sync again...")
           (matrix-sync session)))
 
-(matrix-defcallback sync-complete matrix-session
-  "Completion callback function for sync requests.
-If sync was successful or timed-out, make a new sync request.  If
-SESSION has no access token, consider the session logged-out."
-  :slots (access-token)
-  :body ;; (pcase symbol-status
-  ;;   ('success
-  ;;    (matrix-log "SYNC SUCCESS.")
-  ;;    (unless matrix-synchronous
-  ;;      ;; Call self again to wait for more data.  But don't do this if
-  ;;      ;; `matrix-synchronous' is set, which would cause an infinite
-  ;;      ;; loop.  It should only be set when testing, in which case we
-  ;;      ;; sync manually.
-  ;;      (matrix-log "NOT SYNCHRONOUS")
-  ;;      (when access-token
-  ;;        (matrix-log "POLLING...")
-  ;;        (matrix-sync session))))
-  ;;   ('timeout
-  ;;    (matrix-log "SYNC TIMED OUT.")
-  ;;    (unless matrix-synchronous
-  ;;      ;; Call self again to wait for more data.  But don't do this if
-  ;;      ;; `matrix-synchronous' is set, which would cause an infinite
-  ;;      ;; loop.  It should only be set when testing, in which case we
-  ;;      ;; sync manually.
-  ;;      (matrix-log "NOT SYNCHRONOUS")
-  ;;      (when access-token
-  ;;        (matrix-log "POLLING...")
-  ;;        (matrix-sync session))))
-  ;;   (_ (matrix-warn "SYNC FAILED: %s  NOT STARTING NEW SYNC REQUEST.  API SHOULD BE CONSIDERED DISCONNECTED."
-  ;;                   (upcase (symbol-name symbol-status)))))
-  (pcase symbol-status
-    ;; NOTE: For successful syncs, we need to start polling after processing the sync and setting next-batch.
-    ('success
-     (matrix-log "SYNC SUCCESS.")
-     (if matrix-synchronous
-         (matrix-log "SYNCHRONOUS: NOT POLLING")
-       (if access-token
-           (progn
-             (matrix-log "POLLING...")
-             (matrix-sync session))
-         (matrix-log "NO ACCESS TOKEN: NOT POLLING"))))
-    ;; ('success (matrix-log "SYNC SUCCESS."))
-    ('timeout
-     (matrix-log "SYNC TIMED OUT.")
-     (if matrix-synchronous
-         (matrix-log "SYNCHRONOUS: NOT POLLING")
-       (if access-token
-           (progn
-             (matrix-log "POLLING...")
-             (matrix-sync session))
-         (matrix-warn "NO ACCESS TOKEN: NOT POLLING"))))
-    (_ (matrix-warn "SYNC FAILED: %s  API MAY BE DISCONNECTED."
-                    symbol-status))))
+(matrix-defcallback sync-error matrix-session
+  "Callback function for sync request error."
+  :slots (rooms next-batch initial-sync-p sync-retry-delay)
+  :body (progn
+          (matrix-log (a-list 'type 'matrix-sync-error-callback
+                              'data data
+                              'sync-retry-delay sync-retry-delay))
+          (setq sync-retry-delay (cond ((>= sync-retry-delay 60) 60)
+                                       (t (* sync-retry-delay 2))))
+          (matrix-sync session)))
 
 (cl-defmethod matrix-sync-presence ((session matrix-session) state-changes)
   "Process presence STATE-CHANGES."
@@ -683,11 +651,11 @@ maximum number of events to return (default 10)."
   ;; TODO: As written, this may only work going backward.  Needs testing.
   (with-slots (id session prev-batch last-full-sync) room
     (matrix-get session (format$ "rooms/$id/messages")
-                (a-list 'from prev-batch
-                        'to last-full-sync
-                        'dir direction
-                        'limit limit)
-                (apply-partially #'matrix-messages-callback room))))
+      :data (a-list 'from prev-batch
+                    'to last-full-sync
+                    'dir direction
+                    'limit limit)
+      :success (apply-partially #'matrix-messages-callback room))))
 
 (matrix-defcallback messages matrix-room
   "Callback for /rooms/{roomID}/messages."
@@ -772,13 +740,14 @@ When IS-DIRECT is non-nil, set that flag on the new room."
   ;; MAYBE: Add other parameters: invite_3pid, creation_content,
   ;; initial_state.  Not sure how useful these would be for us.
 
-  (matrix-post session 'createRoom (a-list 'visibility visibility
-                                           'room_alias_name alias
-                                           'name name
-                                           'topic topic
-                                           'preset preset
-                                           'is-direct is-direct)
-               #'matrix-create-room-callback))
+  (matrix-post session 'createRoom
+    :data (a-list 'visibility visibility
+                  'room_alias_name alias
+                  'name name
+                  'topic topic
+                  'preset preset
+                  'is-direct is-direct)
+    :success #'matrix-create-room-callback))
 
 (matrix-defcallback create-room matrix-session
   "Callback for create-room.
@@ -801,9 +770,9 @@ added."
                     ;; Already has server
                     room-id))
          (endpoint (concat "join/" (url-hexify-string room-id))))
-    (matrix-post session endpoint nil
-                 #'matrix-join-room-callback
-                 :error-callback #'matrix-join-room-error-callback)))
+    (matrix-post session endpoint
+      :success #'matrix-join-room-callback
+      :error #'matrix-join-room-error-callback)))
 
 (matrix-defcallback join-room matrix-session
   "Callback for join-room."
@@ -831,23 +800,25 @@ added."
                             'body (encode-coding-string message 'utf-8)))
            (txn-id (cl-incf txn-id))
            (endpoint (format$ "rooms/$id/send/$type/$txn-id")))
-      (matrix-put session endpoint content
-                  (apply-partially #'matrix-send-message-callback room)))))
+      (matrix-put session endpoint
+        :data content
+        :success (apply-partially #'matrix-send-message-callback room)))))
 
 (matrix-defcallback send-message matrix-room
   "Callback for send-message."
   ;; For now, just log it, because we'll get it back when we sync anyway.
   :slots (id)
-  :body (matrix-log "Message sent to room %s. Event ID: %s  Data: %s"
-                    id (a-get data 'event_id) data))
+  :body (matrix-log (a-list 'event 'matrix-send-message-callback
+                            'room-id id
+                            'data data)))
 
 (cl-defmethod matrix-leave ((room matrix-room))
   "Leave room."
   ;; https://matrix.org/docs/spec/client_server/r0.3.0.html#id203
   (with-slots (id session) room
     (let* ((endpoint (format$ "rooms/$id/leave")))
-      (matrix-post session endpoint nil
-                   (apply-partially #'matrix-leave-callback room)))))
+      (matrix-post session endpoint
+        :success (apply-partially #'matrix-leave-callback room)))))
 
 (matrix-defcallback leave matrix-room
   "Leave room callback."
@@ -868,8 +839,8 @@ added."
   ;; https://matrix.org/docs/spec/client_server/r0.3.0.html#id204
   (with-slots (id session) room
     (let* ((endpoint (format$ "rooms/$id/forget")))
-      (matrix-post session endpoint nil
-                   (apply-partially #'matrix-forget-callback room)))))
+      (matrix-post session endpoint
+        :success (apply-partially #'matrix-forget-callback room)))))
 
 (matrix-defcallback forget matrix-room
   "Forget room callback."
@@ -884,7 +855,8 @@ TYPING should be t or nil."
                (endpoint (format$ "rooms/$id/typing/$user"))
                (data (a-list 'typing typing
                              'timeout 30000)))
-    (matrix-put session endpoint data #'ignore)))
+    (matrix-put session endpoint
+      :data data)))
 
 ;;;; Footer
 
