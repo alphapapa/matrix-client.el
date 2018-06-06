@@ -145,18 +145,10 @@ FN-NAME should be a string, and is available in the ELSE form as `fn-name'."
                    :instance-initform (concat "https://" server "/_matrix/client/r0/")
                    :documentation "URL prefix for API requests.  Derived automatically from server-name and built-in API version.")
    (device-id :initarg :device-id
-              ;; FIXME: Does the initform work for this?  When this
-              ;; file gets byte-compiled, does it get hard-coded in
-              ;; the class definition?  Does this need to be in an
-              ;; instance-initform instead?
               :initform (md5 (concat "matrix-client.el" (system-name)))
               :documentation "ID of the client device.")
    (initial-device-display-name
     :initarg :initial-device-display-name
-    ;; FIXME: Does the initform work for this?  When this
-    ;; file gets byte-compiled, does it get hard-coded in
-    ;; the class definition?  Does this need to be in an
-    ;; instance-initform instead?
     :initform (concat "matrix-client.el @ " (system-name))
     :type string
     :documentation "A display name to assign to the newly-created device.  Ignored if device_id corresponds to a known device.")
@@ -183,6 +175,12 @@ FN-NAME should be a string, and is available in the ELSE form as `fn-name'."
                      :type integer
                      :documentation "When a /sync request fails, wait this long before syncing again.
 The sync error handler should increase this for consecutive errors, up to a maximum, and the success handler should reset it to 0.")
+   (disconnect :initform nil
+               :documentation "Set to non-nil to cancel further /sync requests.")
+   (pending-syncs :initarg :pending-syncs
+                  :type list
+                  :initform nil
+                  :documentation "List of response buffers for pending /sync requests.  This should generally be a list of zero or one buffers.  This is used to cancel pending /sync requests when the user disconnects.")
    (extra :initarg :extra
           :documentation "Reserved for users of the library, who may store whatever they want here."))
   :allow-nil-initform t)
@@ -453,30 +451,37 @@ requests, and we make a new request."
   ;; beginning of the room, in which case I guess the start/end tokens from /messages will be
   ;; the same...?  Or we'll receive fewer messages than the limit...?
 
-  (with-slots (access-token next-batch) session
+  (with-slots (access-token next-batch pending-syncs disconnect) session
     (matrix-log (a-list 'event 'matrix-sync
                         'next-batch next-batch
                         'timeout timeout))
-    (unless access-token
-      ;; FIXME: This should never happen.  If it does, maybe we should handle it differently.
-      (error "Missing access token for session"))
-    (matrix-get session 'sync
-      :data (a-list 'since next-batch
-                    'full_state full-state
-                    'set_presence set-presence
-                    ;; Convert timeout to milliseconds
-                    'timeout (* timeout 1000))
-      :success #'matrix-sync-callback
-      :error #'matrix-sync-error-callback
-      ;; Add 5 seconds to timeout to give server a bit of grace period before we
-      ;; consider it unresponsive.
-      ;; MAYBE: Increase grace period substantially, maybe up to 60 seconds.
-      :timeout (+ timeout 5))))
+    (cl-case disconnect
+      ;; FIXME: This seems a bit inelegant, but it may be the best way to stop syncs from continuing
+      ;; after the user has decided to disconnect.
+      ('t (matrix-log (a-list 'event 'matrix-sync
+                              'disconnect disconnect)))
+      ('nil (unless access-token
+              ;; FIXME: This should never happen.  If it does, maybe we should handle it differently.
+              (error "Missing access token for session"))
+            (when-let ((response-buffer (matrix-get session 'sync
+                                          :data (a-list 'since next-batch
+                                                        'full_state full-state
+                                                        'set_presence set-presence
+                                                        ;; Convert timeout to milliseconds
+                                                        'timeout (* timeout 1000))
+                                          :success #'matrix-sync-callback
+                                          :error #'matrix-sync-error-callback
+                                          ;; Add 5 seconds to timeout to give server a bit of grace period before we
+                                          ;; consider it unresponsive.
+                                          ;; MAYBE: Increase grace period substantially, maybe up to 60 seconds.
+                                          :timeout (+ timeout 5))))
+              (push response-buffer pending-syncs)
+              (matrix-log (a-list 'pending-syncs-after-push pending-syncs)))))))
 
 (matrix-defcallback sync matrix-session
   "Callback function for successful sync request."
   ;; https://matrix.org/docs/spec/client_server/r0.3.0.html#id167
-  :slots (rooms next-batch initial-sync-p sync-retry-delay)
+  :slots (rooms next-batch initial-sync-p sync-retry-delay pending-syncs)
   :body (progn
           (matrix-log (a-list 'type 'matrix-sync-callback
                               'data data))
@@ -489,19 +494,25 @@ requests, and we make a new request."
           (setq initial-sync-p nil
                 next-batch (a-get data 'next_batch)
                 sync-retry-delay 0)
+          (matrix-log (a-list 'pending-syncs-before-delete pending-syncs))
+          (setq pending-syncs (delete (current-buffer) pending-syncs))
+          (matrix-log (a-list 'pending-syncs-after-delete pending-syncs))
           (matrix-log "Sync callback complete.  Calling sync again...")
           (matrix-sync session)))
 
 (matrix-defcallback sync-error matrix-session
   "Callback function for sync request error."
-  :slots (rooms next-batch initial-sync-p sync-retry-delay)
-  :body (progn
-          (matrix-log (a-list 'type 'matrix-sync-error-callback
-                              'data data
-                              'sync-retry-delay sync-retry-delay))
-          (setq sync-retry-delay (cond ((>= sync-retry-delay 60) 60)
-                                       (t (* sync-retry-delay 2))))
-          (matrix-sync session)))
+  :slots (rooms next-batch initial-sync-p sync-retry-delay disconnect)
+  :body (cl-case disconnect
+          ('t (matrix-log (a-list 'event 'matrix-sync-error-callback
+                                  'disconnect disconnect)))
+          ('nil (matrix-log (a-list 'event 'matrix-sync-error-callback
+                                    'error error
+                                    'data data
+                                    'sync-retry-delay sync-retry-delay))
+                (setq sync-retry-delay (cond ((>= sync-retry-delay 60) 60)
+                                             (t (* sync-retry-delay 2))))
+                (matrix-sync session))))
 
 (cl-defmethod matrix-sync-presence ((session matrix-session) state-changes)
   "Process presence STATE-CHANGES."

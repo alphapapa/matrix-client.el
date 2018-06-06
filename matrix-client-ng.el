@@ -249,19 +249,23 @@ Add session to sessions list and run initial sync."
   (when (f-exists? matrix-client-ng-save-token-file)
     (read (f-read matrix-client-ng-save-token-file))))
 
-(defun matrix-client-ng-disconnect (&optional really-logout)
+(defun matrix-client-ng-disconnect (&optional logout)
   "Unplug from the Matrix.
-If SKIP-LOGOUT is non-nil, don't actually log out from server,
-just clear local session data."
+If LOGOUT is non-nil, actually log out, canceling access
+tokens (username and password will be required again)."
   (interactive "P")
   ;; MAYBE: Delete buffers.
-  (when really-logout
+  (when logout
     (seq-do #'matrix-logout matrix-client-ng-sessions)
     ;; Remove saved token
     (f-delete matrix-client-ng-save-token-file))
-  ;; Delete access token
   (--each matrix-client-ng-sessions
-    (oset it access-token nil))
+    ;; Kill pending sync response buffer processes
+    (with-slots (pending-syncs disconnect) it
+      (setq disconnect t)
+      (seq-do #'delete-process pending-syncs))
+    ;; Try to GC the session object.  Hopefully no timers or processes or buffers still hold a ref...
+    (setf it nil))
   (setq matrix-client-ng-sessions nil))
 
 ;;;; Rooms
