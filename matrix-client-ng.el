@@ -686,7 +686,8 @@ non-nil, don't search past that position."
                       (or (not limit)
                           (< pos limit)))
            until (get-text-property pos property)
-           finally return pos))
+           finally return (when (< pos limit)
+                            pos)))
 
 (defun matrix-client-ng-event-timestamp (data)
   "Return timestamp of event DATA."
