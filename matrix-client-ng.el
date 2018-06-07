@@ -15,6 +15,7 @@
 
 (require 'f)
 (require 'ov)
+(require 'tracking)
 
 (require 'matrix-api-r0.3.0)
 (require 'matrix-notifications)
@@ -87,6 +88,10 @@ ad-hoc 'org.matrix.custom.html' messages that Vector emits."
 (defcustom matrix-client-ng-save-token-file "~/.cache/matrix-client.el.token"
   "Save username and access token to this file."
   :type 'file)
+
+(defcustom matrix-client-use-tracking nil
+  "Enable tracking.el support in matrix-client."
+  :type 'boolean)
 
 (defcustom matrix-client-save-outgoing-messages t
   "Save outgoing messages in kill ring before sending.
@@ -478,7 +483,9 @@ INPUT should begin with \"/me\"."
     (switch-to-buffer (current-buffer))
     ;; FIXME: Remove these or update them.
     ;; (set (make-local-variable 'matrix-client-room-connection) con)
-    (setq-local matrix-client-ng-room room))
+    (setq-local matrix-client-ng-room room)
+    (when matrix-client-use-tracking
+      (tracking-mode 1)))
   (matrix-client-ng-insert-prompt room)
   (matrix-client-ng-insert-last-seen room))
 
