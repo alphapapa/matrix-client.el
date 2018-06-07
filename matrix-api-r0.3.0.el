@@ -355,11 +355,11 @@ set, will be called if the request fails."
 (matrix-defcallback request-error matrix-session
   "Callback function for request error."
   :slots (user)
-  :body (matrix-warn (a-list 'event 'matrix-request-error-callback
-                             'error error
-                             'url url
-                             'query query
-                             'data data)))
+  :body (matrix-warn "Warning: %s" (a-list 'event 'matrix-request-error-callback
+                                           'error error
+                                           'url url
+                                           'query query
+                                           'data data)))
 
 ;;;;; Login/logout
 
@@ -374,7 +374,8 @@ DEVICE-ID and INITIAL-DEVICE-DISPLAY-NAME."
                     'password password
                     'device_id device-id
                     'initial_device_display_name initial-device-display-name)
-      :success #'matrix-login-callback)))
+      :success #'matrix-login-callback
+      :error #'matrix-login-error-callback)))
 
 (matrix-defcallback login matrix-session
   "Callback function for successful login.
@@ -385,6 +386,19 @@ Set access_token and device_id in session."
           (setq access-token access_token
                 device-id device_id)
           (run-hook-with-args 'matrix-login-hook session)))
+
+(matrix-defcallback login-error matrix-session
+  "Callback function for unsuccessful login."
+  :body (progn
+          (matrix-log (a-list 'event 'matrix-login-error-callback
+                              'error error
+                              'url url
+                              'query query
+                              'data data))
+          (setq error (pcase error
+                        (`(error http 403) "403 Unauthorized (probably invalid username or password)")
+                        (_ _)))
+          (display-warning 'matrix-client-ng (format$ "Login failed.  Error: $error") :error)))
 
 (cl-defmethod matrix-logout ((session matrix-session))
   "Log out of SESSION."
