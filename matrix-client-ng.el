@@ -87,6 +87,12 @@ ad-hoc 'org.matrix.custom.html' messages that Vector emits."
   "Save username and access token to this file."
   :type 'file)
 
+(defcustom matrix-client-save-outgoing-messages t
+  "Save outgoing messages in kill ring before sending.
+This way, in the event that a message gets lost in transit, the
+user can recover it from the kill ring instead of retyping it."
+  :type 'boolean)
+
 ;;;;; Faces
 
 (defface matrix-client-metadata
@@ -399,20 +405,24 @@ Creates a new header if necessary."
 (defun matrix-client-ng-send-input ()
   "Send current input to current room."
   (interactive)
-  (goto-char (ov-end (car (ov-in 'matrix-client-prompt t))))
-  (kill-line)
+  (goto-char (matrix-client--prompt-position))
   (pcase-let* ((room matrix-client-ng-room)
                ((eieio session) room)
-               (input (pop kill-ring))
+               (input (prog1
+                          (buffer-substring-no-properties (point) (point-max))
+                        (delete-region (point) (point-max))))
                ;; NOTE: A happy accident, `s-split-words' chops off the leading "/".
                (first-word (car (s-split-words input))))
-    (apply-if-fn (concat "matrix-client-ng-room-command-" first-word)
-        ;; Special command
-        (list room input)
-      (progn
-        ;; Normal message
-        (matrix-send-message room input)
-        (matrix-client-ng-update-last-seen room)))))
+    (unless (s-blank-str? input)
+      (when matrix-client-save-outgoing-messages
+        (push input kill-ring))
+      (apply-if-fn (concat "matrix-client-ng-room-command-" first-word)
+          ;; Special command
+          (list room input)
+        (progn
+          ;; Normal message
+          (matrix-send-message room input)
+          (matrix-client-ng-update-last-seen room))))))
 
 (cl-defmethod matrix-client-ng-room-command-join ((room matrix-room) input)
   "Join room on session.
