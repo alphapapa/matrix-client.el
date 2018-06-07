@@ -125,6 +125,11 @@ ad-hoc 'org.matrix.custom.html' messages that Vector emits."
   "Face for last-seen overlay."
   :group 'matrix-client)
 
+(defface matrix-client-date-header
+  '((t (:inherit highlight :weight bold)))
+  "Face for date headers."
+  :group 'matrix-client)
+
 ;;;; Macros
 
 (defmacro with-room-buffer (room &rest body)
@@ -281,23 +286,86 @@ tokens (username and password will be required again)."
 (cl-defmethod matrix-client-ng-insert ((room matrix-room) string)
   "Insert STRING into ROOM's buffer.
 STRING should have a `timestamp' text-property."
-  (let ((inhibit-read-only t)
-        (timestamp (get-text-property 0 'timestamp string)))
-    (with-room-buffer room
-      (cl-loop initially do (progn
-                              (goto-char (ov-beg (car (ov-in 'matrix-client-prompt t))))
-                              (forward-line -1))
-               for buffer-ts = (get-text-property (point) 'timestamp)
-               until (when buffer-ts
-                       (< buffer-ts timestamp))
-               while (when-let (pos (previous-single-property-change (point) 'timestamp))
-                       (goto-char pos))
-               finally do (when-let (pos (next-single-property-change (point) 'timestamp))
-                            (goto-char pos)))
-      (insert (propertize (concat "\n" string)
-                          'read-only t))
-      (unless (matrix-client-ng-buffer-visible-p)
-        (set-buffer-modified-p t)))))
+  (with-room-buffer room
+    (let* ((inhibit-read-only t)
+           (timestamp (get-text-property 0 'timestamp string))
+           (day-number (time-to-days timestamp))
+           (event-id (get-text-property 0 'event_id string))
+           (header-pos (matrix-client--get-date-header timestamp))
+           (limit (or (matrix--next-property-change header-pos 'matrix-header-day-number)
+                      (1- (matrix-client--prompt-position))))
+           (insertion-pos (if-let ((next-event-pos (matrix--next-property-change header-pos 'timestamp limit)))
+                              ;; Existing messages found beneath header
+                              (catch 'stop
+                                (while (< next-event-pos limit)
+                                  (when (> (get-text-property next-event-pos 'timestamp) timestamp)
+                                    ;; Found newer timestamp: insert message here
+                                    (throw 'stop next-event-pos))
+                                  (setq next-event-pos (matrix--next-property-change next-event-pos 'timestamp limit)))
+                                ;; No more messages beneath this header: insert message here
+                                next-event-pos)
+                            ;; No messages under this header: return limit, which is next header pos or end of buffer
+                            limit))
+           (non-face-properties (cl-loop for (key val) on (text-properties-at 0 string) by #'cddr
+                                         unless (eq key 'face)
+                                         append (list key val))))
+      (goto-char insertion-pos)
+      ;; Ensure event before point doesn't have the same ID
+      (unless (when-let ((previous-event-pos (matrix--prev-property-change (point) 'timestamp)))
+                (string-equal event-id (get-text-property previous-event-pos 'event_id)))
+        ;; Insert the message
+        (insert (apply #'propertize (concat string "\n") 'read-only t non-face-properties))
+        ;; Update tracking
+        (unless (matrix-client-buffer-visible-p)
+          (set-buffer-modified-p t)
+          (when matrix-client-use-tracking
+            ;; TODO handle faces when receving highlights
+            (tracking-add-buffer (current-buffer))))))))
+
+(defun matrix-client--get-date-header (timestamp)
+  "Return position of appropriate date header in current buffer for TIMESTAMP.
+Creates a new header if necessary."
+  (cl-labels ((prev-header-pos () (matrix--prev-property-change (point) 'matrix-header-day-number))
+              (current-header-day-number () (get-text-property (point) 'matrix-header-day-number)))
+    (let* ((target-day-number (time-to-days timestamp)))
+      (goto-char (1- (matrix-client--prompt-position)))
+      (catch 'found
+        (while t
+          (if-let ((prev-header-pos (prev-header-pos)))
+              (progn
+                ;; Found a previous header
+                (goto-char prev-header-pos)
+                (let ((current-header-day-number (current-header-day-number)))
+                  (cond ((= current-header-day-number target-day-number)
+                         ;; Found correct header
+                         (throw 'found prev-header-pos))
+                        ((< current-header-day-number target-day-number)
+                         ;; Found earlier header: insert new one after current header's position
+                         (goto-char (matrix--next-property-change (point) 'matrix-header-day-number
+                                                                  (1- (matrix-client--prompt-position))))
+                         (matrix-client-room--insert-date-header timestamp)
+                         ;; Return position after new header
+                         (throw 'found (point)))))
+                ;; Wrong header: keep looking
+                )
+            ;; No more headers found: insert new header here
+            (matrix-client-room--insert-date-header timestamp)
+            ;; Return one character before the end of the new header.  This is sort of a tiny hack
+            ;; that is simpler than handling the logic in `matrix-client-insert'.  It fixes the case
+            ;; when a new header for older messages is first inserted.
+            (throw 'found (1- (point)))))))))
+
+(defun matrix-client-room--insert-date-header (timestamp)
+  "Insert date header for TIMESTAMP at current position in current buffer."
+  (let* ((visible-header (propertize (concat " " (format-time-string "%Y-%m-%d" timestamp) "\n")
+                                     'face 'matrix-client-date-header))
+         (whole-header (propertize (concat "\n"
+                                           visible-header
+                                           "\n")
+                                   'matrix-client-date-header t
+                                   'matrix-header-day-number (time-to-days timestamp)
+                                   'read-only t)))
+    (insert whole-header)))
 
 (cl-defmethod matrix-client-ng-display-name ((room matrix-room))
   "Return display name for ROOM."
@@ -579,6 +647,29 @@ Also update prompt with typers."
     ))
 
 ;;;; Helper functions
+
+(defun matrix-client--prompt-position ()
+  "Return position of prompt in current buffer."
+  (ov-beg (car (ov-in 'matrix-client-prompt))))
+
+(defun matrix--prev-property-change (pos property)
+  "Return the previous position in buffer, starting from POS, where PROPERTY changes and is set.
+Positions where PROPERTY is not set are ignored."
+  (cl-loop do (setq pos (previous-single-property-change pos property))
+           while pos
+           until (get-text-property pos property)
+           finally return pos))
+
+(defun matrix--next-property-change (pos property &optional limit)
+  "Return the next position in buffer, starting from POS, where PROPERTY changes and is set.
+Positions where PROPERTY is not set are ignored.  If LIMIT is
+non-nil, don't search past that position."
+  (cl-loop do (setq pos (next-single-property-change pos property nil limit))
+           while (and pos
+                      (or (not limit)
+                          (< pos limit)))
+           until (get-text-property pos property)
+           finally return pos))
 
 (defun matrix-client-ng-event-timestamp (data)
   "Return timestamp of event DATA."
