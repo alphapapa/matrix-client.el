@@ -30,6 +30,7 @@ to match until the next whitespace character."
   (url-with-retrieve-async url
     :silent t
     :inhibit-cookies t
+    :query-on-exit nil
     :parser (apply-partially #'matrix-client-parse-image room)
     :success (apply-partially #'matrix-client-insert-image-callback
                               :room room

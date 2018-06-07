@@ -279,7 +279,8 @@ MESSAGE and ARGS should be a string and list of strings for
 ;;;;; Request
 
 (cl-defmethod matrix-request ((session matrix-session) endpoint &key data success
-                              (method "GET") (error #'matrix-request-error-callback) timeout)
+                              (method "GET") (error #'matrix-request-error-callback) timeout
+                              (query-on-exit t))
   "Make request to ENDPOINT on SESSION with DATA and call CALLBACK on success.
 Request is made asynchronously.  METHOD should be a symbol or
 string, `get' (the default) or `post' (it will be upcased).  ENDPOINT may be a string
@@ -331,6 +332,7 @@ set, will be called if the request fails."
                           'timeout timeout))
       (pcase method
         ("GET" (url-with-retrieve-async url
+                 :query-on-exit query-on-exit
                  :silent t
                  :inhibit-cookies t
                  :extra-headers (a-list "Authorization" (concat "Bearer " access-token))
@@ -339,6 +341,7 @@ set, will be called if the request fails."
                  :success success
                  :error error))
         ((or "POST" "PUT") (url-with-retrieve-async url
+                             :query-on-exit query-on-exit
                              :silent t
                              :inhibit-cookies t
                              :method method
@@ -474,7 +477,9 @@ requests, and we make a new request."
                                           ;; Add 5 seconds to timeout to give server a bit of grace period before we
                                           ;; consider it unresponsive.
                                           ;; MAYBE: Increase grace period substantially, maybe up to 60 seconds.
-                                          :timeout (+ timeout 5))))
+                                          :timeout (+ timeout 5)
+                                          ;; Don't prompt the user if Emacs is exited while a /sync is waiting
+                                          :query-on-exit nil)))
               (push response-buffer pending-syncs)
               (matrix-log (a-list 'pending-syncs-after-push pending-syncs)))))))
 
