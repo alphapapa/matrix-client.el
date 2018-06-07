@@ -13,6 +13,8 @@
 
 ;;;; Requirements
 
+(require 'calendar)
+
 (require 'f)
 (require 'ov)
 (require 'tracking)
@@ -360,7 +362,8 @@ Creates a new header if necessary."
                          (throw 'found (point)))))
                 ;; Wrong header: keep looking
                 )
-            ;; No more headers found: insert new header here
+            ;; No more headers found: update other headers and insert new header here
+            (matrix-client--update-date-headers)
             (matrix-client-room--insert-date-header timestamp)
             ;; Return one character before the end of the new header.  This is sort of a tiny hack
             ;; that is simpler than handling the logic in `matrix-client-insert'.  It fixes the case
@@ -369,7 +372,7 @@ Creates a new header if necessary."
 
 (defun matrix-client-room--insert-date-header (timestamp)
   "Insert date header for TIMESTAMP at current position in current buffer."
-  (let* ((visible-header (propertize (concat " " (format-time-string "%Y-%m-%d" timestamp) "\n")
+  (let* ((visible-header (propertize (concat " " (matrix-client--human-format-date timestamp) "\n")
                                      'face 'matrix-client-date-header))
          (whole-header (propertize (concat "\n"
                                            visible-header
@@ -721,6 +724,55 @@ If BUFFER is nil, use the current buffer."
   (let ((buffer (or buffer (current-buffer))))
     (or (eq buffer (window-buffer (selected-window)))
         (get-buffer-window buffer))))
+
+(defun matrix--calendar-absolute-to-timestamp (absolute)
+  "Convert ABSOLUTE day number to Unix timestamp.
+Does not account for leap seconds.  ABSOLUTE should be the number
+of days since 0000-12-31, e.g. as returned by
+`calendar-absolute-from-gregorian'."
+  ;; NOTE: This function should come with Emacs!
+  (let* ((gregorian (calendar-gregorian-from-absolute absolute))
+         (days-between (1+ (days-between (format "%s-%02d-%02d 00:00" (caddr gregorian) (car gregorian) (cadr gregorian))
+                                         "1970-01-01 00:00")))
+         (seconds-between (* 86400 days-between)))
+    (string-to-number (format-time-string "%s" seconds-between))))
+
+(defun matrix-client--human-format-date (date)
+  "Return human-formatted DATE.
+DATE should be either an integer timestamp, or a string in
+\"YYYY-MM-DD HH:MM:SS\" format.  The \"HH:MM:SS\" part is
+optional."
+  ;; NOTE: This seems to be the only format that `days-between' (and `date-to-time') accept.  This
+  ;; appears to be undocumented; it just says, "date-time strings" without specifying what KIND of
+  ;; date-time strings, leaving you to assume it pl.  I only found this out by trial-and-error.
+  (setq date (cl-typecase date
+               (integer (format-time-string "%F" (seconds-to-time date)))
+               (float (format-time-string "%F" (seconds-to-time date)))
+               (list (format-time-string "%F" (seconds-to-time date)))
+               (string date)))
+  (unless (string-match (rx (= 2 digit) ":" (= 2 digit) eos) date)
+    (setq date (concat date " 00:00")))
+  (let* ((difference (days-between (format-time-string "%F %T") date)))
+    (cond ((= 0 difference) "Today")
+          ((< difference 7) (format-time-string "%A" (date-to-time date)))
+          (t (format-time-string "%A, %B %d, %Y" (date-to-time date))))))
+
+(defun matrix-client--update-date-headers ()
+  "Update date headers in current buffer."
+  (save-excursion
+    (goto-char (point-min))
+    (cl-loop with inhibit-read-only = t
+             with limit = (matrix-client--prompt-position)
+             with timestamp
+             with new-header
+             for pos = (matrix--next-property-change (point) 'matrix-header-day-number limit)
+             while pos
+             do (goto-char pos)
+             for day-number = (get-text-property (point) 'matrix-header-day-number)
+             when day-number
+             do (progn
+                  (delete-region (point) (next-single-property-change (point) 'matrix-header-day-number nil limit))
+                  (matrix-client-room--insert-date-header (matrix--calendar-absolute-to-timestamp day-number))))))
 
 ;;;; Footer
 
