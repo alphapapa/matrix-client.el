@@ -890,6 +890,14 @@ TYPING should be t or nil."
     (matrix-put session endpoint
       :data data)))
 
+;;;;; Misc
+
+(cl-defmethod matrix-transform-mxc-uri ((session matrix-session) uri)
+  "Return HTTPS URL for MXI URI to be accessed through SESSION."
+  (pcase-let* (((eieio server) session)
+               (`(,protocol _ ,mxc-server ,file) (split-string uri "/")))
+    (format$ "https://$server/_matrix/media/v1/download/$mxc-server/$file")))
+
 ;;;; Footer
 
 (provide 'matrix-api-r0.3.0)

@@ -18,6 +18,7 @@
 
 (require 'matrix-api-r0.3.0)
 (require 'matrix-notifications)
+(require 'matrix-client-images)
 
 ;;;; TEMP
 
@@ -547,8 +548,7 @@ Also update prompt with typers."
   "Process m.room.message EVENT in ROOM."
   :object-slots ((room session)
                  (session user))
-  :event-keys (thumbnail_url url)
-  :content-keys (body format formatted_body msgtype)
+  :content-keys (body format formatted_body msgtype thumbnail_url url)
   :let ( ;; We don't use `matrix-client-event-data-timestamp', because for
         ;; room messages, the origin_server_ts is the actual message time.
         (timestamp (/ origin_server_ts 1000))
@@ -578,10 +578,10 @@ Also update prompt with typers."
                                   (delete-blank-lines)
                                   (buffer-string))))
                              ("m.image"
-                              (setq matrix-image-url (matrix-transform-mxc-uri (or url thumbnail_url)))
+                              (setq matrix-image-url (matrix-transform-mxc-uri session (or url thumbnail_url)))
                               (concat body
                                       ": "
-                                      (matrix-client-linkify-urls matrix-image-url)))
+                                      (matrix-client-ng-linkify-urls matrix-image-url)))
                              (_ (matrix-client-ng-linkify-urls body)))))
             ;; Apply face for own messages
             (let (metadata-face message-face)
@@ -607,9 +607,9 @@ Also update prompt with typers."
 
             ;; Start image insertion if necessary
             (when matrix-client-ng-show-images
-              (cl-loop for url in (-non-nil (append (matrix-client-ng--image-urls message)
+              (cl-loop for url in (-non-nil (append (matrix-client--image-urls message)
                                                     (list matrix-image-url)))
-                       do (matrix-client-ng-insert-image room event_id url)))
+                       do (matrix-client-insert-image room event_id url)))
 
             ;; Move last-seen line if it's our own message
             (when (equal sender user)

@@ -128,14 +128,6 @@ If BUFFER is nil, use the current buffer."
   (let ((version (or version "api/v1")))
     (format "%s/_matrix/client/%s" matrix-homeserver-base-url version)))
 
-(defun matrix-transform-mxc-uri (uri)
-  "Turn an MXC content URI in to an HTTP URL."
-  (let ((components (split-string uri "/")))
-    (format "%s/_matrix/media/v1/download/%s/%s"
-            matrix-homeserver-base-url
-            (elt components 2)
-            (elt components 3))))
-
 (defun matrix-client-room-for-id (connection room-id)
   "Return room for ROOM-ID on CONNECTION."
   (a-get (oref connection :rooms) room-id))

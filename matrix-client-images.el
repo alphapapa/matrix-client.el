@@ -25,7 +25,7 @@ to match until the next whitespace character."
            for regexp = (rx-to-string `(seq (regexp ,regexp) (1+ (not space))))
            append (-map #'first (s-match-strings-all regexp text))))
 
-(cl-defmethod matrix-client-insert-image ((room matrix-client-room) message-id url)
+(cl-defmethod matrix-client-insert-image ((room matrix-room) message-id url)
   "Download image from URL and insert it at message MESSAGE-ID in ROOM."
   (url-with-retrieve-async url
     :silent t
@@ -37,7 +37,7 @@ to match until the next whitespace character."
                               :message-id message-id
                               :url url)))
 
-(cl-defmethod matrix-client-parse-image ((room matrix-client-room) &rest rescale-args)
+(cl-defmethod matrix-client-parse-image ((room matrix-room) &rest rescale-args)
   "Parse image from current HTTP response buffer and return image object.
 RESCALE-ARGS are passed to `matrix-client-rescale-image'."
   (pcase-let* ((data (progn
@@ -46,7 +46,8 @@ RESCALE-ARGS are passed to `matrix-client-rescale-image'."
                        (mm-disable-multibyte)
                        ;; Point is where the body starts, after the headers
                        (buffer-substring (point) (point-max))))
-               ((eieio buffer) room))
+               ((eieio extra) room)
+               ((eieio buffer) extra))
     (with-current-buffer buffer
       ;; Rescale image in room buffer to get proper size
       (apply #'matrix-client-rescale-image data rescale-args))))
@@ -75,15 +76,15 @@ determined by the size of the buffer's window."
                   :max-width max-width
                   :max-height max-height)))
 
-(cl-defmethod matrix-client-insert-image-callback (&key (room matrix-client-room) message-id url
+(cl-defmethod matrix-client-insert-image-callback (&key (room matrix-room) message-id url
                                                         data error-thrown symbol-status response
                                                         &allow-other-keys)
   "Insert image into proper place at URL in message MESSAGE-ID in ROOM.
 Image is passed from parser as DATA, which should be an image
 object made with `create-image'.  This function should be called
 as an async callback when the image is downloaded."
-  (with-slots (buffer) room
-    (with-current-buffer buffer
+  (with-current-buffer (oref* room extra buffer)
+    (save-excursion
       ;; Starting with last message, search backward to find message
       (cl-loop initially do (goto-char (point-max))
                for event_id = (get-text-property (point) 'event_id)

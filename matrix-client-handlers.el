@@ -67,7 +67,7 @@ the Matrix spec for more information about its format."
                             matrix-client-input-filter-leave
                             matrix-client-send-to-current-room)))))
 
-(defun matrix-client-handler-m.room.avatar (con room data)
+(cl-defmethod matrix-client-handler-m.room.avatar ((session matrix-session) room data)
   (when matrix-client-show-room-avatars
     (pcase-let* (((map sender content) data)
                  ((map url) content)
@@ -82,7 +82,7 @@ the Matrix spec for more information about its format."
       (if url
           ;; New avatar
           ;; TODO: Maybe display the new avatar in the chat list, like Riot.
-          (url-with-retrieve-async (matrix-transform-mxc-uri url)
+          (url-with-retrieve-async (matrix-transform-mxc-uri session url)
             :silent t
             :inhibit-cookies t
             :parser (apply-partially #'matrix-client-parse-image room :max-width 32 :max-height 32)
