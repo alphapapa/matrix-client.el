@@ -278,9 +278,9 @@ tokens (username and password will be required again)."
 (cl-defmethod matrix-client-ng-update-last-seen ((room matrix-room) &rest _)
   "Move the last-seen overlay to after the last message in ROOM."
   (with-room-buffer room
-    (when-let ((prompt-ov (car (ov-in 'matrix-client-prompt)))
-               (seen-ov (car (ov-in 'matrix-client-last-seen)))
-               (target-pos (1- (ov-beg prompt-ov))))
+    ;; FIXME: Does this need to be when-let?  Shouldn't these always be found?
+    (when-let ((seen-ov (car (ov-in 'matrix-client-last-seen)))
+               (target-pos (1- (matrix-client--prompt-position))))
       (ov-move seen-ov target-pos target-pos))))
 
 (cl-defmethod matrix-client-ng-insert ((room matrix-room) string)
