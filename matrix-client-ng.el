@@ -302,26 +302,27 @@ tokens (username and password will be required again)."
   "Insert STRING into ROOM's buffer.
 STRING should have a `timestamp' text-property."
   (with-room-buffer room
-    (let* ((inhibit-read-only t)
-           (timestamp (get-text-property 0 'timestamp string))
-           (day-number (time-to-days timestamp))
-           (event-id (get-text-property 0 'event_id string))
-           (insertion-pos (matrix-client-ng--insertion-pos timestamp))
-           (non-face-properties (cl-loop for (key val) on (text-properties-at 0 string) by #'cddr
-                                         unless (eq key 'face)
-                                         append (list key val))))
-      (goto-char insertion-pos)
-      ;; Ensure event before point doesn't have the same ID
-      (unless (when-let ((previous-event-pos (matrix--prev-property-change (point) 'timestamp)))
-                (string-equal event-id (get-text-property previous-event-pos 'event_id)))
-        ;; Insert the message
-        (insert (apply #'propertize (concat string "\n") 'read-only t non-face-properties))
-        ;; Update tracking
-        (unless (matrix-client-buffer-visible-p)
-          (set-buffer-modified-p t)
-          (when matrix-client-use-tracking
-            ;; TODO handle faces when receving highlights
-            (tracking-add-buffer (current-buffer))))))))
+    (save-excursion
+      (let* ((inhibit-read-only t)
+             (timestamp (get-text-property 0 'timestamp string))
+             (day-number (time-to-days timestamp))
+             (event-id (get-text-property 0 'event_id string))
+             (insertion-pos (matrix-client-ng--insertion-pos timestamp))
+             (non-face-properties (cl-loop for (key val) on (text-properties-at 0 string) by #'cddr
+                                           unless (eq key 'face)
+                                           append (list key val))))
+        (goto-char insertion-pos)
+        ;; Ensure event before point doesn't have the same ID
+        (unless (when-let ((previous-event-pos (matrix--prev-property-change (point) 'timestamp)))
+                  (string-equal event-id (get-text-property previous-event-pos 'event_id)))
+          ;; Insert the message
+          (insert (apply #'propertize (concat string "\n") 'read-only t non-face-properties))
+          ;; Update tracking
+          (unless (matrix-client-buffer-visible-p)
+            (set-buffer-modified-p t)
+            (when matrix-client-use-tracking
+              ;; TODO handle faces when receving highlights
+              (tracking-add-buffer (current-buffer)))))))))
 
 (defun matrix-client-ng--insertion-pos (timestamp)
   "Return insertion position for TIMESTAMP.
