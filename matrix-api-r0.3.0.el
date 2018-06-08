@@ -817,12 +817,15 @@ added."
 (matrix-defcallback join-room-error matrix-session
   "Error callback for join-room."
   ;; Just log it, because it will be handled on the next sync.
-  :body (let ((room-id (url-unhex-string (-last-item (s-split "/" url)))))
-          (pcase code
-            (404 (matrix-warn (a-list 'matrix-join-room-error
-                                      'error (format$ "Room not found: $room-id"))))
-            (_ (matrix-warn (a-list 'matrix-join-room-error
-                                    'error (format$ "Error joining room $room-id: $error")))))))
+  :body (progn
+          (matrix-log (a-list 'event 'matrix-join-room-error-callback
+                              'data data
+                              'url url
+                              'status status))
+          (let ((room-id (url-unhex-string (-last-item (s-split "/" url)))))
+            (pcase error
+              (`(error http 404) (matrix-warn (format$ "Room not found: $room-id")))
+              (_ (matrix-warn (format$ "Error joining room $room-id: $error")))))))
 
 (cl-defmethod matrix-send-message ((room matrix-room) message &key (msgtype "m.text"))
   "Send MESSAGE of MSGTYPE to ROOM."
