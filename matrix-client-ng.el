@@ -13,6 +13,7 @@
 
 ;;;; Requirements
 
+(require 'cl-lib)
 (require 'calendar)
 
 (require 'f)
@@ -438,7 +439,7 @@ Creates a new header if necessary."
 INPUT should be, e.g. \"/join #room:matrix.org\"."
   (pcase-let* (((eieio session) room)
                (words (s-split (rx (1+ space)) input))
-               (room-id (second words)))
+               (room-id (cadr words)))
     ;; Only accept one room
     (if (> (length words) 2)
         (user-error "Invalid /join command")
@@ -732,7 +733,7 @@ of days since 0000-12-31, e.g. as returned by
 `calendar-absolute-from-gregorian'."
   ;; NOTE: This function should come with Emacs!
   (let* ((gregorian (calendar-gregorian-from-absolute absolute))
-         (days-between (1+ (days-between (format "%s-%02d-%02d 00:00" (caddr gregorian) (car gregorian) (cadr gregorian))
+         (days-between (1+ (days-between (format "%s-%02d-%02d 00:00" (cl-caddr gregorian) (car gregorian) (cadr gregorian))
                                          "1970-01-01 00:00")))
          (seconds-between (* 86400 days-between)))
     (string-to-number (format-time-string "%s" seconds-between))))
