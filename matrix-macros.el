@@ -2,6 +2,8 @@
 
 
 (require 'subr-x)
+(require 'url-http)
+
 
 (defmacro format$ (string &rest objects)
   "Interpolated `format'.
@@ -237,6 +239,9 @@ SUCCESS and ERROR as `body'.  Or, if the body is not needed,
                                        (string method))))
          ;; TODO: Note that extra-headers must be an alist, and both keys and values must be strings.
          (url-request-extra-headers extra-headers)
+         ;; FIXME: Document how `url-http-attempt-keepalives' is set.
+         (url-http-attempt-keepalives (and (not timeout)
+                                           url-http-attempt-keepalives))
          (callback (lambda (status &optional cbargs)
                      (unwind-protect
                          ;; This is called by `url-http-activate-callback' with the response buffer
@@ -310,6 +315,15 @@ SUCCESS and ERROR as `body'.  Or, if the body is not needed,
                                           ;; `status' arg), then we delete the process, causing the process's
                                           ;; sentinel to be called, which then calls the callback, which detects
                                           ;; the error and calls the error-body-fn.
+
+                                          ;; FIXME: Sometimes this seems to stop catching timeouts.
+                                          ;; When that happens, it seems that the response buffer
+                                          ;; process does not get deleted, as it remains listed in
+                                          ;; `list-processes'.  Maybe the solution is to bind
+                                          ;; `url-http-attempt-keepalives' to nil when a timeout is
+                                          ;; set, because maybe that would prevent processes from
+                                          ;; being left around, which seems to contribute to the
+                                          ;; problem.
                                           (setq url-callback-arguments (list (list :error 'timeout) url-callback-arguments))
                                           ;; Since `get-buffer-process' is a C function, we just call it again
                                           ;; instead of storing the buffer process in a variable.
