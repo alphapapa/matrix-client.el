@@ -246,6 +246,7 @@ SUCCESS and ERROR as `body'.  Or, if the body is not needed,
                          (pcase status
                            ;; NOTE: This may need to be updated to correctly handle multiple errors
                            (`(:error . ,_) (funcall error-body-fn
+						    :url url
                                                     :cbargs cbargs
                                                     :status status
                                                     :error (plist-get status :error)))
