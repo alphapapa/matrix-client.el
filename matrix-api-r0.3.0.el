@@ -370,7 +370,8 @@ set, will be called if the request fails."
   "Log in to SESSION with PASSWORD.
 Session should already have its USER slot set, and optionally its
 DEVICE-ID and INITIAL-DEVICE-DISPLAY-NAME."
-  (with-slots (user device-id initial-device-display-name) session
+  (with-slots (user device-id initial-device-display-name initial-sync-p) session
+    (setq initial-sync-p t)
     (matrix-post session 'login
       :data (a-list 'type "m.login.password"
                     'user user

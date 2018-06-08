@@ -565,7 +565,7 @@ Also update prompt with typers."
 (matrix-client-ng-defevent m.room.message
   "Process m.room.message EVENT in ROOM."
   :object-slots ((room session)
-                 (session user))
+                 (session user initial-sync-p))
   :content-keys (body format formatted_body msgtype thumbnail_url url)
   :let ( ;; We don't use `matrix-client-event-data-timestamp', because for
         ;; room messages, the origin_server_ts is the actual message time.
@@ -634,7 +634,8 @@ Also update prompt with typers."
               (matrix-client-ng-update-last-seen room))
 
             ;; Notification
-            (unless (equal sender user)
+            (unless (or initial-sync-p
+                        (equal sender user))
               (matrix-client-notify "m.room.message" event :room room)))))
 
 (matrix-client-ng-defevent m.room.member
