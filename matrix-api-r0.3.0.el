@@ -247,9 +247,10 @@ MESSAGE and ARGS should be a string and list of strings for
   t)
 
 (defun matrix-warn (&rest args)
-  "Log MESSAGE with ARGS to Matrix log buffer and signal warning with same MESSAGE.
-MESSAGE and ARGS should be a string and list of strings for
-`format'."
+  "Log ARGS to Matrix log buffer and signal warning.
+The first element of ARGS may be a string; if not, \"Warning\"
+will be added."
+  ;; FIXME: Improve this and the docstring.
   (unless (stringp (car args))
     (push "Warning: " args))
   (apply #'matrix-log args)
