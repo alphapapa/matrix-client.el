@@ -246,12 +246,14 @@ MESSAGE and ARGS should be a string and list of strings for
   ;; Returning t is more convenient than nil, which is returned by `message'.
   t)
 
-(defun matrix-warn (message &rest args)
+(defun matrix-warn (&rest args)
   "Log MESSAGE with ARGS to Matrix log buffer and signal warning with same MESSAGE.
 MESSAGE and ARGS should be a string and list of strings for
 `format'."
-  (apply #'matrix-log message args)
-  (apply #'warn message args))
+  (unless (stringp (car args))
+    (push "Warning: " args))
+  (apply #'matrix-log args)
+  (display-warning 'matrix-client (car args) :error))
 
 (defun matrix-unimplemented (&rest args)
   (when matrix-warn-unimplemented
