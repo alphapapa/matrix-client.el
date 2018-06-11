@@ -498,8 +498,7 @@ requests, and we make a new request."
                                           :timeout (+ timeout 5)
                                           ;; Don't prompt the user if Emacs is exited while a /sync is waiting
                                           :query-on-exit nil)))
-              (push response-buffer pending-syncs)
-              (matrix-log (a-list 'pending-syncs-after-push pending-syncs)))))))
+              (push response-buffer pending-syncs))))))
 
 (matrix-defcallback sync matrix-session
   "Callback function for successful sync request."
@@ -517,9 +516,7 @@ requests, and we make a new request."
           (setq initial-sync-p nil
                 next-batch (a-get data 'next_batch)
                 sync-retry-delay 0)
-          (matrix-log (a-list 'pending-syncs-before-delete pending-syncs))
           (setq pending-syncs (delete (current-buffer) pending-syncs))
-          (matrix-log (a-list 'pending-syncs-after-delete pending-syncs))
           (matrix-log "Sync callback complete.  Calling sync again...")
           (matrix-sync session)))
 
