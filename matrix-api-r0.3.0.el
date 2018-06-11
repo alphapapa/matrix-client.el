@@ -352,7 +352,7 @@ set, will be called if the request fails."
                           'data data
                           'timeout timeout))
       (pcase method
-        ("GET" (url-with-retrieve-async url
+        ("GET" (matrix-url-with-retrieve-async url
                  :query-on-exit query-on-exit
                  :silent t
                  :inhibit-cookies t
@@ -361,7 +361,7 @@ set, will be called if the request fails."
                  :parser #'json-read
                  :success success
                  :error error))
-        ((or "POST" "PUT") (url-with-retrieve-async url
+        ((or "POST" "PUT") (matrix-url-with-retrieve-async url
                              :query-on-exit query-on-exit
                              :silent t
                              :inhibit-cookies t

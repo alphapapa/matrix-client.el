@@ -82,7 +82,7 @@ the Matrix spec for more information about its format."
       (if url
           ;; New avatar
           ;; TODO: Maybe display the new avatar in the chat list, like Riot.
-          (url-with-retrieve-async (matrix-transform-mxc-uri session url)
+          (matrix-url-with-retrieve-async (matrix-transform-mxc-uri session url)
             :silent t
             :inhibit-cookies t
             :parser (apply-partially #'matrix-client-parse-image room :max-width 32 :max-height 32)

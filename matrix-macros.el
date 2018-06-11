@@ -168,14 +168,14 @@ Is transformed to:
            do (setq body `((with-slots ,slots ,object ,@body)))
            finally return (car body)))
 
-(defvar-local url-with-retrieve-async-timeout-timer nil
+(defvar-local matrix-url-with-retrieve-async-timeout-timer nil
   "When a response buffer has a timeout, this variable stores the
   timer object so that it may be canceled if the request
   completes successfully.")
 
-(cl-defun url-with-retrieve-async (url &key cbargs silent inhibit-cookies data
-                                       (method "GET") extra-headers query timeout success error
-                                       parser (query-on-exit t))
+(cl-defun matrix-url-with-retrieve-async (url &key cbargs silent inhibit-cookies data
+                                              (method "GET") extra-headers query timeout success error
+                                              parser (query-on-exit t))
   "Retrieve URL asynchronously with `url-retrieve'.
 
 Arguments CBARGS, SILENT, and INHIBIT-COOKIES are passed to
@@ -270,8 +270,8 @@ SUCCESS and ERROR as `body'.  Or, if the body is not needed,
                                        :headers headers
                                        :data data)))
                            (_ (error "Response status unrecognized; please report this error: %s" (pp-to-string status))))
-                       (when url-with-retrieve-async-timeout-timer
-                         (cancel-timer url-with-retrieve-async-timeout-timer))
+                       (when matrix-url-with-retrieve-async-timeout-timer
+                         (cancel-timer matrix-url-with-retrieve-async-timeout-timer))
                        (unless (kill-buffer (current-buffer))
                          (warn "Unable to kill response buffer: %s" (current-buffer))))))
          url-obj query-string query-params response-buffer)
@@ -301,7 +301,7 @@ SUCCESS and ERROR as `body'.  Or, if the body is not needed,
     (setq response-buffer (url-retrieve url callback cbargs silent inhibit-cookies))
     (when timeout
       (with-current-buffer response-buffer
-        (setq-local url-with-retrieve-async-timeout-timer
+        (setq-local matrix-url-with-retrieve-async-timeout-timer
                     (run-with-timer timeout nil
                                     (lambda ()
                                       (when (and (buffer-live-p response-buffer)
@@ -330,7 +330,7 @@ SUCCESS and ERROR as `body'.  Or, if the body is not needed,
                                           ;; Since `get-buffer-process' is a C function, we just call it again
                                           ;; instead of storing the buffer process in a variable.
                                           (delete-process (get-buffer-process response-buffer))
-                                          (setq url-with-retrieve-async-timeout-timer nil))))))))
+                                          (setq matrix-url-with-retrieve-async-timeout-timer nil))))))))
     (unless query-on-exit
       (set-process-query-on-exit-flag (get-buffer-process response-buffer) nil))
     response-buffer))

@@ -27,7 +27,7 @@ to match until the next whitespace character."
 
 (cl-defmethod matrix-client-insert-image ((room matrix-room) message-id url)
   "Download image from URL and insert it at message MESSAGE-ID in ROOM."
-  (url-with-retrieve-async url
+  (matrix-url-with-retrieve-async url
     :silent t
     :inhibit-cookies t
     :query-on-exit nil
