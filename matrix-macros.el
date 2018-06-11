@@ -324,6 +324,8 @@ SUCCESS and ERROR as `body'.  Or, if the body is not needed,
                                           ;; set, because maybe that would prevent processes from
                                           ;; being left around, which seems to contribute to the
                                           ;; problem.
+
+                                          ;; NOTE: This may be loosely relevant: <https://github.com/jorgenschaefer/circe/issues/327>
                                           (setq url-callback-arguments (list (list :error 'timeout) url-callback-arguments))
                                           ;; Since `get-buffer-process' is a C function, we just call it again
                                           ;; instead of storing the buffer process in a variable.
