@@ -274,7 +274,6 @@ Add session to sessions list and run initial sync."
 If LOGOUT is non-nil, actually log out, canceling access
 tokens (username and password will be required again)."
   (interactive "P")
-  ;; MAYBE: Delete buffers.
   (when logout
     (seq-do #'matrix-logout matrix-client-ng-sessions)
     ;; Remove saved token
@@ -286,6 +285,10 @@ tokens (username and password will be required again)."
       (ignore-errors
         ;; Ignore errors in case of "Attempt to get process for a dead buffer"
         (seq-do #'delete-process pending-syncs)))
+    ;; Kill buffers
+    (with-slots (rooms) it
+      (--each rooms
+        (kill-buffer (oref* it extra buffer))))
     ;; Try to GC the session object.  Hopefully no timers or processes or buffers still hold a ref...
     (setf it nil))
   (setq matrix-client-ng-sessions nil))
