@@ -251,9 +251,9 @@ MESSAGE and ARGS should be a string and list of strings for
 The first element of ARGS may be a string; if not, \"Warning\"
 will be added."
   ;; FIXME: Improve this and the docstring.
+  (apply #'matrix-log args)
   (unless (stringp (car args))
     (push "Warning: " args))
-  (apply #'matrix-log args)
   (display-warning 'matrix-client (car args) :error))
 
 (defun matrix-unimplemented (&rest args)
