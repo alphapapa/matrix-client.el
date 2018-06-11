@@ -369,7 +369,8 @@ Creates a new header if necessary."
                          (throw 'found prev-header-pos))
                         ((< current-header-day-number target-day-number)
                          ;; Found earlier header: insert new one after current header's position
-                         (goto-char (next-single-property-change (point) 'matrix-header-day-number nil prompt))
+                         (goto-char (or (matrix--next-property-change (point) 'matrix-header-day-number prompt)
+                                        prompt))
                          (matrix-client-room--insert-date-header timestamp)
                          ;; Return position after new header
                          (throw 'found (point)))))
