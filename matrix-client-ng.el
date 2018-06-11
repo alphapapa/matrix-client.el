@@ -283,7 +283,9 @@ tokens (username and password will be required again)."
     ;; Kill pending sync response buffer processes
     (with-slots (pending-syncs disconnect) it
       (setq disconnect t)
-      (seq-do #'delete-process pending-syncs))
+      (ignore-errors
+        ;; Ignore errors in case of "Attempt to get process for a dead buffer"
+        (seq-do #'delete-process pending-syncs)))
     ;; Try to GC the session object.  Hopefully no timers or processes or buffers still hold a ref...
     (setf it nil))
   (setq matrix-client-ng-sessions nil))
