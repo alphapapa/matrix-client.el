@@ -53,13 +53,6 @@ EVENT should be the `event' variable from the
 
 ;;;; Variables
 
-(defvar matrix-client-ng-mode-map
-  (let ((map (make-sparse-keymap)))
-    (define-key map (kbd "RET") 'matrix-client-ng-send-input)
-    (define-key map (kbd "DEL") 'matrix-client-ng-delete-backward-char)
-    map)
-  "Keymap for `matrix-client-mode'.")
-
 (defvar matrix-client-ng-sessions nil
   "List of active sessions.")
 
@@ -213,9 +206,21 @@ method without it."
 
 ;;;; Mode
 
-(add-hook 'matrix-room-update-hook #'matrix-client-ng-update)
+(define-derived-mode matrix-client-ng-mode fundamental-mode "Matrix"
+  "Mode for Matrix room buffers."
+  :group 'matrix-client-ng
+  ;; TODO: Add a new abbrev table that uses usernames, rooms, etc.
+  :keymap matrix-client-ng-mode-map)
 
-(defun matrix-client-ng (&optional user password access-token)
+;;;;; Keys
+
+(define-key matrix-client-ng-mode-map (kbd "RET") 'matrix-client-ng-send-input)
+(define-key matrix-client-ng-mode-map (kbd "DEL") 'matrix-client-ng-delete-backward-char)
+
+;;;; Connect / disconnect
+
+;;;###autoload
+(defun matrix-client-ng-connect (&optional user password access-token)
   "Matrix Client NG"
   (interactive)
   (if matrix-client-ng-sessions
@@ -492,8 +497,7 @@ INPUT should begin with \"/me\"."
 (cl-defmethod matrix-client-ng-setup-room-buffer ((room matrix-room))
   "Prepare and switch to buffer for ROOM-ID, and return room object."
   (with-room-buffer room
-    (use-local-map matrix-client-ng-mode-map)
-    ;;  (matrix-client-mode)
+    (matrix-client-ng-mode)
     (visual-line-mode 1)
     (setq buffer-undo-list t)
     ;; Unset buffer's modified status when it's selected
@@ -684,6 +688,8 @@ Also update prompt with typers."
     (matrix-clear-timeline room)
     ;; TODO: Update other room things: header, avatar, typers, topic, name, aliases, etc.
     ))
+
+(add-hook 'matrix-room-update-hook #'matrix-client-ng-update)
 
 ;;;; Helper functions
 
