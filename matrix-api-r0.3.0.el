@@ -156,8 +156,26 @@ FN-NAME should be a string, and is available in the ELSE form as `fn-name'."
                  :documentation "API access_token.")
    (txn-id :initarg :txn-id
            :initform 0
+           ;; Initialize to a random number.  This may avoid a potential problem like:
+
+           ;; 1.  User connects.
+           ;; 2.  User sends one message with txn-id 0.
+           ;; 3.  Client crashes (Emacs is killed, whatever), txn-id is not saved to disk.
+           ;; 4.  User restarts Emacs and connects.
+           ;; 5.  User sends another message with txn-id 0.
+
+           ;; If this happens within 30 minutes (see links below), I guess it's possible that the
+           ;; server would reject it as a duplicate txn.
+           :instance-initform (random 100000)
            :type integer
-           :documentation "Transaction ID.  Defaults to 0 and should be automatically incremented for each request.")
+           ;; NOTE: According to <https://matrix.org/docs/spec/client_server/r0.3.0.html#id183>, the
+           ;; transaction ID should be scoped to the access token, so we should preserve it with the
+           ;; token.  However, if the client crashes and fails to save the TID, and then reuses it
+           ;; in the future...what happens?  The server seems to accept messages with already-used
+           ;; TIDs.  Maybe it has some kind of heuristic...  I found these:
+           ;; <https://github.com/matrix-org/synapse/issues/1481> and
+           ;; <https://github.com/matrix-org/synapse/pull/1624>.
+           :documentation "Transaction ID.  Defaults to 0 and should be automatically incremented for each request.  According to the API, the scope of the transaction ID is an access token, so this should be preserved with the access token.")
    (rooms :initarg :rooms
           :type list
           :documentation "List of room objects user has joined.")

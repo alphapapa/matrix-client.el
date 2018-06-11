@@ -228,14 +228,16 @@ method without it."
         ;; Use saved token
         ;; FIXME: Change "username" to "user" when we no longer need compatibility with old code
         (setq user (a-get saved 'username)
-              access-token (a-get saved 'token))
+              access-token (a-get saved 'token)
+              txn-id (a-get saved 'txn-id))
       ;; Not saved: prompt for username and password
       (setq user (or user (read-string "User ID: "))
             password (or password (read-passwd "Password: "))))
     (if access-token
         ;; Use saved token and call post-login hook
         (matrix-client-ng-login-hook (matrix-session :user user
-                                                     :access-token access-token))
+                                                     :access-token access-token
+                                                     :txn-id txn-id))
       ;; Log in with username and password
       (matrix-login (matrix-session :user user)
                     password))))
@@ -255,11 +257,12 @@ Add session to sessions list and run initial sync."
   "Save username and access token for session SESSION to file."
   ;; TODO: Check if file exists; if so, ensure it has a proper header so we know it's ours.
   (with-temp-file matrix-client-ng-save-token-file
-    (with-slots (user access-token) session
+    (with-slots (user access-token txn-id) session
       ;; FIXME: Change "username" to "user" when we no longer need compatibility with old code
       ;; FIXME: Change token to access-token for clarity.
       (prin1 (a-list 'username user
-                     'token access-token)
+                     'token access-token
+                     'txn-id txn-id)
              (current-buffer))))
   ;; Ensure permissions are safe
   (chmod matrix-client-ng-save-token-file #o600))
