@@ -402,7 +402,7 @@ Set access_token and device_id in session."
           (setq error (pcase error
                         (`(error http 403) "403 Unauthorized (probably invalid username or password)")
                         (_ _)))
-          (display-warning 'matrix-client-ng (format$ "Login failed.  Error: $error") :error)))
+          (matrix-warn (format$ "Login failed.  Error: $error"))))
 
 (cl-defmethod matrix-logout ((session matrix-session))
   "Log out of SESSION."
