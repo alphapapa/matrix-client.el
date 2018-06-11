@@ -227,6 +227,9 @@ to `url-request-extra-headers', which see.
 QUERY is an alist of key-value pairs which is appended to the URL
 as the query.
 
+TIMEOUT may be a number of seconds, after which the error
+callback will run if the request hasn't completed by then.
+
 SUCCESS may be a function symbol or a body form, which is called
 with zero arguments upon successful completion of the request.
 In the call to SUCCESS, these variables will be bound:

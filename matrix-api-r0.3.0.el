@@ -255,9 +255,8 @@ MESSAGE and ARGS should be a string and list of strings for
 `format'."
   (when matrix-log
     (when (stringp (car args))
-      (setq args (a-list 'args args)))
-    (push (cons 'timestamp (format-time-string "%Y-%m-%d %H:%M:%S"))
-          args)
+      (setq args (a-list 'message args)))
+    (map-put args 'timestamp (format-time-string "%Y-%m-%d %H:%M:%S"))
     (with-current-buffer (get-buffer-create matrix-log-buffer)
       (save-excursion
         (goto-char (point-max))
@@ -357,7 +356,8 @@ set, will be called if the request fails."
                  :query data
                  :parser #'json-read
                  :success success
-                 :error error))
+                 :error error
+                 :timeout timeout))
         ((or "POST" "PUT") (matrix-url-with-retrieve-async url
                              :query-on-exit query-on-exit
                              :silent t
@@ -368,7 +368,8 @@ set, will be called if the request fails."
                              :data (json-encode data)
                              :parser #'json-read
                              :success success
-                             :error error))))))
+                             :error error
+                             :timeout timeout))))))
 
 (matrix-defcallback request-error matrix-session
   "Callback function for request error."
@@ -521,6 +522,8 @@ requests, and we make a new request."
   :slots (rooms next-batch initial-sync-p sync-retry-delay pending-syncs)
   :body (progn
           (matrix-log (a-list 'type 'matrix-sync-callback
+                              'headers headers
+
                               'data data))
           (cl-loop for param in '(rooms presence account_data to_device device_lists)
                    ;; Assume that methods called will signal errors if anything goes wrong, so
@@ -844,8 +847,15 @@ added."
               (`(error http 404) (matrix-error (format$ "Room not found: $room-id")))
               (_ (matrix-error (format$ "Error joining room $room-id: $error")))))))
 
-(cl-defmethod matrix-send-message ((room matrix-room) message &key (msgtype "m.text"))
-  "Send MESSAGE of MSGTYPE to ROOM."
+(cl-defmethod matrix-send-message ((room matrix-room) message &key (msgtype "m.text") override-txn-id
+                                   success error)
+  "Send MESSAGE of MSGTYPE to ROOM.
+SUCCESS should be a function which will be called when the server
+acknowledges the message; if nil, `matrix-send-message-callback'
+will be called.  ERROR should be a function which will be called
+if sending the message fails.  If OVERRIDE-TXN-ID is non-nil, use
+it as the transaction ID; otherwise, automatically increment and
+use the session's."
   ;; https://matrix.org/docs/spec/client_server/r0.3.0.html#id182
   (with-slots* (((id session) room)
                 ((txn-id) session))
@@ -853,11 +863,23 @@ added."
     (let* ((type "m.room.message")
            (content (a-list 'msgtype msgtype
                             'body (encode-coding-string message 'utf-8)))
-           (txn-id (cl-incf txn-id))
-           (endpoint (format$ "rooms/$id/send/$type/$txn-id")))
+           (txn-id (or override-txn-id (cl-incf txn-id)))
+           (endpoint (format$ "rooms/$id/send/$type/$txn-id"))
+           (success (or success
+                        (apply-partially #'matrix-send-message-callback room))))
+      ;; FIXME: I just received a send-message reply from the server, with the event_id, 16
+      ;; (sixteen) minutes after the HTTP PUT request.  I guess we need to set a timeout, now that
+      ;; we're implementing resend.
       (matrix-put session endpoint
         :data content
-        :success (apply-partially #'matrix-send-message-callback room)))))
+        :success success
+        :error error
+        ;; Trying a 30 second timeout.  However, given that 16-minute reply I experienced, who knows
+        ;; if this is a good idea.  Theoretically, if we resend with the same transaction ID, the
+        ;; server won't duplicate the message...
+        :timeout 30)
+      ;; Return txn-id
+      txn-id)))
 
 (matrix-defcallback send-message matrix-room
   "Callback for send-message."

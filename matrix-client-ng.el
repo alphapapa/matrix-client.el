@@ -118,6 +118,20 @@ user can recover it from the kill ring instead of retyping it."
   "Face for user's own chat messages."
   :group 'matrix-client)
 
+(defface matrix-client-pending-messages
+  '((((class color) (background light)) (:foreground "#586e75" :weight bold :slant italic))
+    (((class color) (background dark)) (:foreground "#586e75" :weight bold :slant italic))
+    (t (:weight bold :slant italic)))
+  "Face for user's pending chat messages."
+  :group 'matrix-client)
+
+(defface matrix-client-failed-messages
+  '((((class color) (background light)) (:foreground "red" :weight bold :slant italic))
+    (((class color) (background dark)) (:foreground "red" :weight bold :slant italic))
+    (t (:weight bold :slant italic)))
+  "Face for user's failed chat messages."
+  :group 'matrix-client)
+
 (defface matrix-client-notice
   '((t :inherit font-lock-comment-face))
   "Face for notices."
@@ -194,6 +208,7 @@ method without it."
                         collect (list slots object))))
     `(cl-defmethod ,method-name ((room matrix-room) event)
        ,docstring
+       (declare (indent defun))
        (with-slots* ,slots
          (pcase-let* (((map content event_id sender origin_server_ts type unsigned ,@event-keys) event)
                       ((map ,@content-keys) content)
@@ -272,6 +287,8 @@ Add session to sessions list and run initial sync."
 
 (cl-defmethod matrix-client-ng-save-token ((session matrix-session))
   "Save username and access token for session SESSION to file."
+  ;; FIXME: This does not work with multiple sessions.
+  ;; MAYBE: Could we use `savehist-additional-variables' instead of our own code for this?
   ;; TODO: Check if file exists; if so, ensure it has a proper header so we know it's ours.
   (with-temp-file matrix-client-ng-save-token-file
     (with-slots (user server access-token txn-id) session
@@ -295,10 +312,11 @@ Add session to sessions list and run initial sync."
 If LOGOUT is non-nil, actually log out, canceling access
 tokens (username and password will be required again)."
   (interactive "P")
-  (when logout
-    (seq-do #'matrix-logout matrix-client-ng-sessions)
-    ;; Remove saved token
-    (f-delete matrix-client-ng-save-token-file))
+  (cond (logout (seq-do #'matrix-logout matrix-client-ng-sessions)
+                ;; Remove saved token
+                (f-delete matrix-client-ng-save-token-file))
+        ;; FIXME: This does not work for multiple sessions.
+        (t (matrix-client-ng-save-token (car matrix-client-ng-sessions))))
   (--each matrix-client-ng-sessions
     ;; Kill pending sync response buffer processes
     (with-slots (pending-syncs disconnect) it
@@ -324,31 +342,86 @@ tokens (username and password will be required again)."
                (target-pos (1- (matrix-client--prompt-position))))
       (ov-move seen-ov target-pos target-pos))))
 
-(cl-defmethod matrix-client-ng-insert ((room matrix-room) string)
+(defvar matrix-client-prefix-fn nil
+  "FIXME")
+
+(cl-defmethod matrix-client-ng-insert ((room matrix-room) string &key update)
   "Insert STRING into ROOM's buffer.
-STRING should have a `timestamp' text-property."
+STRING should have a `timestamp' text-property.
+
+UPDATE may be a plist, in which case the buffer will be searched
+for an existing item having text properties matching the keys and
+values in UPDATE; if found, it will be replaced with STRING,
+otherwise a new item will be inserted.
+
+If `matrix-client-prefix-fn' is non-nil, call that function with
+point positioned before the inserted message."
   (with-room-buffer room
     (save-excursion
-      (let* ((inhibit-read-only t) ; MAYBE: use buffer-read-only mode instead
+      (let* ((inhibit-read-only t)      ; MAYBE: use buffer-read-only mode instead
              (timestamp (get-text-property 0 'timestamp string))
              (day-number (time-to-days timestamp))
              (event-id (get-text-property 0 'event_id string))
-             (insertion-pos (matrix-client-ng--insertion-pos timestamp))
              (non-face-properties (cl-loop for (key val) on (text-properties-at 0 string) by #'cddr
                                            unless (eq key 'face)
-                                           append (list key val))))
-        (goto-char insertion-pos)
-        ;; Ensure event before point doesn't have the same ID
-        (unless (when-let ((previous-event-pos (matrix--prev-property-change (point) 'timestamp)))
+                                           append (list key val)))
+             (string (apply #'propertize (concat string "\n") 'read-only t non-face-properties)))
+        (unless (and update
+                     ;; Inserting our own message, received back in /sync
+                     (matrix-client-ng--replace-string update string))
+          ;; Inserting someone else's message, or our own from earlier sessions
+          (goto-char (matrix-client-ng--insertion-pos timestamp))
+          ;; Ensure event before point doesn't have the same ID
+          (when (when-let ((previous-event-pos (matrix--prev-property-change (point) 'timestamp)))
                   (string-equal event-id (get-text-property previous-event-pos 'event_id)))
+            ;; FIXME: This should probably only be an error when debugging is enabled.
+            (matrix-error (a-list 'event 'matrix-client-ng-insert
+                                  'message "Trying to insert duplicate event"
+                                  'event-id event-id)))
+          (when matrix-client-prefix-fn
+            (funcall matrix-client-prefix-fn))
           ;; Insert the message
-          (insert (apply #'propertize (concat string "\n") 'read-only t non-face-properties))
-          ;; Update tracking
-          (unless (matrix-client-buffer-visible-p)
-            (set-buffer-modified-p t)
-            (when matrix-client-use-tracking
-              ;; TODO handle faces when receving highlights
-              (tracking-add-buffer (current-buffer)))))))))
+          (insert string))
+        ;; Update tracking
+        (unless (matrix-client-buffer-visible-p)
+          (set-buffer-modified-p t)
+          (when matrix-client-use-tracking
+            ;; TODO handle faces when receving highlights
+            (tracking-add-buffer (current-buffer))))))))
+
+(defun matrix-client-ng--replace-string (plist string)
+  "Replace text in buffer, which has text properties and values found in PLIST, with STRING.
+If such text is not found, return nil."
+  (save-excursion
+    (goto-char (point-max))
+    (-when-let* (((beg end) (matrix-client-ng--find-propertized-string plist)))
+      (goto-char beg)
+      (delete-region beg end)
+      (insert string)
+      t)))
+
+(defun matrix-client-ng--find-propertized-string (plist)
+  "Return list of beginning and ending positions in buffer that have text properties in PLIST."
+  (save-excursion
+    (goto-char (point-max))
+    (-let* (((first-property first-value rest) (list (car plist) (cadr plist) (cddr plist))))
+      (cl-loop for pos = (matrix--prev-property-change (point) first-property first-value)
+               ;; NOTE: We subtract 1 from pos because
+               ;; `previous-single-property-change' returns the position
+               ;; *after* the property is set, so checking that position will
+               ;; find no value, and then the loop will skip to where the
+               ;; property *starts*.
+               while pos
+               when (and pos
+                         (cl-loop for (property value) on rest by #'cddr
+                                  always (equal (get-text-property pos property) value)))
+               ;; NOTE: We assume that when the first property changes again,
+               ;; we've found the beginning of the string.  To be completely
+               ;; correct, we should check all of the properties and find the
+               ;; first place any of them change, but that probably isn't
+               ;; necessary, and it would be slower.
+               return (list (previous-single-property-change pos first-property) pos)
+               do (goto-char pos)))))
 
 (defun matrix-client-ng--insertion-pos (timestamp)
   "Return insertion position for TIMESTAMP.
@@ -356,14 +429,14 @@ Creates a new header if necessary."
   (let* ((header-pos (matrix-client--get-date-header timestamp))
          (limit (or (matrix--next-property-change header-pos 'matrix-header-day-number)
                     (1- (matrix-client--prompt-position))))
-         (next-timestamp-pos (matrix--next-property-change header-pos 'timestamp limit)))
+         (next-timestamp-pos (matrix--next-property-change header-pos 'timestamp nil limit)))
     (catch 'found
       (while next-timestamp-pos
-        (when (> (get-text-property next-timestamp-pos 'timestamp) timestamp)
+        (when (>= (get-text-property next-timestamp-pos 'timestamp) timestamp)
           ;; Found greater timestamp: return its position
           (throw 'found next-timestamp-pos))
         ;; Look for next timestamp
-        (setq next-timestamp-pos (matrix--next-property-change next-timestamp-pos 'timestamp limit)))
+        (setq next-timestamp-pos (matrix--next-property-change next-timestamp-pos 'timestamp nil limit)))
       ;; No more timestamps: return limit
       limit)))
 
@@ -457,11 +530,27 @@ Creates a new header if necessary."
   (goto-char (matrix-client--prompt-position))
   (pcase-let* ((room matrix-client-ng-room)
                ((eieio session) room)
+               ((eieio user txn-id) session)
                (input (prog1
                           (buffer-substring-no-properties (point) (point-max))
                         (delete-region (point) (point-max))))
                ;; NOTE: A happy accident, `s-split-words' chops off the leading "/".
-               (first-word (car (s-split-words input))))
+               (first-word (car (s-split-words input)))
+               (event-string (propertize input
+                                         'sender user
+                                         'timestamp (time-to-seconds)))
+               (matrix-client-prefix-fn (lambda ()
+                                          (insert-button "[pending] "
+                                                         'face 'matrix-client-pending-messages
+                                                         'action (lambda (&rest ignore)
+                                                                   (when (yes-or-no-p "Resend message?")
+                                                                     ;; FIXME: Include txn-id.  FIXME: This will include
+                                                                     ;; the metadata, which we probably don't want to
+                                                                     ;; resend.
+                                                                     (matrix-send-message room string
+                                                                                          :override-txn-id (1+ txn-id))))
+                                                         'help-echo "Resend message"
+                                                         'transaction_id (1+ txn-id)))))
     (unless (s-blank-str? input)
       (when matrix-client-save-outgoing-messages
         (push input kill-ring))
@@ -470,8 +559,75 @@ Creates a new header if necessary."
           (list room input)
         (progn
           ;; Normal message
-          (matrix-send-message room input)
+          (matrix-client-event-m.room.message
+           room (a-list 'origin_server_ts (* 1000 (string-to-number (format-time-string "%s")))
+                        'sender user
+                        'unsigned (a-list 'transaction_id (1+ txn-id))
+                        'content (a-list 'body input
+                                         'msgtype "m.text")
+                        'type "m.room.message"))
+          (matrix-send-message room input
+                               :success (apply-partially #'matrix-client-send-message-callback room
+                                                         ;; HACK: We have to get the txn-id
+                                                         ;; ourselves here so we can apply it to the
+                                                         ;; callback, before send-message returns
+                                                         ;; the txn-id.
+                                                         (1+ txn-id))
+                               :error (apply-partially #'matrix-client-send-message-error-callback room
+                                                       (1+ txn-id)))
           (matrix-client-ng-update-last-seen room))))))
+
+(cl-defmethod matrix-client-send-message-callback ((room matrix-room) txn-id &key data &allow-other-keys)
+  "Client callback for send-message.
+Replacing pending button with normal message event."
+  ;; NOTE: ewoc.el might make this easier...
+  (matrix-log (a-list :event 'matrix-client-send-message-callback
+                      :txn-id txn-id
+                      :data data))
+  (pcase-let* (((eieio session) room)
+               ((eieio user) session)
+               ((map event_id) data)
+               (inhibit-read-only t))
+    (with-room-buffer room
+      (-when-let* (((beg end) (matrix-client-ng--find-propertized-string (list 'transaction_id txn-id))))
+        (add-text-properties beg end (list 'event_id event_id))
+        ;; Remove "pending" overlay
+        (--when-let (car (ov-in 'transaction_id txn-id))
+          (delete-region (ov-beg it) (ov-end it))
+          (delete-overlay it))))))
+
+(defun matrix-client-ng--propertize-buffer-string (find-plist set-plist)
+  "Find string in buffer having text properties in FIND-PLIST, then add the properties in SET-PLIST.
+If string is not found or no properties change, return nil."
+  (-when-let* (((beg end) (matrix-client-ng--find-propertized-string find-plist))
+               (inhibit-read-only t))
+    (add-text-properties beg end set-plist)))
+
+(cl-defmethod matrix-client-send-message-error-callback ((room matrix-room) txn-id &key data &allow-other-keys)
+  "Client error callback for send-message.
+Update [pending] overlay."
+  ;; NOTE: ewoc.el might make this easier...
+  (matrix-log (a-list :event 'matrix-client-send-message-error-callback
+                      :txn-id txn-id))
+  (pcase-let* (((eieio session) room)
+               ((eieio user) session))
+    (with-room-buffer room
+      ;; MAYBE: Should probably make a little library to insert and replace things in the buffer...
+      (if-let* ((inhibit-read-only t)
+                ;; MAYBE: Ensure that only one overlay is found.
+                (ov (car (ov-in 'transaction_id txn-id)))
+                (beg (ov-beg ov))
+                (end (ov-end ov)))
+          (progn ;; Found message
+            (delete-region beg end)
+            (goto-char beg)
+            ;; This should insert into the overlay
+            (insert (propertize "[FAILED] "
+                                'face 'matrix-client-failed-messages)))
+        ;; Message not found
+        (matrix-error (a-list 'event 'matrix-client-send-message-callback
+                              'error "Can't find transaction"
+                              :txn-id txn-id))))))
 
 (cl-defmethod matrix-client-ng-room-command-join ((room matrix-room) input)
   "Join room on session.
@@ -598,11 +754,13 @@ Also update prompt with typers."
   :object-slots ((room session)
                  (session user initial-sync-p))
   :content-keys (body format formatted_body msgtype thumbnail_url url)
-  :let ( ;; We don't use `matrix-client-event-data-timestamp', because for
+  :let (;; We don't use `matrix-client-event-data-timestamp', because for
         ;; room messages, the origin_server_ts is the actual message time.
         (timestamp (/ origin_server_ts 1000))
+        ;; FIXME: Not sure we need to call `seconds-to-time' here.
         (timestamp-string (format-time-string "%T" (seconds-to-time timestamp)))
         (displayname (matrix-user-displayname room sender))
+        ((map transaction_id) unsigned)
         (metadata) (msg) (matrix-image-url))
   :body (progn
           ;; (matrix-log "PROCESSING MESSAGE EVENT: \n%s" (matrix-pp-string event))
@@ -647,12 +805,18 @@ Also update prompt with typers."
               (add-face-text-property 0 (length metadata) metadata-face 'append metadata)
               (add-face-text-property 0 (length message) message-face 'append message))
 
-            ;; Insert metadata with message and add text properties
+            ;; Delete existing event, and insert metadata with message and add text properties
+            (when event_id
+              (matrix-client-ng--delete-event room (list 'event_id event_id)))
             (matrix-client-ng-insert room (propertize (concat metadata message)
                                                       'timestamp timestamp
                                                       'displayname displayname
                                                       'sender sender
-                                                      'event_id event_id))
+                                                      'event_id event_id
+                                                      'transaction_id (cl-typecase transaction_id
+                                                                        (number transaction_id)
+                                                                        ;; The server treats txn-ids as strings.
+                                                                        (string (string-to-number transaction_id)))))
 
             ;; Start image insertion if necessary
             (when matrix-client-ng-show-images
@@ -668,6 +832,13 @@ Also update prompt with typers."
             (unless (or initial-sync-p
                         (equal sender user))
               (matrix-client-notify "m.room.message" event :room room)))))
+
+(cl-defmethod matrix-client-ng--delete-event ((room matrix-room) plist)
+  "Delete event with text properties in PLIST from ROOM's buffer."
+  (with-room-buffer room
+    (-when-let* (((beg end) (matrix-client-ng--find-propertized-string plist))
+                 (inhibit-read-only t))
+      (delete-region beg end))))
 
 (matrix-client-ng-defevent m.room.member
   "Say that member in EVENT joined/left ROOM."
@@ -720,24 +891,46 @@ Also update prompt with typers."
   "Return position of prompt in current buffer."
   (ov-beg (car (ov-in 'matrix-client-prompt))))
 
-(defun matrix--prev-property-change (pos property)
+(defun matrix--prev-property-change (pos property &optional value limit)
   "Return the previous position in buffer, starting from POS, where PROPERTY changes and is set.
-Positions where PROPERTY is not set are ignored."
-  (cl-loop do (setq pos (previous-single-property-change pos property))
-           while pos
-           until (get-text-property pos property)
-           finally return pos))
+If VALUE is non-nil, ensure PROPERTY has VALUE, compared with
+`equal'.  Positions where PROPERTY is not set are ignored.  If
+LIMIT is non-nil, don't search before that position.  If property
+doesn't change before POS, return nil."
+  (cl-loop do (setq pos (previous-single-property-change pos property nil limit))
+           ;; NOTE: We have to test `limit' ourselves, because `previous-single-property-change'
+           ;; returns `limit' if nothing is found until it.
+           while (and pos
+                      (or (not limit)
+                          (> pos limit)))
+           for value-at-pos = (or (get-text-property pos property)
+                                  ;; HACK: We also check the value at the position before the change is detected, because
+                                  ;; `previous-single-property-change' returns the position after it changes, where it has
+                                  ;; no value.  But we only do this when testing for a value.
+                                  (when value
+                                    (get-text-property (1- pos) property)))
+           when (and value-at-pos
+                     (or (not value)
+                         (equal value-at-pos value)))
+           return pos))
 
-(defun matrix--next-property-change (pos property &optional limit)
+(defun matrix--next-property-change (pos property &optional value limit)
   "Return the next position in buffer, starting from POS, where PROPERTY changes and is set.
-Positions where PROPERTY is not set are ignored.  If LIMIT is
-non-nil, don't search past that position."
+If VALUE is non-nil, ensure PROPERTY has VALUE, compared with
+`equal'.  Positions where PROPERTY is not set are ignored.  If
+LIMIT is non-nil, don't search past that position.  If property
+doesn't change after POS, return nil."
   (cl-loop do (setq pos (next-single-property-change pos property nil limit))
+           ;; NOTE: We have to test `limit' ourselves, because `next-single-property-change' returns
+           ;; `limit' if nothing is found until it.
            while (and pos
                       (or (not limit)
                           ;; Should this be <= ?
                           (< pos limit)))
-           when (get-text-property pos property)
+           for value-at-pos = (get-text-property pos property)
+           when (and value-at-pos
+                     (or (not value)
+                         (equal value-at-pos value)))
            return pos))
 
 (defun matrix-client-ng-event-timestamp (data)
@@ -814,7 +1007,7 @@ optional."
              with limit = (matrix-client--prompt-position)
              with timestamp
              with new-header
-             for pos = (matrix--next-property-change (point) 'matrix-header-day-number limit)
+             for pos = (matrix--next-property-change (point) 'matrix-header-day-number nil limit)
              while pos
              do (goto-char pos)
              for day-number = (get-text-property (point) 'matrix-header-day-number)
