@@ -258,17 +258,29 @@ SUCCESS and ERROR as `body'.  Or, if the body is not needed,
                            ((or 'nil
                                 `(:peer (:certificate . ,_))
                                 `(:redirect . ,_))
-                            (let ((headers (buffer-substring (point) url-http-end-of-headers))
-                                  (data (if parser
-                                            (progn
-                                              (goto-char (1+ url-http-end-of-headers))
-                                              (funcall parser))
-                                          (buffer-substring (1+ url-http-end-of-headers) (point-max)))))
-                              (funcall success-body-fn
-                                       :cbargs cbargs
-                                       :status status
-                                       :headers headers
-                                       :data data)))
+                            (if (not url-http-end-of-headers)
+                                ;; HACK: It seems that the callback can be called with `nil' when
+                                ;; the connection fails before getting any headers, like:
+                                ;; url-http-end-of-document-sentinel(#<process matrix.org<5>>
+                                ;; "connection broken by remote peer\n"), in which case
+                                ;; `url-http-end-of-headers' is nil, so we need to call the error
+                                ;; fn.  Would like to structure this more cleanly.
+                                (funcall error-body-fn
+                                         :url url
+                                         :cbargs cbargs
+                                         :status status
+                                         :error (plist-get status :error))
+                              (let ((headers (buffer-substring (point) url-http-end-of-headers))
+                                    (data (if parser
+                                              (progn
+                                                (goto-char (1+ url-http-end-of-headers))
+                                                (funcall parser))
+                                            (buffer-substring (1+ url-http-end-of-headers) (point-max)))))
+                                (funcall success-body-fn
+                                         :cbargs cbargs
+                                         :status status
+                                         :headers headers
+                                         :data data))))
                            (_ (error "Response status unrecognized; please report this error: %s" (pp-to-string status))))
                        (when matrix-url-with-retrieve-async-timeout-timer
                          (cancel-timer matrix-url-with-retrieve-async-timeout-timer))
