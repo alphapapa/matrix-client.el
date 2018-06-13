@@ -779,6 +779,7 @@ optional."
     (setq date (concat date " 00:00")))
   (let* ((difference (days-between (format-time-string "%F %T") date)))
     (cond ((= 0 difference) "Today")
+          ((= 1 difference) "Yesterday")
           ((< difference 7) (format-time-string "%A" (date-to-time date)))
           (t (format-time-string "%A, %B %d, %Y" (date-to-time date))))))
 
