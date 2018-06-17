@@ -9,7 +9,8 @@
   "Interpolated `format'.
 Any word in STRING beginning with \"$\" is replaced with the
 contents of the variable named that word.  OBJECTS are applied
-in-order to %-sequences in STR.
+in-order to %-sequences in STR.  Words surrounded by \"${}\" may
+contain %-sequences.
 
 For example:
 
@@ -28,101 +29,135 @@ names.  For example:
 
 Is expanded to:
 
-  (format \"[%s] %s %s>\" date-time greeting username)"
-  ;; TODO: Rewrite this using regexps, probably would be simpler.
+  (format \"[%s] %s %s>\" date-time greeting username)
+
+Including %-sequences, this:
+
+  (format$ \"Amount: ${amount%.02f}  $name  %s\" date)
+
+Expands to:
+
+  (format \"Amount: %.02f  %s  %s\" amount name date)"
   (cl-macrolet ((concatf (place string)
-                         `(setf ,place (concat ,place ,string))))
-    (cl-labels ((peek (seq)
-                      (when (> (length seq) 1)
-                        (elt seq 0))))
-      (let* (current-var current-char current-% (new-str "") vars)
-        (while (setq current-char (when (not (string-empty-p string))
-                                    (prog1 (seq-take string 1)
-                                      (setq string (seq-drop string 1)))))
-          (pcase current-char
-            ;; FIXME: Other whitespace chars.
-            (" " (progn
-                   (or (pcase current-%
+                         `(setf ,place (concat ,place ,string)))
+                (peek (seq)
+                      `(when (> (length ,seq) 1)
+                         (seq-take ,seq 1))))
+    (let* (current-var current-char current-% current-{ (new-str "") vars)
+      (while (setq current-char (when (not (string-empty-p string))
+                                  (prog1 (seq-take string 1)
+                                    (setq string (seq-drop string 1)))))
+        (pcase current-char
+          ;; FIXME: Other whitespace chars.  (Use pcase rx matcher in Emacs 26!)
+          (" " (progn
+                 (or (pcase current-%
+                       (`nil nil)
+                       (_ (pcase current-{
+                            (`t (progn
+                                  ;; Space as part of %-sequence
+                                  (concatf current-% current-char)))
+                            (_ (progn
+                                 ;; Space after %-sequence
+                                 (concatf new-str current-%))))))
+                     (pcase current-var
+                       (`nil nil)
+                       (_ (progn
+                            ;; Space after var
+                            (push (intern current-var) vars)))))
+                 (unless current-{
+                   (concatf new-str current-char)
+                   (setq current-var nil
+                         current-% nil))))
+          ("%" (pcase (peek string)
+                 ("%" (progn
+                        ;; %%
+                        (concatf new-str "%%")
+                        (seq-drop string 1)))
+                 (" " (pcase current-{
+                        (`t (progn
+                              ;; Part of %-sequence
+                              (setq current-% current-char)))
+                        (_ (progn
+                             ;; % alone
+                             (concatf new-str current-char)))))
+                 (_ (progn
+                      ;; New %-sequence
+                      (setq current-% current-char)
+                      (unless current-{
+                        (push (pop objects) vars))))))
+          ("$" (pcase (peek string)
+                 ("$" (progn
+                        ;; "$$"
+                        (concatf new-str "$$")
+                        ;; FIXME: Using seq-drop here seems incorrect
+                        (seq-drop string 1)))
+                 (" " (progn
+                        ;; Plain "$"
+                        (concatf new-str "$")))
+                 (`nil (progn
+                         ;; End of string
+                         (concatf new-str "$")))
+                 ("{" (progn
+                        ;; New variable with % control string
+                        (setq current-var t
+                              current-{ t)
+                        (setq string (seq-drop string 1))))
+                 (_ (progn
+                      ;; New var
+                      (concatf new-str "%s")
+                      (setq current-var t)))))
+          ((pred (string-match-p (rx (or alnum "-" "_" "." "+" "#"))))
+           ;; Character could be part of var name or %-sequence
+           (or (pcase current-%
+                 (`nil nil)
+                 (_ (progn
+                      ;; Part of %-sequence
+                      (concatf current-% current-char))))
+               (pcase current-var
+                 (`nil (progn
+                         ;; Non-var character
+                         (concatf new-str current-char)))
+                 (`t (progn
+                       ;; New var name
+                       (setq current-var current-char)))
+                 (_ (progn
+                      ;; Partial var name
+                      (concatf current-var current-char))))))
+          ("}" (progn
+                 (if (and current-var current-%)
+                     (progn
+                       ;; Closing ${} sequence
+                       (push (intern current-var) vars)
+                       (concatf new-str current-%)
+                       (setq current-var nil
+                             current-% nil
+                             current-{ nil))
+                   ;; Plain }
+                   (concatf new-str current-char))))
+          (_ (progn
+               (if (or (pcase current-%
                          (`nil nil)
                          (_ (progn
-                              ;; Space after %-sequence
-                              (concatf new-str current-%))))
+                              ;; After %-sequence
+                              t)))
                        (pcase current-var
                          (`nil nil)
                          (_ (progn
-                              ;; Space after var
+                              ;; After var
                               (push (intern current-var) vars)))))
-                   (concatf new-str current-char)
-                   (setq current-var nil
-                         current-% nil)))
-            ("%" (pcase (peek string)
-                   ("%" (progn
-                          ;; %%
-                          (concatf new-str "%%")
-                          (seq-drop string 1)))
-                   (" " (progn
-                          ;; % alone
-                          (concatf new-str current-char)))
-                   (_ (progn
-                        ;; New %-sequence
-                        (setq current-% current-char)
-                        (push (pop objects) vars)))))
-            ("$" (pcase (peek string)
-                   ("$" (progn
-                          ;; "$$"
-                          (concatf new-str "$$")
-                          (seq-drop string 1)))
-                   (" " (progn
-                          ;; Plain "$"
-                          (concatf new-str "$")))
-                   (`nil (progn
-                           ;; End of string
-                           (concatf new-str "$")))
-                   (_ (progn
-                        ;; New var
-                        (concatf new-str "%s")
-                        (setq current-var t)))))
-            ((pred (string-match-p (rx (or alnum "-" "_"))))
-             ;; Character could be part of var name or %-sequence
-             (or (pcase current-%
-                   (`nil nil)
-                   (_ (progn
-                        ;; Part of %-sequence
-                        (concatf current-% current-char))))
-                 (pcase current-var
-                   (`nil (progn
-                           ;; Non-var character
-                           (concatf new-str current-char)))
-                   (`t (progn
-                         ;; New var name
-                         (setq current-var current-char)))
-                   (_ (progn
-                        ;; Partial var name
-                        (concatf current-var current-char))))))
-            (_ (progn
-                 (if (or (pcase current-%
-                           (`nil nil)
-                           (_ (progn
-                                ;; After %-sequence
-                                t)))
-                         (pcase current-var
-                           (`nil nil)
-                           (_ (progn
-                                ;; After var
-                                (push (intern current-var) vars)))))
-                     (progn
-                       (concatf new-str current-char)
-                       (setq current-var nil
-                             current-% nil))
-                   ;; Character not part of var name
-                   (concatf new-str current-char))))))
-        (cond (current-%
-               ;; String ended with %-sequence
-               (concatf new-str current-%))
-              (current-var
-               ;; String ended with variable
-               (push (intern current-var) vars)))
-        `(format ,new-str ,@(nreverse vars))))))
+                   (progn
+                     (concatf new-str current-char)
+                     (setq current-var nil
+                           current-% nil))
+                 ;; Character not part of var name
+                 (concatf new-str current-char))))))
+      (cond (current-%
+             ;; String ended with %-sequence
+             (concatf new-str current-%))
+            (current-var
+             ;; String ended with variable
+             (push (intern current-var) vars)))
+      `(format ,new-str ,@(nreverse vars)))))
 
 (defmacro oref* (&rest slots)
   "Access SLOTS of nested EIEIO objects.
