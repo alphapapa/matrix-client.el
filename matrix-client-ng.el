@@ -242,9 +242,11 @@ method without it."
         ;; Use saved token and call post-login hook
         (matrix-client-ng-login-hook (matrix-session :user user
                                                      :access-token access-token
-                                                     :txn-id txn-id))
+                                                     :txn-id txn-id
+                                                     :initial-sync-p t))
       ;; Log in with username and password
-      (matrix-login (matrix-session :user user)
+      (matrix-login (matrix-session :user user
+                                    :initial-sync-p t)
                     password))))
 
 (cl-defmethod matrix-client-ng-login-hook ((session matrix-session))
