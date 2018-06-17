@@ -223,6 +223,7 @@ The sync error handler should increase this for consecutive errors, up to a maxi
    (members :documentation "List of room members, as user objects."
             :type list)
    (state :documentation "Updates to the state, between the time indicated by the since parameter, and the start of the timeline (or all state up to the start of the timeline, if since is not given, or full_state is true).")
+   (state-new :documentation "List of new state events.  Clients should clear this list by calling `matrix-clear-state'.")
    (timeline :documentation "List of timeline events."
              :type list)
    (timeline-new :documentation "List of new timeline events.  Clients may clear this list by calling `matrix-clear-timeline'."
@@ -606,11 +607,12 @@ requests, and we make a new request."
 
 (cl-defmethod matrix-sync-state ((room matrix-room) data)
   "Process state DATA in ROOM."
-  (with-slots (state) room
+  (with-slots (state state-new) room
     (pcase-let (((map events) data))
       ;; events is an array, not a list, so we can't use --each.
       (seq-doseq (event events)
         (push event state)
+        (push event state-new)
         (matrix-event room event)))))
 
 ;; (defvar matrix-sync-timeline-hook nil
@@ -658,8 +660,6 @@ requests, and we make a new request."
 (cl-defmethod matrix-event-m.room.member ((room matrix-room) event)
   "Process m.room.member EVENT in ROOM."
   (with-slots (members id) room
-    ;; (matrix-log "m.room.member for ROOM:%s  EVENT:\n%s" id (pp-to-string event))
-
     (pcase-let* (((map ('state_key user-id) content) event)
                  ((map membership displayname avatar_url) content))
       (pcase membership
@@ -693,6 +693,11 @@ was updated.")
   "Clear ROOM's `timeline-new' list."
   (with-slots (timeline-new) room
     (setq timeline-new nil)))
+
+(cl-defmethod matrix-clear-state ((room matrix-room))
+  "Clear ROOM's `state-new' list."
+  (with-slots (state-new) room
+    (setq state-new nil)))
 
 (cl-defmethod matrix-messages ((room matrix-room)
                                &key (direction "b") (limit 100))

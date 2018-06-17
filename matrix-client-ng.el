@@ -186,6 +186,8 @@ variables.
 
 It is hoped that using this macro is easier than defining a large
 method without it."
+  ;; FIXME: It would probably be better to use the same form for OBJECT-SLOTS that is used by
+  ;; `pcase-let*', because having two different ways is too confusing.
   (declare (indent defun))
   (let ((method-name (intern (concat "matrix-client-event-" (symbol-name type))))
         (slots (cl-loop for (object . slots) in object-slots
@@ -410,6 +412,10 @@ Creates a new header if necessary."
 (cl-defmethod matrix-client-ng-display-name ((room matrix-room))
   "Return display name for ROOM."
   ;; https://matrix.org/docs/spec/client_server/r0.3.0.html#id267
+
+  ;; FIXME: Make it easier to name the room separately from the room's buffer.  e.g. I want the
+  ;; header line to have the official room name, but I want the buffer name in 1-on-1 chats to be
+  ;; the other person's name.
   (cl-labels ((displaynames-sorted-by-id (members)
                                          (--> members
                                               (cl-sort it #'string< :key #'car)
@@ -656,6 +662,8 @@ Also update prompt with typers."
 
 (matrix-client-ng-defevent m.room.member
   "Say that member in EVENT joined/left ROOM."
+  :object-slots ((room session)
+                 (session initial-sync-p))
   :event-keys (state_key)
   :content-keys (displayname membership)
   :let ((timestamp (matrix-client-ng-event-timestamp event))
@@ -670,23 +678,27 @@ Also update prompt with typers."
                          'timestamp timestamp)))
   ;; MAYBE: Get displayname from API room object's membership list.
   :body (progn
-          (matrix-client-ng-insert room msg)
+          (unless initial-sync-p
+            ;; FIXME: This does not seem to work; on initial connect, "user joined" messages still show up from when the user initially joined the room.
+            (matrix-client-ng-insert room msg))
           (with-room-buffer room
+            ;; FIXME: It's inefficient to do this for every join event, especially on initial sync in a large room.
             (rename-buffer (matrix-client-ng-display-name room)))))
 
 ;;;; Update-room-at-once approach
 
 (cl-defmethod matrix-client-ng-update ((room matrix-room))
   "Update ROOM."
-  (with-slots* (((extra timeline-new id) room)
-                ((buffer) extra))
+  (with-slots* (((extra state-new timeline-new id) room))
     ;; Process new events
-    (seq-doseq (event timeline-new)
-      (pcase-let* (((map type) event))
-        (apply-if-fn (concat "matrix-client-event-" type)
-            (list room event)
-          (matrix-unimplemented (format$ "Unimplemented client method: $fn-name")))))
+    (dolist (event-list (list state-new timeline-new))
+      (seq-doseq (event event-list)
+        (pcase-let* (((map type) event))
+          (apply-if-fn (concat "matrix-client-event-" type)
+              (list room event)
+            (matrix-unimplemented (format$ "Unimplemented client method: $fn-name"))))))
     ;; Clear new events
+    (matrix-clear-state room)
     (matrix-clear-timeline room)
     ;; TODO: Update other room things: header, avatar, typers, topic, name, aliases, etc.
     ))
