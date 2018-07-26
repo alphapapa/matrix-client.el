@@ -265,15 +265,11 @@ MESSAGE and ARGS should be a string and list of strings for
   ;; Returning t is more convenient than nil, which is returned by `message'.
   t)
 
-(defun matrix-warn (&rest args)
-  "Log ARGS to Matrix log buffer and signal warning.
-The first element of ARGS may be a string; if not, \"Warning\"
-will be added."
+(defun matrix-error (&rest args)
+  "Log ARGS to Matrix log buffer and signal error."
   ;; FIXME: Improve this and the docstring.
   (apply #'matrix-log args)
-  (unless (stringp (car args))
-    (push "Warning: " args))
-  (display-warning 'matrix-client (car args) :error))
+  (display-warning 'matrix-client (pp-to-string args) :error))
 
 (defun matrix-unimplemented (&rest args)
   (when matrix-warn-unimplemented
@@ -377,11 +373,11 @@ set, will be called if the request fails."
 (matrix-defcallback request-error matrix-session
   "Callback function for request error."
   :slots (user)
-  :body (matrix-warn "Warning: %s" (a-list 'event 'matrix-request-error-callback
-                                           'error error
-                                           'url url
-                                           'query query
-                                           'data data)))
+  :body (matrix-error (a-list 'event 'matrix-request-error-callback
+                              'error error
+                              'url url
+                              'query query
+                              'data data)))
 
 ;;;;; Login/logout
 
@@ -421,7 +417,7 @@ Set access_token and device_id in session."
           (setq error (pcase error
                         (`(error http 403) "403 Unauthorized (probably invalid username or password)")
                         (_ _)))
-          (matrix-warn (format$ "Login failed.  Error: $error"))))
+          (matrix-error (format$ "Login failed.  Error: $error"))))
 
 (cl-defmethod matrix-logout ((session matrix-session))
   "Log out of SESSION."
@@ -845,8 +841,8 @@ added."
                               'status status))
           (let ((room-id (url-unhex-string (-last-item (s-split "/" url)))))
             (pcase error
-              (`(error http 404) (matrix-warn (format$ "Room not found: $room-id")))
-              (_ (matrix-warn (format$ "Error joining room $room-id: $error")))))))
+              (`(error http 404) (matrix-error (format$ "Room not found: $room-id")))
+              (_ (matrix-error (format$ "Error joining room $room-id: $error")))))))
 
 (cl-defmethod matrix-send-message ((room matrix-room) message &key (msgtype "m.text"))
   "Send MESSAGE of MSGTYPE to ROOM."
