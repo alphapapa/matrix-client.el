@@ -320,7 +320,7 @@ tokens (username and password will be required again)."
 STRING should have a `timestamp' text-property."
   (with-room-buffer room
     (save-excursion
-      (let* ((inhibit-read-only t)
+      (let* ((inhibit-read-only t) ; MAYBE: use buffer-read-only mode instead
              (timestamp (get-text-property 0 'timestamp string))
              (day-number (time-to-days timestamp))
              (event-id (get-text-property 0 'event_id string))
