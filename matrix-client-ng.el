@@ -222,7 +222,7 @@ method without it."
 ;;;; Connect / disconnect
 
 ;;;###autoload
-(defun matrix-client-ng-connect (&optional user password access-token)
+(defun matrix-client-ng-connect (&optional user password access-token server)
   "Matrix Client NG"
   (interactive)
   (if matrix-client-ng-sessions
@@ -235,19 +235,27 @@ method without it."
         ;; Use saved token
         ;; FIXME: Change "username" to "user" when we no longer need compatibility with old code
         (setq user (a-get saved 'username)
+              server (a-get saved 'server)
               access-token (a-get saved 'token)
               txn-id (a-get saved 'txn-id))
       ;; Not saved: prompt for username and password
       (setq user (or user (read-string "User ID: "))
-            password (or password (read-passwd "Password: "))))
+            password (or password (read-passwd "Password: "))
+            server (or server
+                       (--> (read-passwd "Server (leave blank to derive from user ID): ")
+                            (if (string-empty-p it)
+                                nil
+                              it)))))
     (if access-token
         ;; Use saved token and call post-login hook
         (matrix-client-ng-login-hook (matrix-session :user user
+                                                     :server server
                                                      :access-token access-token
                                                      :txn-id txn-id
                                                      :initial-sync-p t))
       ;; Log in with username and password
       (matrix-login (matrix-session :user user
+                                    :server server
                                     :initial-sync-p t)
                     password))))
 
@@ -266,10 +274,11 @@ Add session to sessions list and run initial sync."
   "Save username and access token for session SESSION to file."
   ;; TODO: Check if file exists; if so, ensure it has a proper header so we know it's ours.
   (with-temp-file matrix-client-ng-save-token-file
-    (with-slots (user access-token txn-id) session
+    (with-slots (user server access-token txn-id) session
       ;; FIXME: Change "username" to "user" when we no longer need compatibility with old code
       ;; FIXME: Change token to access-token for clarity.
       (prin1 (a-list 'username user
+                     'server server
                      'token access-token
                      'txn-id txn-id)
              (current-buffer))))
