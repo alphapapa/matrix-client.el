@@ -211,7 +211,8 @@ The sync error handler should increase this for consecutive errors, up to a maxi
    (id :documentation "Fully-qualified room ID."
        :initarg :id
        :type string)
-   (avatar :initarg :avatar)
+   (avatar :initarg :avatar
+           :documentation "A string containing the room avatar image in its text properties.")
    (typers :initarg :typers)
    (name :initarg :name
          :type string)

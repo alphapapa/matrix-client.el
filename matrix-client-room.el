@@ -4,6 +4,10 @@
   "When set, `matrix-client-ng-insert' will call this function before inserting.
 Used to add a button for pending messages.")
 
+(defcustom matrix-client-show-room-avatars t
+  "Download and show room avatars."
+  :type 'boolean)
+
 ;;;; Commands
 
 (defun matrix-client-ng-delete-backward-char (n &optional kill-flag)
@@ -613,6 +617,58 @@ Creates a new header if necessary."
           ;; We can't use :content-keys to get the topic, because it shadows the room slot.
           (setq topic it)
           (matrix-client-ng-update-header room)))
+
+(matrix-client-ng-defevent m.room.avatar
+  "Handle room avatar events."
+  :object-slots ((room avatar session)
+                 (session initial-sync-p user))
+  :content-keys (sender url)
+  :let ((username (matrix-user-displayname room sender))
+        (own-username (matrix-user-displayname room user))
+        (timestamp (matrix-client-ng-event-timestamp event))
+        (time-string (format-time-string "[%T]" (seconds-to-time timestamp)))
+        (action (if url "changed" "removed"))
+        (message (unless initial-sync-p
+                   (propertize (format "%s %s %s the room avatar" time-string username action)
+                               'timestamp timestamp
+                               'face 'matrix-client-notice))))
+  :body (when matrix-client-show-room-avatars
+          (if url
+              ;; New avatar
+              ;; TODO: Maybe display the new avatar in the chat list, like Riot.
+              (matrix-url-with-retrieve-async (matrix-transform-mxc-uri session url)
+                :parser (apply-partially #'matrix-client-parse-image room :max-width 32 :max-height 32)
+                :success (apply-partially #'matrix-client-room-avatar-callback
+                                          :room room
+                                          :message message
+                                          :max-width 32
+                                          :max-height 32))
+            ;; Avatar removed
+            (setq avatar nil)
+            ;; TODO: A function to automatically propertize a string with its related event data would be nice.
+            (when message
+              (matrix-client-ng-insert room message))
+            (matrix-client-ng-update-header room))
+
+          ;; Move last-seen line if it's our own message
+          (when (equal own-username username)
+            (matrix-client-ng-update-last-seen room))))
+
+(cl-defmethod matrix-client-room-avatar-callback (&key (room matrix-room) message data &allow-other-keys)
+  "Set avatar for ROOM.
+Image is passed from parser as DATA, which should be an image
+object made with `create-image'.  This function should be called
+as an async callback when the image is downloaded."
+  (with-slots (avatar) room
+    (when-let ((image-string (with-temp-buffer
+                               (insert " ")
+                               (insert-image data)
+                               (insert " ")
+                               (buffer-string))))
+      (setq avatar image-string)
+      (matrix-client-ng-update-header room)
+      (when message
+        (matrix-client-ng-insert room message)))))
 
 ;;;; Update-room-at-once approach
 
