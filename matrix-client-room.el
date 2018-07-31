@@ -598,12 +598,20 @@ Creates a new header if necessary."
             ;; FIXME: It's inefficient to do this for every join event, especially on initial sync in a large room.
             (rename-buffer (matrix-client-ng-display-name room)))))
 
+(matrix-client-ng-defevent m.typing
+  "Handle m.typing events."
+  :object-slots ((room typers))
+  :content-keys (user_ids)
+  :body (progn
+          (setq typers user_ids)
+          (matrix-client-ng-update-header room)))
+
 ;;;; Update-room-at-once approach
 
 (cl-defmethod matrix-client-ng-update ((room matrix-room))
   "Update ROOM."
-  (with-slots* (((extra state-new timeline-new id) room))
-    ;; Process new events
+  (with-slots* (((extra state-new timeline-new ephemeral id) room))
+    ;; Process new timeline events
     (dolist (event-list (list state-new timeline-new))
       (seq-doseq (event event-list)
         (pcase-let* (((map type) event))
@@ -613,6 +621,13 @@ Creates a new header if necessary."
     ;; Clear new events
     (matrix-clear-state room)
     (matrix-clear-timeline room)
+    ;; Process new ephemeral events
+    (seq-doseq (event ephemeral)
+      (pcase-let* (((map type) event))
+        (apply-if-fn (concat "matrix-client-event-" type)
+            (list room event)
+          (matrix-unimplemented (format$ "Unimplemented client method: $fn-name")))))
+    (setq ephemeral nil)                ; I think we can skip making a method for this.
     ;; TODO: Update other room things: header, avatar, typers, topic, name, aliases, etc.
     ))
 

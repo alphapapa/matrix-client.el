@@ -212,9 +212,7 @@ The sync error handler should increase this for consecutive errors, up to a maxi
        :initarg :id
        :type string)
    (avatar :initarg :avatar)
-   (typers :initarg :typers
-           ;; MAYBE: Not sure if we need this, haven't gotten this far yet.
-           )
+   (typers :initarg :typers)
    (name :initarg :name
          :type string)
    (topic :initarg :topic
@@ -740,12 +738,13 @@ maximum number of events to return (default 10)."
             (setq prev-batch end)
             (matrix-messages room))))
 
-(cl-defmethod matrix-sync-ephemeral ((room matrix-room) ephemeral)
+(cl-defmethod matrix-sync-ephemeral ((room matrix-room) data)
   "Sync EPHEMERAL in ROOM."
   (with-slots (ephemeral) room
-    (pcase-let (((map events) ephemeral))
+    (pcase-let (((map events) data))
       (seq-doseq (event events)
-        (push event ephemeral)))))
+        (push event ephemeral)
+        (matrix-event room event)))))
 
 (cl-defmethod matrix-sync-account_data ((session matrix-session) data)
   "Sync ACCOUNT-DATA in SESSION."
