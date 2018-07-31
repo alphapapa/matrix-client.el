@@ -606,6 +606,14 @@ Creates a new header if necessary."
           (setq typers user_ids)
           (matrix-client-ng-update-header room)))
 
+(matrix-client-ng-defevent m.room.topic
+  "Handle m.room.topic events."
+  :object-slots ((room topic))
+  :body (--when-let (a-get content 'topic)
+          ;; We can't use :content-keys to get the topic, because it shadows the room slot.
+          (setq topic it)
+          (matrix-client-ng-update-header room)))
+
 ;;;; Update-room-at-once approach
 
 (cl-defmethod matrix-client-ng-update ((room matrix-room))
