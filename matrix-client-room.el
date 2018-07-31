@@ -4,11 +4,81 @@
   "When set, `matrix-client-ng-insert' will call this function before inserting.
 Used to add a button for pending messages.")
 
+(defvar matrix-client-ng-mode-map
+  (let ((map (make-sparse-keymap))
+        (mappings '(
+                    "r" matrix-client-reply-or-insert
+                    "R" (lambda () (interactive) (matrix-client-reply-or-insert t))
+                    "RET" matrix-client-ret
+                    "DEL "matrix-client-delete-backward-char
+                    "M-v" matrix-client-scroll-down
+                    "C-k" matrix-client-kill-line-or-unsent-message
+                    "TAB" matrix-client-tab
+                    )))
+    (cl-loop for (key fn) on mappings by #'cddr
+             do (define-key map (cl-typecase key
+                                  (string (kbd key))
+                                  (otherwise key))
+                  fn))
+    map)
+  "Keymap for `matrix-client-ng-mode'.")
+
 (defcustom matrix-client-show-room-avatars t
   "Download and show room avatars."
   :type 'boolean)
 
 ;;;; Commands
+
+(defun matrix-client-kill-line-or-unsent-message (&optional message)
+  "Kill current line; with prefix, kill everything after prompt."
+  (interactive "P")
+  (if message
+      (progn
+        (goto-char (matrix-client--prompt-position))
+        (kill-region (point) (point-max)))
+    (call-interactively #'kill-visual-line)))
+
+(defun matrix-client-tab ()
+  "If point is before prompt, move point to next event; otherwise call `indent-for-tab-command'."
+  (interactive)
+  (let ((prompt (matrix-client--prompt-position)))
+    (if (< (point) prompt)
+        (when-let ((pos (matrix-client--next-event-pos :limit prompt)))
+          (goto-char pos))
+      (call-interactively #'indent-for-tab-command))))
+
+(defun matrix-client-ret ()
+  "If point is before prompt, move point to prompt; otherwise call `matrix-client-send-active-line'."
+  (interactive)
+  (let ((prompt (matrix-client--prompt-position)))
+    (if (< (point) prompt)
+        (goto-char prompt)
+      (call-interactively #'matrix-client-ng-send-input))))
+
+(defun matrix-client-reply-or-insert (&optional quote-p)
+  "If point is on a previous message, begin a reply addressed to its sender.  Otherwise, self-insert.
+With prefix, quote message or selected region of message."
+  (interactive "P")
+  (if (get-text-property (point) 'sender)
+      ;; Start reply
+      (let ((display-name (get-text-property (point) 'displayname))
+            (quote (if quote-p
+                       ;; FIXME: Also quote in HTML format
+                       (--> (if (use-region-p)
+                                (buffer-substring (region-beginning) (region-end))
+                              (matrix-client-ng--this-message))
+                            (prog1 it
+                              (remove-text-properties 0 (length it) '(read-only t) it))
+                            (replace-regexp-in-string (rx bol) "> " it)
+                            (concat it "\n\n"))
+                     ;; Not quoting
+                     ""))
+            (inhibit-read-only t))
+        ;; FIXME: Insert a link to username, and use a filter to transform to HTML before sending.
+        (goto-char (matrix-client--prompt-position))
+        (insert display-name ": " quote))
+    ;; Do self-insert
+    (call-interactively 'self-insert-command)))
 
 (defun matrix-client-ng-delete-backward-char (n &optional kill-flag)
   "Delete backward unless the point is at the prompt or other read-only text."
@@ -318,6 +388,26 @@ INPUT should begin with \"/me\"."
 ;;;; Functions
 
 ;;;;; Support
+
+(cl-defun matrix-client--next-event-pos (&key limit backward)
+  "Return position of next event in buffer.  If BACKWARD is non-nil, look backward.
+If LIMIT is non-nil, don't search past it; otherwise determine
+limit automatically."
+  (let ((fn (cl-case backward
+              ('nil #'next-single-property-change)
+              (t #'previous-single-property-change)))
+        (limit (or limit (cl-case backward
+                           (null (matrix-client--prompt-position))
+                           (t (point-min))))))
+    (funcall fn (point) 'event_id nil limit)))
+
+(defun matrix-client-ng--this-message ()
+  "Return message point is on."
+  (let* ((beg (previous-single-property-change (point) 'event_id))
+         (end (next-single-property-change (point) 'event_id))
+         ;; Skip past metadata
+         (message-beg (next-single-property-change beg 'face)))
+    (buffer-substring message-beg end)))
 
 (defun matrix-client-ng--replace-string (plist string)
   "Replace text in buffer, which has text properties and values found in PLIST, with STRING.

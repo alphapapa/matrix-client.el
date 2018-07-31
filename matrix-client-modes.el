@@ -33,13 +33,6 @@
 
 (require 'simple)
 
-(defvar matrix-client-mode-map
-  (let ((map (make-sparse-keymap)))
-    (define-key map (kbd "RET") 'matrix-client-send-active-line)
-    (define-key map (kbd "DEL") 'matrix-client-delete-backward-char)
-    map)
-  "Keymap for `matrix-client-mode'.")
-
 (define-derived-mode matrix-client-mode fundamental-mode "Matrix Client"
   "Major mode for Matrix client buffers.
 

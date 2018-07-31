@@ -176,11 +176,6 @@ method without it."
   ;; TODO: Add a new abbrev table that uses usernames, rooms, etc.
   :keymap matrix-client-ng-mode-map)
 
-;;;;; Keys
-
-(define-key matrix-client-ng-mode-map (kbd "RET") 'matrix-client-ng-send-input)
-(define-key matrix-client-ng-mode-map (kbd "DEL") 'matrix-client-ng-delete-backward-char)
-
 ;;;; Connect / disconnect
 
 ;;;###autoload
