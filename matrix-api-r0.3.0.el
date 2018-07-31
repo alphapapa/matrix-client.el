@@ -686,8 +686,6 @@ was updated.")
 Each function is called with one argument, the room object that
 was updated.")
 
-
-
 (cl-defmethod matrix-clear-timeline ((room matrix-room))
   "Clear ROOM's `timeline-new' list."
   (with-slots (timeline-new) room
