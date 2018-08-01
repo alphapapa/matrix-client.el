@@ -671,12 +671,13 @@ Creates a new header if necessary."
   "Say that member in EVENT joined/left ROOM."
   :object-slots ((room session)
                  (session initial-sync-p))
-  :event-keys (state_key)
+  :event-keys (state_key sender)
   :content-keys (displayname membership)
-  :let ((timestamp (matrix-client-ng-event-timestamp event))
+  :let ((displayname (or displayname sender))
+        (timestamp (matrix-client-ng-event-timestamp event))
         (action (pcase membership
                   ("join" "joined")
-                  ("left" "left")
+                  ("leave" "left")
                   (_ membership)))
         (msg (propertize (format$ "$displayname $action")
                          'face 'matrix-client-notice
