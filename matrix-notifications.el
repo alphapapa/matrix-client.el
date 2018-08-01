@@ -25,6 +25,11 @@
 
 ;;;; Variables
 
+(defcustom matrix-client-ng-notifications t
+  "Enable notifications."
+  ;; This variable may be let-bound to nil to disable notifications, e.g. when loading old messages.
+  :type 'boolean)
+
 (defvar matrix-client-notify-hook nil
   "List of functions called for events.
 Each is called with the event-type and the event data.")
@@ -39,12 +44,13 @@ Automatically trimmed to last 20 notifications.")
   "Run notify hooks and built-in notificataion for an event of EVENT-TYPE with DATA.
 Optional REST of args are also applied to hooks and function."
   ;; FIXME: Pass session so we can get its initial-sync-p
-  (unless (oref (car matrix-client-ng-sessions) initial-sync-p)
-    (run-hook-with-args 'matrix-client-notify-hook event-type data rest)
-    ;; Run built-in notification for this event type
-    (let ((fn (intern-soft (concat "matrix-client-notify-" event-type))))
-      (when (functionp fn)
-        (apply #'funcall fn data rest)))))
+  (when matrix-client-ng-notifications
+    (unless (oref (car matrix-client-ng-sessions) initial-sync-p)
+      (run-hook-with-args 'matrix-client-notify-hook event-type data rest)
+      ;; Run built-in notification for this event type
+      (let ((fn (intern-soft (concat "matrix-client-notify-" event-type))))
+        (when (functionp fn)
+          (apply #'funcall fn data rest))))))
 
 ;; MAYBE: Use a macro to define the handlers, because they have to
 ;; define their arg lists in a certain way, and the macro would take

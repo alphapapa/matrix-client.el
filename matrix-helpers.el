@@ -151,5 +151,13 @@ If BUFFER is nil, use the current buffer."
    (t
     nil)))
 
+(defun matrix--alist (&rest pairs)
+  "Return an alist of the key-value pairs in PAIRS whose value is non-nil.
+PAIRS is a spliced plist."
+  ;; e.g. (matrix--alist "direction" "b" "limit" nil) => (("direction" . "b"))
+  (cl-loop for (key value) on pairs by #'cddr
+           when value
+           collect (cons key value)))
+
 (provide 'matrix-helpers)
 ;;; matrix-helpers.el ends here

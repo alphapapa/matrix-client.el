@@ -29,6 +29,14 @@ Used to add a button for pending messages.")
 
 ;;;; Commands
 
+(defun matrix-client-scroll-down ()
+  "Call `scroll-down-command'.  If point is at the top of the buffer, load history."
+  (interactive)
+  (if (= (line-number-at-pos (point)) 1)
+      (matrix-client-ng-fetch-history matrix-client-ng-room)
+    (let ((scroll-error-top-bottom t))
+      (scroll-down-command))))
+
 (defun matrix-client-kill-line-or-unsent-message (&optional message)
   "Kill current line; with prefix, kill everything after prompt."
   (interactive "P")
@@ -140,6 +148,34 @@ With prefix, quote message or selected region of message."
           (matrix-client-ng-update-last-seen room))))))
 
 ;;;; Methods
+
+(cl-defmethod matrix-client-ng-fetch-history ((room matrix-room))
+  "Load earlier messages for ROOM."
+  (matrix-client-ng-room-banner room "Loading history...")
+  (matrix-messages room ))
+
+(cl-defmethod matrix-client-ng-fetch-history-callback ((room matrix-room) &key data &allow-other-keys)
+  (pcase-let* (((map start end chunk) data)
+               (matrix-client-enable-notifications nil)) ; Silence notifications for old messages
+    ;; NOTE: We don't add the events to the timeline of the room object.
+    (seq-doseq (event chunk)
+      (matrix-event room event))
+    ;; NOTE: When direction is "b", as it is when fetching earlier messages, the "end" token is the
+    ;; earliest chronologically, so it becomes the room's new "start" token.  Not confusing at
+    ;; all... (maybe API 0.3.0 is better)
+    (matrix-client-ng-room-banner room nil)))
+
+(cl-defmethod matrix-client-ng-room-banner ((room matrix-room) message)
+  "Display MESSAGE in a banner overlay at top of ROOM's buffer.
+If MESSAGE is nil, clear existing message."
+  (with-room-buffer room
+    (let ((ov (or (car (ov-in 'matrix-client-banner))
+                  (ov (point-min) (point-min)
+                      'matrix-client-banner t)))
+          (message (when message
+                     (propertize message
+                                 'face 'font-lock-comment-face))))
+      (ov-set ov 'before-string message))))
 
 (cl-defmethod matrix-client-ng--delete-event ((room matrix-room) plist)
   "Delete event with text properties in PLIST from ROOM's buffer."
@@ -598,7 +634,6 @@ Creates a new header if necessary."
         ((map transaction_id) unsigned)
         (metadata) (msg) (matrix-image-url))
   :body (progn
-          ;; (matrix-log "PROCESSING MESSAGE EVENT: \n%s" (matrix-pp-string event))
           (when content
             ;; Redacted messages have no content, so we should do nothing for them.
             (setq metadata (format$ "[$timestamp-string] $displayname> "))
@@ -785,6 +820,7 @@ as an async callback when the image is downloaded."
           (matrix-unimplemented (format$ "Unimplemented client method: $fn-name")))))
     (setq ephemeral nil)                ; I think we can skip making a method for this.
     ;; TODO: Update other room things: header, avatar, typers, topic, name, aliases, etc.
+    (matrix-client-ng-room-banner room nil)
     ))
 
 (add-hook 'matrix-room-update-hook #'matrix-client-ng-update)

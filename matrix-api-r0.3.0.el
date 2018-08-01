@@ -234,6 +234,9 @@ The sync error handler should increase this for consecutive errors, up to a maxi
    (unread-notifications :documentation "Counts of unread notifications for this room.")
    (hook :initarg :hook
          :documentation "List of functions called when room is updated.  Function is called with one argument, this room object.")
+   (end-token :initarg :end-token
+              :initform nil
+              :documentation "The most recent event-id in a room, used to push read-receipts to the server.")
    (extra :initarg :extra
           ;; FIXME: Need clean way to do this.
           :initform (matrix-room-extra)
@@ -304,7 +307,7 @@ or symbol and should represent the final part of the API
 URL (e.g. for \"/_matrix/client/r0/login\", it should be
 \"login\".  DATA should be an alist which will be automatically
 encoded to JSON.  CALLBACK should be a method specialized on
-`matrix-session', whose subsequent arguments are defined in
+`matrix-session', FIXME whose subsequent arguments are defined in
 accordance with the `request' package's API.  ERROR-CALLBACK, if
 set, will be called if the request fails."
   (declare (indent defun))
@@ -588,7 +591,8 @@ requests, and we make a new request."
                                        ;; Make and return new room
                                        (car (push (matrix-room :session session
                                                                :id room-id)
-                                                  rooms)))))
+                                                  rooms))))
+                             (prev-batch (a-get* joined-room 'timeline 'prev_batch)))
                   (cl-loop for param in params
                            ;; If the event array is empty, the function will be
                            ;; called anyway, so ignore its return value.
@@ -695,8 +699,7 @@ was updated.")
   (with-slots (state-new) room
     (setq state-new nil)))
 
-(cl-defmethod matrix-messages ((room matrix-room)
-                               &key (direction "b") (limit 100))
+(cl-defmethod matrix-messages ((room matrix-room) &key (direction "b") (limit 10))
   "Request messages for ROOM-ID in SESSION.
 DIRECTION must be \"b\" (the default) or \"f\".  LIMIT is the
 maximum number of events to return (default 10)."
@@ -712,7 +715,9 @@ maximum number of events to return (default 10)."
 (matrix-defcallback messages matrix-room
   "Callback for /rooms/{roomID}/messages."
   :slots (id timeline timeline-new prev-batch last-full-sync)
-  :body (pcase-let* (((map start end chunk) data))
+  :body (pcase-let* (((map start end chunk) data)
+                     ;; Disable notifications while loading old messages.
+                     (matrix-client-ng-notifications nil))
 
           (matrix-log (a-list 'type 'matrix-messages-callback
                               'room-id id
@@ -729,15 +734,21 @@ maximum number of events to return (default 10)."
             (push event timeline)
             (push event timeline-new))
 
-          (if (equal end last-full-sync)
-              ;; Gap has been filled: clear the last-full-sync token (NOTE: Not sure if this is correct)
-              (progn
-                (matrix-log "Gap is filled")
-                (setq last-full-sync nil))
-            ;; Gap not yet filled: continue filling
-            (matrix-log "Gap not filled" id data)
-            (setq prev-batch end)
-            (matrix-messages room))))
+          (setq prev-batch end)
+          (setq last-full-sync nil)
+          (run-hook-with-args 'matrix-room-update-hook room)
+
+          ;; NOTE: I don't think this code is necessary, but I'm temporarily leaving it for future reference.
+          ;; (if (equal end last-full-sync)
+          ;;     ;; Gap has been filled: clear the last-full-sync token (NOTE: Not sure if this is correct)
+          ;;     (progn
+          ;;       (matrix-log "Gap is filled")
+          ;;       )
+          ;;   ;; Gap not yet filled: continue filling
+          ;;   (matrix-log "Gap not filled" id data)
+          ;;
+          ;;   (matrix-messages room))
+          ))
 
 (cl-defmethod matrix-sync-ephemeral ((room matrix-room) data)
   "Sync EPHEMERAL in ROOM."
