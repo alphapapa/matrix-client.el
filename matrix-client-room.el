@@ -536,7 +536,8 @@ Creates a new header if necessary."
   (cl-labels ((prev-header-pos () (matrix--prev-property-change (point) 'matrix-header-day-number))
               (current-header-day-number () (get-text-property (point) 'matrix-header-day-number)))
     (let* ((target-day-number (time-to-days timestamp))
-           (prompt (1- (matrix-client--prompt-position))))
+           (prompt (1- (matrix-client--prompt-position)))
+           (inhibit-read-only t))
       (goto-char prompt)
       (catch 'found
         (while t
@@ -550,11 +551,11 @@ Creates a new header if necessary."
                          (throw 'found prev-header-pos))
                         ((< current-header-day-number target-day-number)
                          ;; Found earlier header: insert new one after current header's position
-                         (goto-char (or (matrix--next-property-change (point) 'matrix-header-day-number prompt)
+                         (goto-char (or (matrix--next-property-change (point) 'matrix-header-day-number nil prompt)
                                         prompt))
                          (matrix-client-room--insert-date-header timestamp)
-                         ;; Return position after new header
-                         (throw 'found (point)))))
+                         ;; Return position after new header (actually 1- it, see below)
+                         (throw 'found (1- (point))))))
                 ;; Wrong header: keep looking
                 )
             ;; No more headers found: update other headers and insert new header here (this will
