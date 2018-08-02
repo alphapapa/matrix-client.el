@@ -27,6 +27,69 @@ Used to add a button for pending messages.")
   "Download and show room avatars."
   :type 'boolean)
 
+;;;; Macros
+
+(cl-defmacro matrix-client-ng-defevent (type docstring &key object-slots event-keys content-keys let body)
+  "Define a method on `matrix-room' to handle Matrix events of TYPE.
+
+TYPE should be a symbol representing the event type,
+e.g. `m.room.message'.
+
+DOCSTRING should be a docstring for the method.
+
+OBJECT-SLOTS should be a list of lists, each in the form (OBJECT
+SLOT ...), which will be turned into a `with-slots*' form
+surrounding the following `pcase-let*' and BODY.  (This form
+seems more natural than the (SLOTS OBJECT) form used by
+`with-slots'.)
+
+The following are bound in order in `pcase-let*':
+
+EVENT-KEYS should be a list of symbols in the EVENT alist which
+are bound with `pcase-let*' around the body.  These keys are
+automatically bound: `content', `event_id', `sender',
+`origin_server_ts', `type', and `unsigned'.
+
+CONTENT-KEYS should be a list of symbols in the EVENTs `content'
+key, which are bound in the `pcase-let*' around the body.
+
+LET should be a varlist which is bound in the `pcase-let*' around
+the body.
+
+BODY will finally be evaluated in the context of these slots and
+variables.
+
+It is hoped that using this macro is easier than defining a large
+method without it."
+  ;; FIXME: It would probably be better to use the same form for OBJECT-SLOTS that is used by
+  ;; `pcase-let*', because having two different ways is too confusing.
+  (declare (indent defun))
+  (let ((method-name (intern (concat "matrix-client-event-" (symbol-name type))))
+        (slots (cl-loop for (object . slots) in object-slots
+                        collect (list slots object))))
+    `(cl-defmethod ,method-name ((room matrix-room) event)
+       ,docstring
+       (declare (indent defun))
+       (with-slots* ,slots
+         (pcase-let* (((map content event_id sender origin_server_ts type unsigned ,@event-keys) event)
+                      ((map ,@content-keys) content)
+                      ,@let)
+           ,body)))))
+
+(defmacro with-room-buffer (room &rest body)
+  (declare (debug (sexp body)) (indent defun))
+  `(with-slots* (((extra id) room)
+                 ((buffer) extra))
+     (unless buffer
+       ;; Make buffer if necessary.  This seems like the easiest way
+       ;; to guarantee that the room has a buffer, since it seems
+       ;; unclear what the first received event type for a joined room
+       ;; will be.
+       (setq buffer (get-buffer-create (matrix-client-ng-display-name room)))
+       (matrix-client-ng-setup-room-buffer room))
+     (with-current-buffer buffer
+       ,@body)))
+
 ;;;; Commands
 
 (defun matrix-client-scroll-down ()
