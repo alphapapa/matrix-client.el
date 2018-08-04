@@ -136,10 +136,10 @@ FN-NAME should be a string, and is available in the ELSE form as `fn-name'."
                               user)
          :documentation "The fully qualified user ID, e.g. @user:matrix.org.")
    (server :initarg :server
-           :instance-initform (unless server
-                                (nth 2 (s-match (rx "@" (group (1+ (not (any ":"))))
-                                                    ":" (group (1+ anything)))
-                                                user)))
+           :instance-initform (or server
+                                  (nth 2 (s-match (rx "@" (group (1+ (not (any ":"))))
+                                                      ":" (group (1+ anything)))
+                                                  user)))
            :documentation "FQDN of server, e.g. \"matrix.org\" for the official homeserver.  Derived automatically from USER when not explicitly set.")
    (api-url-prefix :type string
                    :instance-initform (concat "https://" server "/_matrix/client/r0/")
