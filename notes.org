@@ -20,6 +20,40 @@ Debugger entered--Lisp error: (error "Not enough arguments for format string")
   request--curl-callback(#<process request curl> "finished\n")
 
 #+END_QUOTE
+** TODO Avatar change events are displayed as joins
+
+I wonder how Riot determines that it's a profile change event. e.g.
+
+#+BEGIN_EXAMPLE
+  ((timestamp . "2018-08-05 14:44:06")
+   ((event . matrix-sync-timeline)
+    (room-id . "!roomid:matrix.org")
+    (prev-batch . "s624701158_513867773_1093874_157527466_69933145_443272_9035199_7733013_17510")
+    (last-full-sync . "s624700933_513867590_1093793_157527355_69933114_443272_9035195_7733012_17510")
+    (data
+     (limited . :json-false)
+     (prev_batch . "s624701801_513868265_1094055_157527685_69933253_443272_9035215_7733024_17510")
+     (events .
+             [((origin_server_ts . 1533498245648)
+               (sender . "@userid:matrix.org")
+               (event_id . "$eventid:matrix.org")
+               (unsigned
+                (prev_content
+                 (membership . "join")
+                 (avatar_url . "mxc://matrix.org/oldurl")
+                 (displayname . "Displayname"))
+                (prev_sender . "@userid:matrix.org")
+                (replaces_state . "$oldevent:matrix.org")
+                (age . 973))
+               (state_key . "@userid:matrix.org")
+               (content
+                (membership . "join")
+                (avatar_url . "mxc://matrix.org/newurl")
+                (displayname . "Displayname"))
+               (membership . "join")
+               (type . "m.room.member"))]))))
+#+END_EXAMPLE
+
 ** TODO Error from broken image-loading connection
 :PROPERTIES:
 :ID:       18501c3b-76a2-4354-befa-d8ffd8340d1b
