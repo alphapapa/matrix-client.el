@@ -355,7 +355,7 @@ set, will be called if the request fails."
                  :silent t
                  :inhibit-cookies t
                  :extra-headers (a-list "Authorization" (concat "Bearer " access-token))
-                 :query (encode-coding-string (json-encode data) 'utf-8)
+                 :query data
                  :parser #'json-read
                  :success success
                  :error error
@@ -367,7 +367,7 @@ set, will be called if the request fails."
                              :method method
                              :extra-headers (a-list "Content-Type" "application/json"
                                                     "Authorization" (concat "Bearer " access-token))
-                             :data (encode-coding-string (json-encode data) 'utf-8)
+                             :data (json-encode data)
                              :parser #'json-read
                              :success success
                              :error error
@@ -871,7 +871,7 @@ use the session's."
     ;; Use `with-slots*' instead of `pcase-let*' so we can `incf' the txn-id.
     (let* ((type "m.room.message")
            (content (a-list 'msgtype msgtype
-                            'body message))
+                            'body (encode-coding-string message 'utf-8)))
            (txn-id (or override-txn-id (cl-incf txn-id)))
            (endpoint (format$ "rooms/$id/send/$type/$txn-id"))
            (success (or success
