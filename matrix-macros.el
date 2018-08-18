@@ -271,7 +271,8 @@ SUCCESS and ERROR as `body'.  Or, if the body is not needed,
                                       `(cl-function
                                         (lambda (&key cbargs status error headers data url)
                                           ,error))))))
-         (url-request-data data)
+         (url-request-data (when data
+                             (encode-coding-string data 'utf-8)))
          (url-request-method (upcase (cl-typecase method
                                        (symbol (symbol-name method))
                                        (string method))))

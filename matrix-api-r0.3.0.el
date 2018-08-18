@@ -871,7 +871,7 @@ use the session's."
     ;; Use `with-slots*' instead of `pcase-let*' so we can `incf' the txn-id.
     (let* ((type "m.room.message")
            (content (a-list 'msgtype msgtype
-                            'body (encode-coding-string message 'utf-8)))
+                            'body message))
            (txn-id (or override-txn-id (cl-incf txn-id)))
            (endpoint (format$ "rooms/$id/send/$type/$txn-id"))
            (success (or success
