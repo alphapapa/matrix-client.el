@@ -246,6 +246,14 @@ If HTML is non-nil, treat input as HTML."
                          (buffer-substring-no-properties (point-min) (point-max)))))
       (s-trim plain-text))))
 
+(defun matrix-client-ng-upload (path)
+  "Upload file at PATH to current room.
+Prompts for confirmation before uploading."
+  (interactive (list (read-file-name "Upload file: " nil nil t)))
+  (when (y-or-n-p (format "Really upload %s?" path))
+    (message "Uploading %s..." path)
+    (matrix-upload matrix-client-ng-room path)))
+
 ;;;; Methods
 
 (cl-defmethod matrix-client-ng-fetch-history ((room matrix-room))
