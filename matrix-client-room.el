@@ -138,6 +138,7 @@ With prefix, quote message or selected region of message."
                        (--> (if (use-region-p)
                                 (buffer-substring (region-beginning) (region-end))
                               (matrix-client-ng--this-message))
+                            (s-trim it)
                             (prog1 it
                               (remove-text-properties 0 (length it) '(read-only t) it))
                             (replace-regexp-in-string (rx bol) "> " it)
