@@ -966,7 +966,9 @@ TYPING should be t or nil."
                ((eieio server) session)
                (filename (file-name-nondirectory path))
                (extension (file-name-extension filename))
-               (mime-type (mailcap-extension-to-mime extension))
+               (mime-type (cond (extension (mailcap-extension-to-mime extension))
+                                (t (mailcap-extension-to-mime (symbol-name (or (image-type-from-file-header path)
+                                                                               (error "Can't determine image type'")))))))
                (file-contents (with-temp-buffer
                                 (insert-file-contents path)
                                 (buffer-string)))
