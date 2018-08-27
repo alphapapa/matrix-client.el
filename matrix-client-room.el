@@ -576,6 +576,11 @@ INPUT should be, e.g. \"/html <b>...\"."
   (insert input)
   (matrix-client-ng-send-input :html t))
 
+(matrix-client-ng-def-room-command upload
+  :insert (when (matrix-client-ng-upload room input)
+            (concat "Uploading: " input))
+  :docstring "Upload file at local path or URL to ROOM.")
+
 ;;;; Functions
 
 ;;;;; Support
