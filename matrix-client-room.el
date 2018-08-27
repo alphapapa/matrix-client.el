@@ -246,13 +246,29 @@ If HTML is non-nil, treat input as HTML."
                          (buffer-substring-no-properties (point-min) (point-max)))))
       (s-trim plain-text))))
 
-(defun matrix-client-ng-upload (path)
-  "Upload file at PATH to current room.
-Prompts for confirmation before uploading."
-  (interactive (list (read-file-name "Upload file: " nil nil t)))
-  (when (y-or-n-p (format "Really upload %s?" path))
+(cl-defmethod matrix-client-ng-upload ((room matrix-room) path)
+  "Upload file at PATH to ROOM.
+PATH may be a local path, optionally prefixed with \"file://\",
+or a remote HTTP(S) path, in which case the file will be
+downloaded and then uploaded.  Prompts for confirmation before
+uploading.
+
+Interactively, completes local file path; with prefix, reads
+path/URL without completion."
+  (interactive (list (if current-prefix-arg
+                         (read-string "Path/URL: ")
+                       (read-file-name "Upload file: " nil nil 'confirm))))
+  (when (yes-or-no-p (format "Really upload %s? " path))
     (message "Uploading %s..." path)
-    (matrix-upload matrix-client-ng-room path)))
+    (matrix-upload room (pcase path
+                          ;; NOTE: `url-file-local-copy' is synchronous; might be nice to do this
+                          ;; with a callback.
+                          ((rx bos "http" (optional "s") "://")
+                           (or (url-file-local-copy path)
+                               (error "Download failed (%s)" path)))
+                          ((rx bos "file://" (let local-path (1+ anything)))
+                           local-path)
+                          (_ path)))))
 
 ;;;; Methods
 
