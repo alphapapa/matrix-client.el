@@ -508,6 +508,10 @@ INPUT should begin with \"/me\"."
                                               'face 'matrix-client-notice))
     (matrix-client-ng-update-last-seen room)))
 
+(cl-defmethod matrix-client-ng-room-command-upload ((room matrix-room) input)
+  "Upload file at local path or URL to ROOM."
+  (matrix-client-ng-upload room (s-chop-prefix "/upload " input)))
+
 ;;;; Functions
 
 ;;;;; Support
