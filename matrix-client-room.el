@@ -168,8 +168,9 @@ With prefix, quote message or selected region of message."
                (input (prog1
                           (buffer-substring-no-properties (point) (point-max))
                         (delete-region (point) (point-max))))
-               ;; NOTE: A happy accident, `s-split-words' chops off the leading "/".
-               (first-word (car (s-split-words input)))
+               (first-word (when (s-prefix? "/" input)
+                             ;; NOTE: A happy accident, `s-split-words' chops off the leading "/".
+                             (car (s-split-words input))))
                (event-string (propertize input
                                          'sender user
                                          'timestamp (time-to-seconds)))
