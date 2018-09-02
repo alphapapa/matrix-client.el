@@ -159,8 +159,6 @@ PAIRS is a spliced plist."
            when value
            collect (cons key value)))
 
-;;;; FIXME: Argh
-
 (defun matrix--url-http-create-request (&optional ref-url)
   "Create an HTTP request for `url-http-target-url', referred to by REF-URL.
 
@@ -303,9 +301,12 @@ modified to allows binary uploads, which are prevented by the
            ;; Any data
            url-http-data))
     ;; Bug#23750
-    (unless (or (equal url-http-method "POST")
-                (= (string-bytes request)
-                   (length request)))
+    (unless (or
+             ;; Our local fix to the "fix" is to not do the string-bytes/length comparison when
+             ;; POSTing.
+             (equal url-http-method "POST")
+             (= (string-bytes request)
+                (length request)))
       (error "Multibyte text in HTTP request: %s" request))
     (url-http-debug "Request is: \n%s" request)
     request))
