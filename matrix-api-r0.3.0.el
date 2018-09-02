@@ -985,19 +985,16 @@ TYPING should be t or nil."
 Post the uploaded file to the room as an m.image or m.file
 message."
   :slots (id)
-  :body (progn
+  :body (-let* (((&plist :filename filename :mime-type mime-type) cbargs)
+                ((&alist 'content_uri url) data)
+                (msgtype (cond ((s-prefix? "image/" mime-type) "m.image")
+                               (t "m.file"))))
           (matrix-log (a-list 'fn 'matrix-upload-callback
-                              'message "UPLOADED:"
                               'room id
                               'data data))
-          (let* ((filename (plist-get cbargs :filename))
-                 (mime-type (plist-get cbargs :mime-type))
-                 (msgtype (cond ((s-prefix? "image/" mime-type) "m.image")
-                                (t "m.file")))
-                 (url (a-get* data 'content_uri)))
-            (matrix-send-message room (concat "File: " filename)
-                                 :msgtype msgtype
-                                 :extra-content (a-list 'url url)))))
+          (matrix-send-message room (concat "File: " filename)
+                               :msgtype msgtype
+                               :extra-content (a-list 'url url))))
 
 ;;;; Footer
 
