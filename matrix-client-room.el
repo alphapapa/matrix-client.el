@@ -475,16 +475,17 @@ INPUT should begin with \"/me\"."
 
 (cl-defmethod matrix-client-ng-room-command-who ((room matrix-room) input)
   "Print list of users to ROOM."
-  (with-slots (members) room
-    (matrix-client-ng-insert room (propertize (concat "Room members: "
-                                                      (--> members
-                                                           (--map (a-get (cdr it) 'displayname) it)
-                                                           (--sort (string-collate-lessp it other nil 'ignore-case)
-                                                                   it)
-                                                           (s-join ", " it)))
-                                              'timestamp (time-to-seconds)
-                                              'face 'matrix-client-notice))
-    (matrix-client-ng-update-last-seen room)))
+  (let ((matrix-client-insert-prefix-fn nil))
+    (with-slots (members) room
+      (matrix-client-ng-insert room (propertize (concat "Room members: "
+                                                        (--> members
+                                                             (--map (a-get (cdr it) 'displayname) it)
+                                                             (--sort (string-collate-lessp it other nil 'ignore-case)
+                                                                     it)
+                                                             (s-join ", " it)))
+                                                'timestamp (time-to-seconds)
+                                                'face 'matrix-client-notice))
+      (matrix-client-ng-update-last-seen room))))
 
 ;;;; Functions
 
