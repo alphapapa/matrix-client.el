@@ -1,3 +1,5 @@
+(require 'shr)
+
 ;;;; Variables
 
 (defvar matrix-client-insert-prefix-fn nil
@@ -158,8 +160,9 @@ With prefix, quote message or selected region of message."
   (unless (get-text-property (- (point) 2) 'read-only)
     (call-interactively #'delete-backward-char n kill-flag)))
 
-(defun matrix-client-ng-send-input ()
-  "Send current input to current room."
+(cl-defun matrix-client-ng-send-input (&key html)
+  "Send current input to current room.
+If HTML is non-nil, treat input as HTML."
   (interactive)
   (goto-char (matrix-client--prompt-position))
   (pcase-let* ((room matrix-client-ng-room)
@@ -185,7 +188,14 @@ With prefix, quote message or selected region of message."
                                                                             (matrix-send-message room string
                                                                                                  :override-txn-id (1+ txn-id))))
                                                                 'help-echo "Resend message"
-                                                                'transaction_id (1+ txn-id)))))
+                                                                'transaction_id (1+ txn-id))))
+               (format) (formatted-body) (extra-content))
+    (when html
+      (setq format "org.matrix.custom.html"
+            formatted-body input
+            input (matrix-client-ng--html-to-plain input)
+            extra-content (a-list 'format format
+                                  'formatted_body formatted-body)))
     (unless (s-blank-str? input)
       (when matrix-client-save-outgoing-messages
         (push input kill-ring))
@@ -199,9 +209,12 @@ With prefix, quote message or selected region of message."
                         'sender user
                         'unsigned (a-list 'transaction_id (1+ txn-id))
                         'content (a-list 'body input
-                                         'msgtype "m.text")
+                                         'msgtype "m.text"
+                                         'format format
+                                         'formatted_body formatted-body)
                         'type "m.room.message"))
           (matrix-send-message room input
+                               :extra-content extra-content
                                :success (apply-partially #'matrix-client-send-message-callback room
                                                          ;; HACK: We have to get the txn-id
                                                          ;; ourselves here so we can apply it to the
@@ -211,6 +224,18 @@ With prefix, quote message or selected region of message."
                                :error (apply-partially #'matrix-client-send-message-error-callback room
                                                        (1+ txn-id)))
           (matrix-client-ng-update-last-seen room))))))
+
+(defun matrix-client-ng--html-to-plain (html)
+  "Return plain-text rendering of HTML."
+  ;; `shr-insert-document' insists on wrapping lines, so we disable the function it uses.
+  (cl-letf (((symbol-function 'shr-fill-line) (lambda (&rest ignore) nil)))
+    (let* ((tree (with-temp-buffer
+                   (insert html)
+                   (libxml-parse-html-region (point-min) (point-max))))
+           (plain-text (with-temp-buffer
+                         (shr-insert-document tree)
+                         (buffer-substring-no-properties (point-min) (point-max)))))
+      (s-trim plain-text))))
 
 ;;;; Methods
 
@@ -455,6 +480,13 @@ Also update prompt with typers."
           'matrix-client-prompt t))))
 
 ;;;;; Room commands
+
+(cl-defmethod matrix-client-ng-room-command-html ((room matrix-room) input)
+  "Send HTML message to ROOM.
+INPUT should be, e.g. \"/html <b>...\"."
+  ;; HACK: Reinsert HTML without "/html" and call send-input again
+  (insert (replace-regexp-in-string (rx bol "/html" (1+ space)) "" input))
+  (matrix-client-ng-send-input :html t))
 
 (cl-defmethod matrix-client-ng-room-command-join ((room matrix-room) input)
   "Join room on session.
