@@ -14,11 +14,14 @@
   "Face for user's own chat metadata properties."
   :group 'matrix-client)
 
-(defface matrix-client-own-messages
-  '((((class color) (background light)) (:foreground "#586e75" :weight bold :slant italic))
-    (((class color) (background dark)) (:foreground "#586e75" :weight bold :slant italic))
-    (t (:weight bold :slant italic)))
-  "Face for user's own chat messages."
+(defface matrix-client-message-body
+  '((t (:inherit default)))
+  "Face for Matrix message bodies."
+  :group 'matrix-client)
+
+(defface matrix-client-own-message-body
+  '((t (:inherit matrix-client-message-body)))
+  "Face for user's own Matrix message bodies."
   :group 'matrix-client)
 
 (defface matrix-client-pending-messages

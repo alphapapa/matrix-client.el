@@ -183,7 +183,7 @@ like."
        (let (metadata-face message-face)
          (cond ((string= display-name own-display-name)
                 (setq metadata-face 'matrix-client-own-metadata
-                      message-face 'matrix-client-own-messages))
+                      message-face 'matrix-client-own-message-body))
                ((string= msgtype "m.notice")
                 (setq metadata-face 'matrix-client-notice-metadata
                       message-face 'matrix-client-notice))

@@ -52,7 +52,7 @@
   "Face for user's own chat metadata properties."
   :group 'matrix-client)
 
-(defface matrix-client-own-messages
+(defface matrix-client-own-message-body
   '((((class color) (background light)) (:foreground "#586e75" :weight bold :slant italic))
     (((class color) (background dark)) (:foreground "#586e75" :weight bold :slant italic))
     (t (:weight bold :slant italic)))

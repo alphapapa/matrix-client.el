@@ -763,13 +763,13 @@ Creates a new header if necessary."
             (let (metadata-face message-face)
               (cond ((equal sender user)
                      (setq metadata-face 'matrix-client-own-metadata
-                           message-face 'matrix-client-own-messages))
+                           message-face 'matrix-client-own-message-body))
                     ((string= msgtype "m.notice")
                      (setq metadata-face 'matrix-client-notice-metadata
                            message-face 'matrix-client-notice))
                     (t
                      (setq metadata-face 'matrix-client-metadata
-                           message-face 'default)))
+                           message-face 'matrix-client-message-body)))
               ;; Use 'append so that link faces are not overridden.
               (add-face-text-property 0 (length metadata) metadata-face 'append metadata)
               (add-face-text-property 0 (length message) message-face 'append message))
