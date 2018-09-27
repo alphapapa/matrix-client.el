@@ -36,37 +36,6 @@
 (require 'matrix-client-images)
 (require 'matrix-notifications)
 
-(cl-defmethod matrix-client-handlers-init ((con matrix-client-connection))
-  "Set up all the matrix-client event type handlers.
-
-Each matrix-client-event-handler is an alist of matrix message type and
-the function that handles them.  Currently only a single handler
-for each event is supported.  The handler takes a single argument,
-DATA, which is a `json-read' object from the Event stream.  See
-the Matrix spec for more information about its format."
-  ;; NOTE: Roughly corresponds with the Matrix Python SDK here:
-  ;; <https://github.com/matrix-org/matrix-python-sdk/blob/master/matrix_client/client.py#L486>
-  ;; FIXME: `matrix-client-window-change-hook' should be renamed, and
-  ;; is currently unimplemented anyway.
-  (push 'matrix-client-window-change-hook window-configuration-change-hook)
-  (with-slots (event-handlers input-filters) con
-    (unless event-handlers
-      (setq event-handlers (a-list "m.room.message" 'matrix-client-handler-m.room.message
-                                   "m.lightrix.pattern" 'matrix-client-handler-m.lightrix.pattern
-                                   "m.room.topic" 'matrix-client-handler-m.room.topic
-                                   "m.room.name" 'matrix-client-handler-m.room.name
-                                   "m.room.member" 'matrix-client-handler-m.room.member
-                                   "m.room.aliases" 'matrix-client-handler-m.room.aliases
-                                   "m.room.avatar" 'matrix-client-handler-m.room.avatar
-                                   "m.presence" 'matrix-client-handler-m.presence
-                                   "m.typing" 'matrix-client-handler-m.typing)))
-    (unless input-filters
-      (setq input-filters '(matrix-client-input-filter-who
-                            matrix-client-input-filter-emote
-                            matrix-client-input-filter-join
-                            matrix-client-input-filter-leave
-                            matrix-client-send-to-current-room)))))
-
 (cl-defmethod matrix-client-handler-m.room.avatar ((session matrix-session) room data)
   (when matrix-client-show-room-avatars
     (pcase-let* (((map sender content) data)
