@@ -481,6 +481,23 @@ Also update prompt with typers."
 
 ;;;;; Room commands
 
+(cl-defmacro matrix-client-ng-def-simple-room-command (name fn &key docstring (msgtype "m.text"))
+  "Define a room command that sends the return value of FN as a message.
+
+FN should accept an optional argument, which will be the input
+after the command name, when applicable.
+
+MSGTYPE may be, e.g. \"m.text\" (the default), \"m.emote\",
+etc (see API docs)."
+  (declare (indent defun))
+  (let* ((command (symbol-name name))
+         (method-name (intern (concat "matrix-client-ng-room-command-" command))))
+    `(cl-defmethod ,method-name ((room matrix-room) input)
+       ,docstring
+       (when-let* ((input (s-chop-prefix (concat "/" command " ") input))
+                   (message (funcall ,fn input)))
+         (matrix-send-message room message :msgtype ,msgtype)))))
+
 (cl-defmethod matrix-client-ng-room-command-html ((room matrix-room) input)
   "Send HTML message to ROOM.
 INPUT should be, e.g. \"/html <b>...\"."
