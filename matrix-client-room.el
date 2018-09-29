@@ -498,7 +498,8 @@ MSGTYPE may be, e.g. \"m.text\" (the default), \"m.emote\",
 etc (see API docs).
 
 INSERT may be a lisp expression which evaluates to a string,
-which is inserted in the room buffer."
+which is inserted in the room buffer.  This happens after MESSAGE
+is sent, if any."
   (declare (indent defun))
   (let* ((command (symbol-name name))
          (method-name (intern (concat "matrix-client-ng-room-command-" command))))
@@ -509,7 +510,7 @@ which is inserted in the room buffer."
            (matrix-send-message room it :msgtype ,msgtype))
          (--when-let ,insert
            (let ((matrix-client-insert-prefix-fn nil))
-             (matrix-client-ng-insert room it)))
+             (matrix-client-ng-insert room (matrix-client-ng--notice-string it))))
          (matrix-client-ng-update-last-seen room))
        (add-to-list 'matrix-client-room-commands ,command))))
 
@@ -520,14 +521,12 @@ which is inserted in the room buffer."
 
 (matrix-client-ng-def-room-command who
   :insert (with-slots (members) room
-            (propertize (concat "Room members: "
-                                (--> members
-                                     (--map (a-get (cdr it) 'displayname) it)
-                                     (--sort (string-collate-lessp it other nil 'ignore-case)
-                                             it)
-                                     (s-join ", " it)))
-                        'timestamp (time-to-seconds)
-                        'face 'matrix-client-notice))
+            (concat "Room members: "
+                    (--> members
+                         (--map (a-get (cdr it) 'displayname) it)
+                         (--sort (string-collate-lessp it other nil 'ignore-case)
+                                 it)
+                         (s-join ", " it))))
   :docstring "Print list of room members.")
 
 (matrix-client-ng-def-room-command join
@@ -536,9 +535,7 @@ which is inserted in the room buffer."
             (if (> (length (s-split (rx (1+ space)) input)) 1)
                 (user-error "Invalid /join command")
               (matrix-join-room session input)
-              (propertize (concat "Joining room: " input)
-                          'timestamp (time-to-seconds)
-                          'face 'matrix-client-notice)))
+              (concat "Joining room: " input)))
   :docstring "Join room on session.
 INPUT should be, e.g. \"#room:matrix.org\".")
 
@@ -552,6 +549,13 @@ INPUT should be, e.g. \"/html <b>...\"."
 ;;;; Functions
 
 ;;;;; Support
+
+(defun matrix-client-ng--notice-string (s)
+  "Return string S propertized for insertion with `matrix-client-ng-insert'.
+Adds timestamp text-property at current time and sets notice face."
+  (propertize s
+              'timestamp (time-to-seconds)
+              'face 'matrix-client-notice))
 
 (cl-defun matrix-client--next-event-pos (&key limit backward)
   "Return position of next event in buffer.  If BACKWARD is non-nil, look backward.
