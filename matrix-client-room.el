@@ -175,9 +175,8 @@ If HTML is non-nil, treat input as HTML."
                (input (prog1
                           (buffer-substring-no-properties (point) (point-max))
                         (delete-region (point) (point-max))))
-               (first-word (when (s-prefix? "/" input)
-                             ;; NOTE: A happy accident, `s-split-words' chops off the leading "/".
-                             (car (s-split-words input))))
+               (first-word (when (string-match (rx bos "/" (group (1+ (not space)))) input)
+                             (match-string 1 input)))
                (event-string (propertize input
                                          'sender user
                                          'timestamp (time-to-seconds)))
