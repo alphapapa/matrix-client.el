@@ -29,6 +29,10 @@ Used to add a button for pending messages.")
   "Download and show room avatars."
   :type 'boolean)
 
+(defvar matrix-client-room-commands nil
+  "List of room commands, without leading slash.
+Used for completion.")
+
 ;;;; Macros
 
 (cl-defmacro matrix-client-ng-defevent (type docstring &key object-slots event-keys content-keys let body)
@@ -481,22 +485,63 @@ Also update prompt with typers."
 
 ;;;;; Room commands
 
-(cl-defmacro matrix-client-ng-def-simple-room-command (name form &key docstring (msgtype "m.text"))
+(cl-defmacro matrix-client-ng-def-room-command (name &key docstring message (msgtype "m.text") insert)
   "Define a room command that sends the return value of FN as a message.
 
-FORM is a lisp expression, the value of which is sent to the room
-as a message.  In the form, the variable `input' is bound to the
-command's argument (i.e. everything after \"/command\").
+In all expressions evaluated, the variable `room' is bound to the
+room object, and `input' is bound to the command's
+argument (i.e. everything after \"/command\").
+
+MESSAGE may be a lisp expression, the value of which is sent to
+the room as a message.
 
 MSGTYPE may be, e.g. \"m.text\" (the default), \"m.emote\",
-etc (see API docs)."
+etc (see API docs).
+
+INSERT may be a lisp expression which evaluates to a string,
+which is inserted in the room buffer."
   (declare (indent defun))
   (let* ((command (symbol-name name))
          (method-name (intern (concat "matrix-client-ng-room-command-" command))))
-    `(cl-defmethod ,method-name ((room matrix-room) input)
-       ,docstring
-       (when-let* ((message ,form))
-         (matrix-send-message room message :msgtype ,msgtype)))))
+    `(progn
+       (cl-defmethod ,method-name ((room matrix-room) input)
+         ,docstring
+         (--when-let ,message
+           (matrix-send-message room it :msgtype ,msgtype))
+         (--when-let ,insert
+           (let ((matrix-client-insert-prefix-fn nil))
+             (matrix-client-ng-insert room it)))
+         (matrix-client-ng-update-last-seen room))
+       (add-to-list 'matrix-client-room-commands ,command))))
+
+(matrix-client-ng-def-room-command me
+  :message input
+  :msgtype "m.emote"
+  :docstring "Send emote to room.")
+
+(matrix-client-ng-def-room-command who
+  :insert (with-slots (members) room
+            (propertize (concat "Room members: "
+                                (--> members
+                                     (--map (a-get (cdr it) 'displayname) it)
+                                     (--sort (string-collate-lessp it other nil 'ignore-case)
+                                             it)
+                                     (s-join ", " it)))
+                        'timestamp (time-to-seconds)
+                        'face 'matrix-client-notice))
+  :docstring "Print list of room members.")
+
+(matrix-client-ng-def-room-command join
+  :insert (pcase-let* (((eieio session) room))
+            ;; Only accept one room
+            (if (> (length (s-split (rx (1+ space)) input)) 1)
+                (user-error "Invalid /join command")
+              (matrix-join-room session input)
+              (propertize (concat "Joining room: " input)
+                          'timestamp (time-to-seconds)
+                          'face 'matrix-client-notice)))
+  :docstring "Join room on session.
+INPUT should be, e.g. \"#room:matrix.org\".")
 
 (cl-defmethod matrix-client-ng-room-command-html ((room matrix-room) input)
   "Send HTML message to ROOM.
@@ -504,34 +549,6 @@ INPUT should be, e.g. \"/html <b>...\"."
   ;; HACK: Reinsert HTML without "/html" and call send-input again
   (insert input)
   (matrix-client-ng-send-input :html t))
-
-(cl-defmethod matrix-client-ng-room-command-join ((room matrix-room) input)
-  "Join room on session.
-INPUT should be, e.g. \"#room:matrix.org\"."
-  (pcase-let* (((eieio session) room))
-    ;; Only accept one room
-    (if (> (length (s-split (rx (1+ space)) input)) 1)
-        (user-error "Invalid /join command")
-      (matrix-join-room session input))))
-
-(cl-defmethod matrix-client-ng-room-command-me ((room matrix-room) input)
-  "Send emote INPUT to ROOM.
-INPUT should begin with \"/me\"."
-  (matrix-send-message room input :msgtype "m.emote"))
-
-(cl-defmethod matrix-client-ng-room-command-who ((room matrix-room) input)
-  "Print list of users to ROOM."
-  (let ((matrix-client-insert-prefix-fn nil))
-    (with-slots (members) room
-      (matrix-client-ng-insert room (propertize (concat "Room members: "
-                                                        (--> members
-                                                             (--map (a-get (cdr it) 'displayname) it)
-                                                             (--sort (string-collate-lessp it other nil 'ignore-case)
-                                                                     it)
-                                                             (s-join ", " it)))
-                                                'timestamp (time-to-seconds)
-                                                'face 'matrix-client-notice))
-      (matrix-client-ng-update-last-seen room))))
 
 ;;;; Functions
 
