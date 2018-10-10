@@ -844,12 +844,16 @@ includes the \"In reply to\" link to the quoted message ID)."
         (cl-letf (((symbol-function 'shr-string-pixel-width) (lambda (string)
                                                                (if (not shr-use-fonts)
                                                                    (length string)
-                                                                 (frame-char-width)))))
+                                                                 (frame-char-width))))
+                  ((symbol-function 'shr-fill-line) (symbol-function 'matrix-client-ng--shr-fill-line)))
           (shr-insert-document dom))
         (add-face-text-property pos (point) 'matrix-client-quoted-message)
         ;; Insert extra newline after blockquote.  (I think shr doesn't insert a blank line after
         ;; the blockquote because it doesn't see anything after the blockquote.)
         (insert "\n")))))
+
+;; Copy the function's definition so we can use it later; an alias would not be correct.
+(fset 'matrix-client-ng--shr-fill-line (symbol-function 'shr-fill-line))
 
 (matrix-client-ng-defevent m.room.message
   "Process m.room.message EVENT in ROOM."
@@ -879,7 +883,8 @@ includes the \"In reply to\" link to the quoted message ID)."
                                 (let* ((shr-external-rendering-functions matrix-client-ng-shr-external-rendering-functions)
                                        (dom (libxml-parse-html-region (point-min) (point-max))))
                                   (erase-buffer)
-                                  (shr-insert-document dom))
+                                  (cl-letf (((symbol-function 'shr-fill-line) (lambda (&rest ignore) nil)))
+                                    (shr-insert-document dom)))
                                 (buffer-string)))
                              ("m.image"
                               (setq matrix-image-url (matrix-transform-mxc-uri session (or url thumbnail_url)))
