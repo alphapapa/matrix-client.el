@@ -311,7 +311,5 @@ modified to allows binary uploads, which are prevented by the
     (url-http-debug "Request is: \n%s" request)
     request))
 
-(advice-add #'url-http-create-request :override #'matrix--url-http-create-request)
-
 (provide 'matrix-helpers)
 ;;; matrix-helpers.el ends here

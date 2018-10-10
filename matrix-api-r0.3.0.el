@@ -973,12 +973,13 @@ TYPING should be t or nil."
                                 (insert-file-contents path)
                                 (buffer-string)))
                (endpoint (url-encode-url (format$ "https://$server/_matrix/media/r0/upload?filename=$filename"))))
-    (matrix-post session endpoint
-      :success (apply-partially #'matrix-upload-callback room
-                                :cbargs (list :filename filename
-                                              :mime-type mime-type))
-      :content-type mime-type
-      :raw-data file-contents)))
+    (cl-letf (((symbol-function 'url-http-create-request) (symbol-function 'matrix--url-http-create-request)))
+      (matrix-post session endpoint
+        :success (apply-partially #'matrix-upload-callback room
+                                  :cbargs (list :filename filename
+                                                :mime-type mime-type))
+        :content-type mime-type
+        :raw-data file-contents))))
 
 (matrix-defcallback upload matrix-room
   "Callback for `matrix-upload'.
