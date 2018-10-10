@@ -355,22 +355,28 @@ set, will be called if the request fails."
                           'data data
                           'timeout timeout))
       (pcase method
-        ("GET" (request url
-                        :headers (a-list "Authorization" (concat "Bearer " access-token))
-                        :params data
-                        :parser #'json-read
-                        :success success
-                        :error error
-                        :timeout timeout))
-        ((or "POST" "PUT") (request url
-                                    :type method
-                                    :headers (a-list "Content-Type" content-type
-                                                     "Authorization" (concat "Bearer " access-token))
-                                    :data (or raw-data (json-encode data))
-                                    :parser #'json-read
-                                    :success success
-                                    :error error
-                                    :timeout timeout))))))
+        ("GET" (matrix-url-with-retrieve-async url
+                 :query-on-exit query-on-exit
+                 :silent t
+                 :inhibit-cookies t
+                 :extra-headers (a-list "Authorization" (concat "Bearer " access-token))
+                 :query data
+                 :parser #'json-read
+                 :success success
+                 :error error
+                 :timeout timeout))
+        ((or "POST" "PUT") (matrix-url-with-retrieve-async url
+                             :query-on-exit query-on-exit
+                             :silent t
+                             :inhibit-cookies t
+                             :method method
+                             :extra-headers (a-list "Content-Type" content-type
+                                                    "Authorization" (concat "Bearer " access-token))
+                             :data (or raw-data (json-encode data))
+                             :parser #'json-read
+                             :success success
+                             :error error
+                             :timeout timeout))))))
 
 (matrix-defcallback request-error matrix-session
   "Callback function for request error."
