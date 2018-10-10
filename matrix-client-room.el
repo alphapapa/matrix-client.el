@@ -69,7 +69,9 @@ It is hoped that using this macro is easier than defining a large
 method without it."
   ;; FIXME: It would probably be better to use the same form for OBJECT-SLOTS that is used by
   ;; `pcase-let*', because having two different ways is too confusing.
-  (declare (indent defun))
+  (declare (indent defun)
+           (debug (&define symbolp stringp
+                           &rest [&or [":body" def-form] [keywordp listp]])))
   (let ((method-name (intern (concat "matrix-client-event-" (symbol-name type))))
         (slots (cl-loop for (object . slots) in object-slots
                         collect (list slots object))))
