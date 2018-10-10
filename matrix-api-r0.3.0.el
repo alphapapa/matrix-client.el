@@ -378,6 +378,85 @@ set, will be called if the request fails."
                              :error error
                              :timeout timeout))))))
 
+(cl-defmethod matrix-request-request ((session matrix-session) endpoint &key data success
+                                      raw-data (content-type "application/json")
+                                      (method "GET") (error #'matrix-request-error-callback) timeout
+                                      (query-on-exit t))
+  "Using `request', make request to ENDPOINT on SESSION with DATA and call CALLBACK on success.
+Request is made asynchronously.  METHOD should be a symbol or
+string, `get' (the default) or `post' (it will be upcased).  ENDPOINT may be a string
+or symbol and should represent the final part of the API
+URL (e.g. for \"/_matrix/client/r0/login\", it should be
+\"login\".  DATA should be an alist which will be automatically
+encoded to JSON.  CALLBACK should be a method specialized on
+`matrix-session', FIXME whose subsequent arguments are defined in
+accordance with the `request' package's API.  ERROR-CALLBACK, if
+set, will be called if the request fails."
+  ;; NOTE: This is necessary because of the crazy bugs in url.el and request.el.  We can't just use
+  ;; one, we have to use both.  This is a copy of `matrix-request' that only changes the
+  ;; `matrix-url-with-retrieve-async' calls to `request' calls.  This will do for now.  Later we can
+  ;; figure out a DRYer way.
+  (declare (indent defun))
+  (with-slots (api-url-prefix access-token txn-id) session
+    (let* ((url (url-encode-url
+                 ;; MAYBE: Come up with a nicer way to use alternate API URL prefixes.
+                 (if (and (stringp endpoint)
+                          (s-prefix? "http" endpoint))
+                     endpoint
+                   (concat api-url-prefix (cl-typecase endpoint
+                                            (string endpoint)
+                                            (symbol (symbol-name endpoint)))))))
+           ;; FIXME: Maybe don't send/increment txn-id for every
+           ;; request, but only those that require it.  But it's
+           ;; simpler to do it here, because we can't forget.
+           ;; (data (map-put data 'txn-id (incf txn-id)))
+           (data (map-filter
+                  ;; Remove keys with null values
+                  ;; TODO: Benchmark this against cl-loop.
+                  (lambda (k v)
+                    v)
+                  data))
+           (success (cl-typecase success
+                      ;; If success is a symbol, apply session to
+                      ;; it.  If it's an already-partially-applied
+                      ;; function, use it as-is.
+                      ;; FIXME: Add to docstring.
+                      (symbol (apply-partially success session))
+                      (t success)))
+           (error (cl-typecase error
+                    ;; If error is a symbol, apply session to
+                    ;; it.  If it's an already-partially-applied
+                    ;; function, use it as-is.
+                    ;; FIXME: Add to docstring.
+                    (symbol (apply-partially error session))
+                    (t error)))
+           (method (upcase (cl-typecase method
+                             (string method)
+                             (symbol (symbol-name method))))))
+      ;; NOTE: This can log sensitive data in the `data' var, e.g. passwords and access tokens
+      (matrix-log (a-list 'event 'matrix-request
+                          'url url
+                          'method method
+                          'data data
+                          'timeout timeout))
+      (pcase method
+        ("GET" (request url
+                        :headers (a-list "Authorization" (concat "Bearer " access-token))
+                        :params data
+                        :parser #'json-read
+                        :success success
+                        :error error
+                        :timeout timeout))
+        ((or "POST" "PUT") (request url
+                                    :type method
+                                    :headers (a-list "Content-Type" content-type
+                                                     "Authorization" (concat "Bearer " access-token))
+                                    :data (or raw-data (json-encode data))
+                                    :parser #'json-read
+                                    :success success
+                                    :error error
+                                    :timeout timeout))))))
+
 (matrix-defcallback request-error matrix-session
   "Callback function for request error."
   :slots (user)
@@ -973,13 +1052,13 @@ TYPING should be t or nil."
                                 (insert-file-contents path)
                                 (buffer-string)))
                (endpoint (url-encode-url (format$ "https://$server/_matrix/media/r0/upload?filename=$filename"))))
-    (cl-letf (((symbol-function 'url-http-create-request) (symbol-function 'matrix--url-http-create-request)))
-      (matrix-post session endpoint
-        :success (apply-partially #'matrix-upload-callback room
-                                  :cbargs (list :filename filename
-                                                :mime-type mime-type))
-        :content-type mime-type
-        :raw-data file-contents))))
+    (matrix-request-request session endpoint
+                            :method "POST"
+                            :success (apply-partially #'matrix-upload-callback room
+                                                      :cbargs (list :filename filename
+                                                                    :mime-type mime-type))
+                            :content-type mime-type
+                            :raw-data file-contents)))
 
 (matrix-defcallback upload matrix-room
   "Callback for `matrix-upload'.
