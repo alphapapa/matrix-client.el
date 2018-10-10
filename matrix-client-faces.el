@@ -24,6 +24,11 @@
   "Face for user's own Matrix message bodies."
   :group 'matrix-client)
 
+(defface matrix-client-quoted-message
+  '((t (:inherit matrix-client-message-body :slant italic)))
+  "Face for Matrix quoted messages."
+  :group 'matrix-client)
+
 (defface matrix-client-pending-messages
   '((((class color) (background light)) (:foreground "#586e75" :weight bold :slant italic))
     (((class color) (background dark)) (:foreground "#586e75" :weight bold :slant italic))
