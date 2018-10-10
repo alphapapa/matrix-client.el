@@ -33,6 +33,10 @@ Used to add a button for pending messages.")
   "List of room commands, without leading slash.
 Used for completion.")
 
+(defvar matrix-client-ng-shr-external-rendering-functions
+  (a-list 'mx-reply #'matrix-client-ng--shr-mx-reply)
+  "Functions used to render HTML in Matrix messages.  See `shr-external-rendering-functions'.")
+
 ;;;; Macros
 
 (cl-defmacro matrix-client-ng-defevent (type docstring &key object-slots event-keys content-keys let body)
@@ -755,6 +759,69 @@ Creates a new header if necessary."
 
 ;;;; Events
 
+(defun matrix-client-ng--shr-mx-reply (dom)
+  "Insert formatted text for DOM rooted at mx-reply tag.
+The purpose of this function is to add the
+`matrix-client-quoted-message' face to only the quoted message
+body, rather than the entire contents of the mx-reply tag (which
+includes the \"In reply to\" link to the quoted message ID)."
+  ;; NOTE: As long as the Matrix server sends formatted_body with mx-reply tags in this format, this
+  ;; should work.
+
+  ;; TODO: Suggest that the Matrix server should send the quoted message as event metadata rather
+  ;; than pseudo-HTML.  Then we wouldn't have to do this hacky parsing of the pseudo HTML.
+
+  ;; NOTE: `-let' makes destructuring the DOM pretty easy, but walking it and replacing parts of it
+  ;; is very messy, because we sometimes replace strings with lists, which must then be flattened
+  ;; and spliced back into the DOM.  If you're reading this and you can make this code prettier,
+  ;; please do.
+  (cl-labels ((newline-to-br (string)
+                             ;; I couldn't find an existing function to split a string by a regexp
+                             ;; AND replace the matches with other elements of a number equal to the
+                             ;; length of each match, so I came up with this.
+                             (cl-loop with length = (length string)
+                                      with positions = (append (s-matched-positions-all "\n+" string)
+                                                               (list (cons length length)))
+                                      with from = 0
+                                      for (match-start . match-end) in positions
+                                      collect (substring string from match-start)
+                                      append (-repeat (- match-end match-start) '(br nil))
+                                      do (setq from match-end)))
+              (walk-dom (dom)
+                        (pcase dom
+                          (`(,tag ,props . ,children) `((,tag ,props ,@(-flatten-n 1 (mapcar #'walk-dom children)))))
+                          ((rx bos "\n" eos) '((br nil)))
+                          ((pred stringp) (if (s-contains? "\n" dom)
+                                              (newline-to-br dom)
+                                            ;; Always return a list so we can flatten it.  This is really messy.  Ugh.
+                                            (list dom))))))
+    (-let* (((_mx-reply-tag _mx-reply-tag-props
+                            (_blockquote-tag _blockquote-tag-props
+                                             quoted-event-a
+                                             _blank-space
+                                             quoted-sender-a
+                                             _br-tag
+                                             . quoted-dom))
+             dom)
+            (quoted-dom (-flatten-n 1 (mapcar #'walk-dom quoted-dom)))
+            (dom `(html nil (body nil (blockquote nil ,@quoted-dom)))))
+      (shr-tag-a quoted-event-a) (insert " ") (shr-tag-a quoted-sender-a) (insert ":")
+      (let ((pos (point)))
+        ;; NOTE: It is crazy that I have to do this, but for some inexplicable reason,
+        ;; `shr-string-pixel-width' is returning 280 as the width of a single "-" character--except
+        ;; when I call this function manually, or when running in edebug: then it works fine.  Oh,
+        ;; and in an earlier Emacs session, it also worked fine--it only started misbehaving this
+        ;; way after I restarted Emacs.  WHO KNOWS WHY!
+        (cl-letf (((symbol-function 'shr-string-pixel-width) (lambda (string)
+                                                               (if (not shr-use-fonts)
+                                                                   (length string)
+                                                                 (frame-char-width)))))
+          (shr-insert-document dom))
+        (add-face-text-property pos (point) 'matrix-client-quoted-message)
+        ;; Insert extra newline after blockquote.  (I think shr doesn't insert a blank line after
+        ;; the blockquote because it doesn't see anything after the blockquote.)
+        (insert "\n")))))
+
 (matrix-client-ng-defevent m.room.message
   "Process m.room.message EVENT in ROOM."
   :object-slots ((room session)
@@ -780,15 +847,11 @@ Creates a new header if necessary."
                              ((guard (and matrix-client-ng-render-html (string= "org.matrix.custom.html" format)))
                               (with-temp-buffer
                                 (insert formatted_body)
-                                (goto-char (point-min))
-                                (while (re-search-forward "\\(<br />\\)+" nil t)
-                                  (replace-match "<br />"))
-                                (let ((document (libxml-parse-html-region (point) (point-max))))
+                                (let* ((shr-external-rendering-functions matrix-client-ng-shr-external-rendering-functions)
+                                       (dom (libxml-parse-html-region (point-min) (point-max))))
                                   (erase-buffer)
-                                  (shr-insert-document document)
-                                  (goto-char (point-min))
-                                  (delete-blank-lines)
-                                  (buffer-string))))
+                                  (shr-insert-document dom))
+                                (buffer-string)))
                              ("m.image"
                               (setq matrix-image-url (matrix-transform-mxc-uri session (or url thumbnail_url)))
                               (concat body
