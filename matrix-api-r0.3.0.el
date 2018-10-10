@@ -298,6 +298,7 @@ MESSAGE and ARGS should be a string and list of strings for
 ;;;;; Request
 
 (cl-defmethod matrix-request ((session matrix-session) endpoint &key data success
+                              raw-data (content-type "application/json")
                               (method "GET") (error #'matrix-request-error-callback) timeout
                               (query-on-exit t))
   "Make request to ENDPOINT on SESSION with DATA and call CALLBACK on success.
@@ -313,9 +314,13 @@ set, will be called if the request fails."
   (declare (indent defun))
   (with-slots (api-url-prefix access-token txn-id) session
     (let* ((url (url-encode-url
-                 (concat api-url-prefix (cl-typecase endpoint
-                                          (string endpoint)
-                                          (symbol (symbol-name endpoint))))))
+                 ;; MAYBE: Come up with a nicer way to use alternate API URL prefixes.
+                 (if (and (stringp endpoint)
+                          (s-prefix? "http" endpoint))
+                     endpoint
+                   (concat api-url-prefix (cl-typecase endpoint
+                                            (string endpoint)
+                                            (symbol (symbol-name endpoint)))))))
            ;; FIXME: Maybe don't send/increment txn-id for every
            ;; request, but only those that require it.  But it's
            ;; simpler to do it here, because we can't forget.
@@ -365,9 +370,9 @@ set, will be called if the request fails."
                              :silent t
                              :inhibit-cookies t
                              :method method
-                             :extra-headers (a-list "Content-Type" "application/json"
+                             :extra-headers (a-list "Content-Type" content-type
                                                     "Authorization" (concat "Bearer " access-token))
-                             :data (json-encode data)
+                             :data (or raw-data (json-encode data))
                              :parser #'json-read
                              :success success
                              :error error
@@ -857,14 +862,15 @@ added."
               (_ (matrix-error (format$ "Error joining room $room-id: $error")))))))
 
 (cl-defmethod matrix-send-message ((room matrix-room) message &key (msgtype "m.text") override-txn-id
-                                   success error)
+                                   extra-content success error)
   "Send MESSAGE of MSGTYPE to ROOM.
 SUCCESS should be a function which will be called when the server
 acknowledges the message; if nil, `matrix-send-message-callback'
 will be called.  ERROR should be a function which will be called
 if sending the message fails.  If OVERRIDE-TXN-ID is non-nil, use
 it as the transaction ID; otherwise, automatically increment and
-use the session's."
+use the session's.  EXTRA-CONTENT is an alist to merge with the
+standard event content object."
   ;; https://matrix.org/docs/spec/client_server/r0.3.0.html#id182
   (with-slots* (((id session) room)
                 ((txn-id) session))
@@ -876,6 +882,8 @@ use the session's."
            (endpoint (format$ "rooms/$id/send/$type/$txn-id"))
            (success (or success
                         (apply-partially #'matrix-send-message-callback room))))
+      (when extra-content
+        (setq content (append content extra-content)))
       ;; FIXME: I just received a send-message reply from the server, with the event_id, 16
       ;; (sixteen) minutes after the HTTP PUT request.  I guess we need to set a timeout, now that
       ;; we're implementing resend.
@@ -951,6 +959,43 @@ TYPING should be t or nil."
   (pcase-let* (((eieio server) session)
                (`(,protocol _ ,mxc-server ,file) (split-string uri "/")))
     (format$ "https://$server/_matrix/media/v1/download/$mxc-server/$file")))
+
+(cl-defmethod matrix-upload ((room matrix-room) path)
+  "Upload file at PATH to SESSION's server."
+  (pcase-let* (((eieio session) room)
+               ((eieio server) session)
+               (filename (file-name-nondirectory path))
+               (extension (file-name-extension filename))
+               (mime-type (cond (extension (mailcap-extension-to-mime extension))
+                                (t (mailcap-extension-to-mime (symbol-name (or (image-type-from-file-header path)
+                                                                               (error "Can't determine image type'")))))))
+               (file-contents (with-temp-buffer
+                                (insert-file-contents path)
+                                (buffer-string)))
+               (endpoint (url-encode-url (format$ "https://$server/_matrix/media/r0/upload?filename=$filename"))))
+    (cl-letf (((symbol-function 'url-http-create-request) (symbol-function 'matrix--url-http-create-request)))
+      (matrix-post session endpoint
+        :success (apply-partially #'matrix-upload-callback room
+                                  :cbargs (list :filename filename
+                                                :mime-type mime-type))
+        :content-type mime-type
+        :raw-data file-contents))))
+
+(matrix-defcallback upload matrix-room
+  "Callback for `matrix-upload'.
+Post the uploaded file to the room as an m.image or m.file
+message."
+  :slots (id)
+  :body (-let* (((&plist :filename filename :mime-type mime-type) cbargs)
+                ((&alist 'content_uri url) data)
+                (msgtype (cond ((s-prefix? "image/" mime-type) "m.image")
+                               (t "m.file"))))
+          (matrix-log (a-list 'fn 'matrix-upload-callback
+                              'room id
+                              'data data))
+          (matrix-send-message room (concat "File: " filename)
+                               :msgtype msgtype
+                               :extra-content (a-list 'url url))))
 
 ;;;; Footer
 
