@@ -1037,10 +1037,7 @@ as an async callback when the image is downloaded."
     ;; Process new timeline events
     (dolist (event-list (list state-new timeline-new))
       (seq-doseq (event event-list)
-        (pcase-let* (((map type) event))
-          (apply-if-fn (concat "matrix-client-event-" type)
-              (list room event)
-            (matrix-unimplemented (format$ "Unimplemented client method: $fn-name"))))))
+        (matrix-client-ng-timeline room event)))
     ;; Clear new events
     (matrix-clear-state room)
     (matrix-clear-timeline room)

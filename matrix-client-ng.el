@@ -216,7 +216,7 @@ tokens (username and password will be required again)."
 (cl-defmethod matrix-client-ng-timeline ((room matrix-room) event)
   "Process EVENT in ROOM."
   (pcase-let* (((map type) event))
-    (apply-if-fn (concat "matrix-client-event-" (symbol-name type))
+    (apply-if-fn (concat "matrix-client-event-" type)
         (list room event)
       (matrix-unimplemented (format$ "Unimplemented client method: $fn-name")))))
 
