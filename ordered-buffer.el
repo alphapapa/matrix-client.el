@@ -27,6 +27,8 @@
 
 ;;; Code:
 
+(require 'cl-lib)
+
 (defface ordered-buffer-header
   '((t (:inherit highlight :weight bold)))
   "Face for headers."
