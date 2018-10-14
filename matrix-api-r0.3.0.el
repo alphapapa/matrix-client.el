@@ -227,6 +227,8 @@ The sync error handler should increase this for consecutive errors, up to a maxi
              :type list)
    (timeline-new :documentation "List of new timeline events.  Clients may clear this list by calling `matrix-clear-timeline'."
                  :type list)
+   (timeline-event-ids :documentation "Hash table of event IDs already stored in the timeline.  Used for deduplication."
+                       :initform (ht))
    (prev-batch :documentation "A token that can be supplied to to the from parameter of the rooms/{roomId}/messages endpoint.")
    (last-full-sync :documentation "The oldest \"since\" token for which the room has been synced completely.")
    (ephemeral :documentation "The ephemeral events in the room that aren't recorded in the timeline or state of the room. e.g. typing.")
@@ -716,7 +718,7 @@ requests, and we make a new request."
 
 (cl-defmethod matrix-sync-timeline ((room matrix-room) data)
   "Sync timeline DATA in ROOM."
-  (with-slots* (((id session timeline timeline-new prev-batch last-full-sync) room)
+  (with-slots* (((id session timeline timeline-new timeline-event-ids prev-batch last-full-sync) room)
                 ((next-batch) session))
     (pcase-let (((map events limited prev_batch) data))
       (matrix-log (a-list 'event 'matrix-sync-timeline
@@ -725,10 +727,13 @@ requests, and we make a new request."
                           'last-full-sync last-full-sync
                           'data data))
       (seq-doseq (event events)
-        (push event timeline)
-        (push event timeline-new)
-        ;; Run API handler for event.
-        (matrix-event room event))
+        (let ((id (a-get event 'event_id)))
+          (unless (ht-get timeline-event-ids id)
+            (ht-set timeline-event-ids id t)
+            (push event timeline)
+            (push event timeline-new)
+            ;; Run API handler for event.
+            (matrix-event room event))))
       (setq prev-batch prev_batch)
       (if (and (not (equal limited :json-false))
                last-full-sync)
@@ -807,10 +812,11 @@ maximum number of events to return (default 10)."
 
 (matrix-defcallback messages matrix-room
   "Callback for /rooms/{roomID}/messages."
-  :slots (id timeline timeline-new prev-batch last-full-sync)
+  :slots (id timeline timeline-new timeline-event-ids prev-batch last-full-sync)
   :body (pcase-let* (((map start end chunk) data)
                      ;; Disable notifications while loading old messages.
-                     (matrix-client-ng-notifications nil))
+                     (matrix-client-ng-notifications nil)
+                     (new-events-p))
 
           (matrix-log (a-list 'type 'matrix-messages-callback
                               'room-id id
@@ -824,12 +830,20 @@ maximum number of events to return (default 10)."
           ;; token should be used again to request even earlier
           ;; events.
           (seq-doseq (event chunk)
-            (push event timeline)
-            (push event timeline-new))
+            (let ((id (a-get event 'event_id)))
+              (unless (ht-get timeline-event-ids id)
+                (setq new-events-p t)
+                (ht-set timeline-event-ids id t)
+                (push event timeline)
+                (push event timeline-new))))
 
           (setq prev-batch end)
           (setq last-full-sync nil)
-          (run-hook-with-args 'matrix-room-update-hook room)
+          (if new-events-p
+              (run-hook-with-args 'matrix-room-update-hook room)
+            (when (> (length chunk) 0)
+              ;; Only got events we already had: go back further
+              (matrix-messages room)))
 
           ;; NOTE: I don't think this code is necessary, but I'm temporarily leaving it for future reference.
           ;; (if (equal end last-full-sync)
