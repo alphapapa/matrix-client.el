@@ -693,20 +693,23 @@ If such text is not found, return nil."
 
 (defun matrix-client--update-date-headers ()
   "Update date headers in current buffer."
-  (save-excursion
-    (goto-char (point-min))
-    (cl-loop with inhibit-read-only = t
-             with limit = (matrix-client--prompt-position)
-             with timestamp
-             with new-header
-             for pos = (matrix--next-property-change (point) 'matrix-header-day-number nil limit)
-             while pos
-             do (goto-char pos)
-             for day-number = (get-text-property (point) 'matrix-header-day-number)
-             when day-number
-             do (progn
-                  (delete-region (point) (next-single-property-change (point) 'matrix-header-day-number nil limit))
-                  (matrix-client-room--insert-date-header (matrix--calendar-absolute-to-timestamp day-number))))))
+  ;; FIXME: Needs updating for ordered-buffer code.
+  nil
+  ;; (save-excursion
+  ;;   (goto-char (point-min))
+  ;;   (cl-loop with inhibit-read-only = t
+  ;;            with limit = (matrix-client--prompt-position)
+  ;;            with timestamp
+  ;;            with new-header
+  ;;            for pos = (matrix--next-property-change (point) 'matrix-header-day-number nil limit)
+  ;;            while pos
+  ;;            do (goto-char pos)
+  ;;            for day-number = (get-text-property (point) 'matrix-header-day-number)
+  ;;            when day-number
+  ;;            do (progn
+  ;;                 (delete-region (point) (next-single-property-change (point) 'matrix-header-day-number nil limit))
+  ;;                 (matrix-client-room--insert-date-header (matrix--calendar-absolute-to-timestamp day-number)))))
+  )
 
 (defun matrix-client--prompt-position ()
   "Return position of prompt in current buffer."
@@ -760,76 +763,6 @@ If string is not found or no properties change, return nil."
   (-when-let* (((beg end) (matrix-client-ng--find-propertized-string find-plist))
                (inhibit-read-only t))
     (add-text-properties beg end set-plist)))
-
-(defun matrix-client-ng--insertion-pos (timestamp)
-  "Return insertion position for TIMESTAMP.
-Creates a new header if necessary."
-  (let* ((header-pos (matrix-client--get-date-header timestamp))
-         (limit (or (matrix--next-property-change header-pos 'matrix-header-day-number)
-                    (1- (matrix-client--prompt-position))))
-         (next-timestamp-pos (matrix--next-property-change header-pos 'timestamp nil limit)))
-    (catch 'found
-      (while next-timestamp-pos
-        (when (>= (get-text-property next-timestamp-pos 'timestamp) timestamp)
-          ;; Found greater timestamp: return its position
-          (throw 'found next-timestamp-pos))
-        ;; Look for next timestamp
-        (setq next-timestamp-pos (matrix--next-property-change next-timestamp-pos 'timestamp nil limit)))
-      ;; No more timestamps: return limit
-      limit)))
-
-(defun matrix-client--get-date-header (timestamp)
-  "Return position of appropriate date header in current buffer for TIMESTAMP.
-Creates a new header if necessary."
-  (cl-labels ((prev-header-pos () (matrix--prev-property-change (point) 'matrix-header-day-number))
-              (current-header-day-number () (get-text-property (point) 'matrix-header-day-number)))
-    (let* ((target-day-number (time-to-days timestamp))
-           (prompt (1- (matrix-client--prompt-position)))
-           (inhibit-read-only t))
-      (goto-char prompt)
-      (catch 'found
-        (while t
-          (if-let ((prev-header-pos (prev-header-pos)))
-              (progn
-                ;; Found a previous header
-                (goto-char prev-header-pos)
-                (let ((current-header-day-number (current-header-day-number)))
-                  (cond ((= current-header-day-number target-day-number)
-                         ;; Found correct header
-                         (throw 'found prev-header-pos))
-                        ((< current-header-day-number target-day-number)
-                         ;; Found earlier header: insert new one after current header's position
-                         (goto-char (or (matrix--next-property-change (point) 'matrix-header-day-number nil prompt)
-                                        prompt))
-                         (matrix-client--update-date-headers)
-                         (matrix-client-room--insert-date-header timestamp)
-                         ;; Return position after new header (actually 1- it, see below)
-                         (throw 'found (1- (point))))))
-                ;; Wrong header: keep looking
-                )
-            ;; No more headers found: update other headers and insert new header here (this will
-            ;; happen when the current date changes and a new message arrives, as well as when a
-            ;; message arrives for the current date and is the first message in that room for the
-            ;; date).  FIXME: Maybe we could be smarter about whether to update the other date
-            ;; headers, to avoid doing it when unnecessary.
-            (matrix-client--update-date-headers)
-            (matrix-client-room--insert-date-header timestamp)
-            ;; Return one character before the end of the new header.  This is sort of a tiny hack
-            ;; that is simpler than handling the logic in `matrix-client-insert'.  It fixes the case
-            ;; when a new header for older messages is first inserted.
-            (throw 'found (1- (point)))))))))
-
-(defun matrix-client-room--insert-date-header (timestamp)
-  "Insert date header for TIMESTAMP at current position in current buffer."
-  (let* ((visible-header (propertize (concat " " (matrix-client--human-format-date timestamp) "\n")
-                                     'face 'matrix-client-date-header))
-         (whole-header (propertize (concat "\n"
-                                           visible-header
-                                           "\n")
-                                   'matrix-client-date-header t
-                                   'matrix-header-day-number (time-to-days timestamp)
-                                   'read-only t)))
-    (insert whole-header)))
 
 ;;;; Events
 
