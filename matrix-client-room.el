@@ -410,7 +410,8 @@ point positioned before the inserted message."
                                       'timestamp (->> timestamp
                                                       (format-time-string "%Y-%m-%d 00:00:00")
                                                       date-to-time
-                                                      time-to-seconds))))
+                                                      time-to-seconds)
+                                      'matrix-client-day-header t)))
     (when (or (not previous-timestamp)
               (>= (abs (- timestamp previous-timestamp)) matrix-client-ng-timestamp-header-delta))
       ;; NOTE: When retrieving earlier messages, this inserts a new hour:minute header before every
@@ -693,23 +694,26 @@ If such text is not found, return nil."
 
 (defun matrix-client--update-date-headers ()
   "Update date headers in current buffer."
-  ;; FIXME: Needs updating for ordered-buffer code.
-  nil
-  ;; (save-excursion
-  ;;   (goto-char (point-min))
-  ;;   (cl-loop with inhibit-read-only = t
-  ;;            with limit = (matrix-client--prompt-position)
-  ;;            with timestamp
-  ;;            with new-header
-  ;;            for pos = (matrix--next-property-change (point) 'matrix-header-day-number nil limit)
-  ;;            while pos
-  ;;            do (goto-char pos)
-  ;;            for day-number = (get-text-property (point) 'matrix-header-day-number)
-  ;;            when day-number
-  ;;            do (progn
-  ;;                 (delete-region (point) (next-single-property-change (point) 'matrix-header-day-number nil limit))
-  ;;                 (matrix-client-room--insert-date-header (matrix--calendar-absolute-to-timestamp day-number)))))
-  )
+  (cl-flet ((next-header-pos () (matrix--next-property-change (point) 'matrix-client-day-header nil limit)))
+    (save-excursion
+      (goto-char (point-min))
+      (cl-loop with inhibit-read-only = t
+               with limit = (matrix-client--prompt-position)
+               with pos = (if (get-text-property (point) 'matrix-client-day-header)
+                              (point)
+                            (next-header-pos))
+               while pos
+               for timestamp = (get-text-property pos 'timestamp)
+               for new-date-string = (propertize (matrix-client--human-format-date timestamp)
+                                                 'timestamp timestamp
+                                                 'matrix-client-day-header t
+                                                 ;; FIXME: Put the face in a variable.
+                                                 'face '(:inherit matrix-client-date-header :height 1.5))
+               do (progn
+                    (goto-char pos)
+                    (setf (buffer-substring (+ 2 (point)) (1- (next-single-property-change (point) 'timestamp nil limit)))
+                          new-date-string))
+               do (setq pos (next-header-pos))))))
 
 (defun matrix-client--prompt-position ()
   "Return position of prompt in current buffer."
