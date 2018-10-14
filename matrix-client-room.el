@@ -34,6 +34,10 @@ Used to add a button for pending messages.")
   "Download and show room avatars."
   :type 'boolean)
 
+(defcustom matrix-client-ng-timestamp-header-delta 300
+  "Number of seconds between messages after which a timestamp header is shown."
+  :type 'integer)
+
 (defvar matrix-client-room-commands nil
   "List of room commands, without leading slash.
 Used for completion.")
