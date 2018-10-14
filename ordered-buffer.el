@@ -51,7 +51,7 @@
                               'ordered-buffer-header t
                               'read-only t
                               properties)))
-    (insert (apply #'propertize whole-header properties))))
+    (insert whole-header)))
 
 (cl-defun ordered-buffer-point-fn (&key backward-from forward-from property comparator value)
   "FIXME"
@@ -72,8 +72,8 @@
                  (function (funcall from))
                  (integer from)))
     (cl-loop for this-value = (funcall get-property-fn)
-             until (or (not this-value)
-                       (funcall comparator this-value value))
+             until (when this-value
+                     (funcall comparator this-value value))
              for next-pos = (funcall property-change-fn (point) property)
              if next-pos
              do (goto-char next-pos)

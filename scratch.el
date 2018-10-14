@@ -61,36 +61,14 @@
   (with-room-buffer room
     (let ((inhibit-read-only t)
           (matrix-client-ng-notifications nil))
+      (ov-clear)
       (erase-buffer)
+      (matrix-client-ng-insert-prompt room)
+      (matrix-client-ng-insert-last-seen room)
       (cl-loop for event in (reverse (oref room timeline))
                do (matrix-client-ng-timeline room event)))))
 
 ;;; ordered-buffer
-
-(defun matrix-client-ng--ordered-buffer-prefix-fn (timestamp)
-  "FIXME"
-  (let* ((ordered-buffer-header-face 'matrix-client-date-header)
-         (previous-timestamp (unless (bobp)
-                               (get-text-property (1- (point)) 'timestamp)))
-         (day-number (time-to-days timestamp))
-         (previous-day-number (when previous-timestamp
-                                (time-to-days previous-timestamp))))
-    (when (or (not previous-day-number)
-              (not (= previous-day-number day-number)))
-      (let ((ordered-buffer-header-face '(:inherit matrix-client-date-header :height 1.5))
-            (ordered-buffer-header-suffix nil))
-        (ordered-buffer-insert-header  (matrix-client--human-format-date timestamp)
-                                       'timestamp (->> timestamp
-                                                       (format-time-string "%Y-%m-%d 00:00:00")
-                                                       date-to-time
-                                                       time-to-seconds))))
-    (when (or (not previous-timestamp)
-              (>= (abs (- timestamp previous-timestamp)) matrix-client-ng-timestamp-header-delta))
-      (ordered-buffer-insert-header (format-time-string "%H:%M" timestamp)
-                                    'timestamp (->> timestamp
-                                                    (format-time-string "%Y-%m-%d %H:%M:00")
-                                                    date-to-time
-                                                    time-to-seconds)))))
 
 (defun ordered-buffer-test (&optional timestamp)
   (interactive (list (cond (current-prefix-arg (- (string-to-number (format-time-string "%s"))
@@ -112,6 +90,8 @@
       (pop-to-buffer (current-buffer)))))
 
 (defun timestamp-overlays ()
+  "Display overlays in margin in current buffer indicating `timestamp' text-property on each line.
+For debugging."
   (interactive)
   (setq left-margin-width 40)
   (save-excursion

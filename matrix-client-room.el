@@ -1,5 +1,7 @@
 (require 'shr)
 
+(require 'ordered-buffer)
+
 ;;;; Variables
 
 (defvar matrix-client-insert-prefix-fn nil
@@ -367,7 +369,6 @@ point positioned before the inserted message."
     (save-excursion
       (let* ((inhibit-read-only t)      ; MAYBE: use buffer-read-only mode instead
              (timestamp (get-text-property 0 'timestamp string))
-             (day-number (time-to-days timestamp))
              (event-id (get-text-property 0 'event_id string))
              (non-face-properties (cl-loop for (key val) on (text-properties-at 0 string) by #'cddr
                                            unless (eq key 'face)
@@ -377,24 +378,51 @@ point positioned before the inserted message."
                      ;; Inserting our own message, received back in /sync
                      (matrix-client-ng--replace-string update string))
           ;; Inserting someone else's message, or our own from earlier sessions
-          (goto-char (matrix-client-ng--insertion-pos timestamp))
-          ;; Ensure event before point doesn't have the same ID
-          (when (when-let ((previous-event-pos (matrix--prev-property-change (point) 'timestamp)))
-                  (string-equal event-id (get-text-property previous-event-pos 'event_id)))
-            ;; FIXME: This should probably only be an error when debugging is enabled.
-            (matrix-error (a-list 'event 'matrix-client-ng-insert
-                                  'message "Trying to insert duplicate event"
-                                  'event-id event-id)))
-          (when matrix-client-insert-prefix-fn
-            (funcall matrix-client-insert-prefix-fn))
-          ;; Insert the message
-          (insert string))
+          (let ((ordered-buffer-prefix-fn (apply-partially #'matrix-client-ng--ordered-buffer-prefix-fn timestamp))
+                (ordered-buffer-point-fn (apply-partially #'ordered-buffer-point-fn
+                                                          :backward-from #'matrix-client--prompt-position
+                                                          :property 'timestamp
+                                                          :value timestamp
+                                                          :comparator #'<=)))
+            ;; MAYBE: Ensure event before point doesn't have the same ID.  Removed this check when
+            ;; switched to ordered-buffer, not sure if necessary.
+            (ordered-buffer-insert string 'timestamp timestamp)))
         ;; Update tracking
         (unless (matrix-client-buffer-visible-p)
           (set-buffer-modified-p t)
           (when matrix-client-use-tracking
             ;; TODO handle faces when receving highlights
             (tracking-add-buffer (current-buffer))))))))
+
+(defun matrix-client-ng--ordered-buffer-prefix-fn (timestamp)
+  "Insert headers at point if necessary, depending on TIMESTAMP."
+  (let* ((ordered-buffer-header-face 'matrix-client-date-header)
+         (previous-timestamp (unless (bobp)
+                               (get-text-property (1- (point)) 'timestamp)))
+         (day-number (time-to-days timestamp))
+         (previous-day-number (when previous-timestamp
+                                (time-to-days previous-timestamp))))
+    (when (or (not previous-day-number)
+              (not (= previous-day-number day-number)))
+      (let ((ordered-buffer-header-face '(:inherit matrix-client-date-header :height 1.5))
+            (ordered-buffer-header-suffix nil))
+        (ordered-buffer-insert-header (matrix-client--human-format-date timestamp)
+                                      'timestamp (->> timestamp
+                                                      (format-time-string "%Y-%m-%d 00:00:00")
+                                                      date-to-time
+                                                      time-to-seconds))))
+    (when (or (not previous-timestamp)
+              (>= (abs (- timestamp previous-timestamp)) matrix-client-ng-timestamp-header-delta))
+      ;; NOTE: When retrieving earlier messages, this inserts a new hour:minute header before every
+      ;; batch of messages.  That's not consistent with `matrix-client-ng-timestamp-header-delta',
+      ;; but it does visually distinguish each batch of old messages, which is helpful, so I'm going
+      ;; to leave this behavior for now.  If we decide it's not what we want, we could do something
+      ;; like check the next timestamp rather than the previous one, when inserting newer messages.
+      (ordered-buffer-insert-header (format-time-string "%H:%M" timestamp)
+                                    'timestamp (->> timestamp
+                                                    (format-time-string "%Y-%m-%d %H:%M:00")
+                                                    date-to-time
+                                                    time-to-seconds)))))
 
 (cl-defmethod matrix-client-ng-update-last-seen ((room matrix-room) &rest _)
   "Move the last-seen overlay to after the last message in ROOM."
