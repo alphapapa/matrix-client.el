@@ -617,6 +617,15 @@ requests, and we make a new request."
                    do (apply-if-fn (concat "matrix-sync-" (symbol-name param))
                           (list session (a-get data param))
                         (matrix-unimplemented (format$ "Unimplemented API method: $fn-name"))))
+          (when initial-sync-p
+            ;; After initial sync timelines are processed, we run the room metadata hook to set the
+            ;; room buffer names (which we do not do during processing of timelines during initial
+            ;; sync, because doing so for every user "join" event is very slow.
+
+            ;; FIXME: This violates separation of API and client code.  There should be an
+            ;; after-initial-sync hook on the client side for this.
+            (dolist (room rooms)
+              (matrix-client-ng-rename-buffer room)))
           (setq initial-sync-p nil
                 next-batch (a-get data 'next_batch)
                 sync-retry-delay 0)

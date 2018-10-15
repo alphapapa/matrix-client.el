@@ -406,44 +406,62 @@ point positioned before the inserted message."
 
 ;;;;; Room metadata
 
+(cl-defmethod matrix-client-ng-rename-buffer ((room matrix-room))
+  "Rename ROOM's buffer."
+  (with-room-buffer room
+    (rename-buffer (matrix-client-ng-display-name room))))
+
 (cl-defmethod matrix-client-ng-display-name ((room matrix-room))
-  "Return display name for ROOM."
+  "Return display name for ROOM.
+If a buffer already exists with the name that would be returned,
+a different name is returned."
   ;; https://matrix.org/docs/spec/client_server/r0.3.0.html#id267
 
   ;; FIXME: Make it easier to name the room separately from the room's buffer.  e.g. I want the
   ;; header line to have the official room name, but I want the buffer name in 1-on-1 chats to be
   ;; the other person's name.
-  (cl-labels ((displaynames-sorted-by-id (members)
-                                         (--> members
-                                              (cl-sort it #'string< :key #'car)
-                                              (--map (matrix-user-displayname room (car it))
-                                                     it))))
-    (with-slots (id name aliases members) room
-      (pcase-let* (((eieio session) room)
-                   ((eieio (user self)) session)
-                   (members (cl-remove self members :test #'string= :key #'car)))
-        (pcase (when members
-                 (length members))
-          (1 (matrix-user-displayname room (caar members)))
-          (2 (s-join ", " (displaynames-sorted-by-id members)))
-          ((or `nil (pred (< 0))) ;; More than 2
-           (or name
-               ;; FIXME: The API docs say to use the canonical_alias instead of aliases.
-               (car aliases)
-               (format "%s and %s others"
-                       (car (displaynames-sorted-by-id members))
-                       (1- (length members)))))
-          (_
-           ;; FIXME: The API says to use names of previous room
-           ;; members if nothing else works, but I don't feel like
-           ;; coding that right now, so we'll just use the room ID.
-           id))))))
 
-(cl-defmethod matrix-client-ng-metadata-updated ((room matrix-room))
-  "Update metadata for ROOM."
-  (matrix-client-ng-update-header room))
-
-(add-hook 'matrix-room-metadata-hook #'matrix-client-ng-metadata-updated)
+  (cl-macrolet ((displaynames-sorted-by-id (members)
+                                           `(--> ,members
+                                                 (-sort (-on #'string< #'car) it)
+                                                 (--map (matrix-user-displayname room (car it))
+                                                        it)))
+                (members-without-self () `(cl-remove self members :test #'string= :key #'car))
+                (pick-name (&rest choices)
+                           ;; This macro allows short-circuiting the choice forms, only evaluating them when needed.
+                           `(or ,@(cl-loop for choice in choices
+                                           collect `(--when-let ,choice
+                                                      (if (listp it)
+                                                          (cl-loop for this-choice in (-non-nil (-flatten it))
+                                                                   unless (--when-let (get-buffer this-choice)
+                                                                            ;; Allow reusing current name of current buffer
+                                                                            (not (equal it (oref* room extra buffer))))
+                                                                   return this-choice)
+                                                        (unless (--when-let (get-buffer it)
+                                                                  ;; Allow reusing current name of current buffer
+                                                                  (not (equal it (oref* room extra buffer))))
+                                                          it)))))))
+    (pcase-let* (((eieio id name aliases members session) room)
+                 ((eieio (user self)) session))
+      (pcase (1- (length members))
+        (1 (pick-name (matrix-user-displayname room (caar (members-without-self)))
+                      name aliases id))
+        (2 (pick-name name aliases
+                      (s-join ", " (displaynames-sorted-by-id (members-without-self)))
+                      id))
+        ((or `nil (pred (< 0))) ;; More than 2
+         (pick-name name
+                    ;; FIXME: The API docs say to use the canonical_alias instead of aliases.
+                    aliases
+                    (format "%s and %s others"
+                            (car (displaynames-sorted-by-id (members-without-self)))
+                            (- (length members) 2))
+                    id))
+        (_ (pick-name name aliases
+                      ;; FIXME: The API says to use names of previous room
+                      ;; members if nothing else works, but I don't feel like
+                      ;; coding that right now, so we'll just use the room ID.
+                      id))))))
 
 (cl-defmethod matrix-client-ng-update-header ((room matrix-room))
   "Update the header line of the current buffer for ROOM.
@@ -466,6 +484,8 @@ Also update prompt with typers."
         (setq header-line-format (concat avatar
                                          ;; NOTE: Not sure if using `format' with an image-containing string works.
                                          (format$ "$name: $topic")))))))
+
+(add-hook 'matrix-room-metadata-hook #'matrix-client-ng-update-header)
 
 ;;;;; Room buffer setup
 
@@ -956,10 +976,9 @@ includes the \"In reply to\" link to the quoted message ID)."
   :body (progn
           (unless initial-sync-p
             ;; FIXME: This does not seem to work; on initial connect, "user joined" messages still show up from when the user initially joined the room.
-            (matrix-client-ng-insert room msg))
-          (with-room-buffer room
-            ;; FIXME: It's inefficient to do this for every join event, especially on initial sync in a large room.
-            (rename-buffer (matrix-client-ng-display-name room)))))
+            (matrix-client-ng-insert room msg)
+            (with-room-buffer room
+              (rename-buffer (matrix-client-ng-display-name room) 'unique)))))
 
 (matrix-client-ng-defevent m.typing
   "Handle m.typing events."
