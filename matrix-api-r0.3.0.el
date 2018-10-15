@@ -843,7 +843,7 @@ maximum number of events to return (default 10)."
           (setq prev-batch end)
           (setq last-full-sync nil)
           (if new-events-p
-              (run-hook-with-args 'matrix-room-update-hook room)
+              (run-hook-with-args 'matrix-room-update-hook room :old-messages t)
             (when (> (length chunk) 0)
               ;; Only got events we already had: go back further
               (matrix-messages room)))

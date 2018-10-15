@@ -358,6 +358,15 @@ Update [pending] overlay."
                               'error "Can't find transaction"
                               :txn-id txn-id))))))
 
+(defvar matrix-client-ordered-buffer-point-fn
+  (lambda (timestamp)
+    (funcall #'ordered-buffer-point-fn
+             :backward-from #'matrix-client--prompt-position
+             :property 'timestamp
+             :value timestamp
+             :comparator #'<=))
+  "Used to override point function when fetching old messages.")
+
 (cl-defmethod matrix-client-ng-insert ((room matrix-room) string &key update)
   "Insert STRING into ROOM's buffer.
 STRING should have a `timestamp' text-property.
@@ -383,11 +392,7 @@ point positioned before the inserted message."
                      (matrix-client-ng--replace-string update string))
           ;; Inserting someone else's message, or our own from earlier sessions
           (let ((ordered-buffer-prefix-fn (apply-partially #'matrix-client-ng--ordered-buffer-prefix-fn timestamp))
-                (ordered-buffer-point-fn (apply-partially #'ordered-buffer-point-fn
-                                                          :backward-from #'matrix-client--prompt-position
-                                                          :property 'timestamp
-                                                          :value timestamp
-                                                          :comparator #'<=)))
+                (ordered-buffer-point-fn (apply-partially matrix-client-ordered-buffer-point-fn timestamp)))
             ;; MAYBE: Ensure event before point doesn't have the same ID.  Removed this check when
             ;; switched to ordered-buffer, not sure if necessary.
             (ordered-buffer-insert string 'timestamp timestamp)))
@@ -400,6 +405,8 @@ point positioned before the inserted message."
 
 (defun matrix-client-ng--ordered-buffer-prefix-fn (timestamp)
   "Insert headers at point if necessary, depending on TIMESTAMP."
+  ;; FIXME: When inserting from point-min, this should look at the next event, not the previous one.
+  ;; May want to use a defvar, maybe something like `ordered-buffer-insertion-direction'.
   (let* ((ordered-buffer-header-face 'matrix-client-date-header)
          (previous-timestamp (unless (bobp)
                                (get-text-property (1- (point)) 'timestamp)))
@@ -1020,26 +1027,35 @@ as an async callback when the image is downloaded."
 
 ;;;; Update-room-at-once approach
 
-(cl-defmethod matrix-client-ng-update ((room matrix-room))
+(cl-defmethod matrix-client-ng-update ((room matrix-room) &key old-messages)
   "Update ROOM."
   (with-slots* (((extra state-new timeline-new ephemeral id) room))
-    ;; Process new timeline events
-    (dolist (event-list (list state-new timeline-new))
-      (seq-doseq (event event-list)
-        (matrix-client-ng-timeline room event)))
-    ;; Clear new events
-    (matrix-clear-state room)
-    (matrix-clear-timeline room)
-    ;; Process new ephemeral events
-    (seq-doseq (event ephemeral)
-      (pcase-let* (((map type) event))
-        (apply-if-fn (concat "matrix-client-event-" type)
-            (list room event)
-          (matrix-unimplemented (format$ "Unimplemented client method: $fn-name")))))
-    (setq ephemeral nil)                ; I think we can skip making a method for this.
-    ;; TODO: Update other room things: header, avatar, typers, topic, name, aliases, etc.
-    (matrix-client-ng-room-banner room nil)
-    ))
+    (let ((matrix-client-ordered-buffer-point-fn (if old-messages
+                                                     (lambda (timestamp)
+                                                       (funcall #'ordered-buffer-point-fn
+                                                                :forward-from #'point-min
+                                                                :property 'timestamp
+                                                                :value timestamp
+                                                                :comparator #'>))
+                                                   matrix-client-ordered-buffer-point-fn)))
+      ;; Process new timeline events
+      (dolist (event-list (list state-new timeline-new))
+        (when old-messages
+          (setq event-list (nreverse event-list)))
+        (seq-doseq (event event-list)
+          (matrix-client-ng-timeline room event)))
+      ;; Clear new events
+      (matrix-clear-state room)
+      (matrix-clear-timeline room)
+      ;; Process new ephemeral events
+      (seq-doseq (event ephemeral)
+        (pcase-let* (((map type) event))
+          (apply-if-fn (concat "matrix-client-event-" type)
+              (list room event)
+            (matrix-unimplemented (format$ "Unimplemented client method: $fn-name")))))
+      (setq ephemeral nil)                ; I think we can skip making a method for this.
+      ;; TODO: Update other room things: header, avatar, typers, topic, name, aliases, etc.
+      (matrix-client-ng-room-banner room nil))))
 
 (add-hook 'matrix-room-update-hook #'matrix-client-ng-update)
 
