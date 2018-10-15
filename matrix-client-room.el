@@ -16,6 +16,9 @@ Used to add a button for pending messages.")
                     "M-v" matrix-client-scroll-down
                     "C-k" matrix-client-kill-line-or-unsent-message
                     "TAB" matrix-client-tab
+                    "<backtab>" (lambda ()
+                                  (interactive)
+                                  (matrix-client-tab :backward t))
                     )))
     (cl-loop for (key fn) on mappings by #'cddr
              do (define-key map (cl-typecase key
@@ -121,14 +124,11 @@ method without it."
         (kill-region (point) (point-max)))
     (call-interactively #'kill-visual-line)))
 
-(defun matrix-client-tab ()
+(cl-defun matrix-client-tab (&key backward)
   "If point is before prompt, move point to next event; otherwise call `indent-for-tab-command'."
   (interactive)
-  (let ((prompt (matrix-client--prompt-position)))
-    (if (< (point) prompt)
-        (when-let ((pos (matrix-client--next-event-pos :limit prompt)))
-          (goto-char pos))
-      (call-interactively #'indent-for-tab-command))))
+  (when-let ((pos (matrix-client--next-event-pos :backward backward)))
+    (goto-char pos)))
 
 (defun matrix-client-ret ()
   "If point is before prompt, move point to prompt; otherwise call `matrix-client-send-active-line'."
@@ -617,11 +617,8 @@ Adds timestamp text-property at current time and sets notice face."
 If LIMIT is non-nil, don't search past it; otherwise determine
 limit automatically."
   (let ((fn (cl-case backward
-              ('nil #'next-single-property-change)
-              (t #'previous-single-property-change)))
-        (limit (or limit (cl-case backward
-                           (null (matrix-client--prompt-position))
-                           (t (point-min))))))
+              ('nil #'matrix--next-property-change)
+              (t #'matrix--prev-property-change))))
     (funcall fn (point) 'event_id nil limit)))
 
 (defun matrix-client-ng--this-message ()
