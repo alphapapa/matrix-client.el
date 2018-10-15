@@ -734,6 +734,9 @@ requests, and we make a new request."
             (push event timeline-new)
             ;; Run API handler for event.
             (matrix-event room event))))
+      ;; Reverse new events so that they are processed in chronological order.
+      ;; MAYBE: Do this in client code rather than here.
+      (setq timeline-new (nreverse timeline-new))
       (setq prev-batch prev_batch)
       (if (and (not (equal limited :json-false))
                last-full-sync)
@@ -836,7 +839,7 @@ maximum number of events to return (default 10)."
                 (ht-set timeline-event-ids id t)
                 (push event timeline)
                 (push event timeline-new))))
-
+          (setq timeline-new (nreverse timeline-new))
           (setq prev-batch end)
           (setq last-full-sync nil)
           (if new-events-p
