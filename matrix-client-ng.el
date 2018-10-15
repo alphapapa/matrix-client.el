@@ -62,6 +62,9 @@ EVENT should be the `event' variable from the
 
 (defvar matrix-client-ng-input-prompt "▶ ")
 
+(defvar matrix-client-ng-midnight-timer nil
+  "Timer used to update date headers at midnight.")
+
 (defcustom matrix-client-ng-render-presence t
   "Show presence changes in the main buffer windows."
   :type 'boolean)
@@ -154,6 +157,8 @@ Add session to sessions list and run initial sync."
   (matrix-sync session)
   (when matrix-client-ng-save-token
     (matrix-client-ng-save-token session))
+  ;; NOTE: What happens if the system is asleep at midnight?
+  (setq matrix-client-ng-midnight-timer (run-at-time "00:00" 86400 #'matrix-client-ng-update-all-date-headers))
   (message "Jacked in to %s.  Syncing..." (oref session server)))
 
 (add-hook 'matrix-login-hook #'matrix-client-ng-login-hook)
@@ -203,9 +208,19 @@ tokens (username and password will be required again)."
         (kill-buffer (oref* it extra buffer))))
     ;; Try to GC the session object.  Hopefully no timers or processes or buffers still hold a ref...
     (setf it nil))
+  (cancel-timer matrix-client-ng-midnight-timer)
+  (setq matrix-client-ng-midnight-timer nil)
   (setq matrix-client-ng-sessions nil))
 
 ;;;; Rooms
+
+(defun matrix-client-ng-update-all-date-headers ()
+  "Update date headers in all rooms.
+Intended to be called from a timer that runs at midnight."
+  (dolist (session matrix-client-ng-sessions)
+    (dolist (room (oref session rooms))
+      (with-room-buffer room
+        (matrix-client--update-date-headers)))))
 
 ;;;;; Timeline
 
