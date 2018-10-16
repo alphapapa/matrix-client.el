@@ -896,7 +896,11 @@ includes the \"In reply to\" link to the quoted message ID)."
                               (format$ "* $body"))
                              ((guard (and matrix-client-ng-render-html (string= "org.matrix.custom.html" format)))
                               (with-temp-buffer
-                                (insert formatted_body)
+                                ;; Because some unknown Matrix clients insert newlines between HTML
+                                ;; tags, we must remove them to make the DOM easier to parse with
+                                ;; `-let*' in `matrix-client-ng--shr-mx-reply'.  This should be good
+                                ;; enough.
+                                (insert (replace-regexp-in-string (rx ">" (1+ "\n") "<") "><" formatted_body))
                                 (let* ((shr-external-rendering-functions matrix-client-ng-shr-external-rendering-functions)
                                        (dom (libxml-parse-html-region (point-min) (point-max))))
                                   (erase-buffer)
