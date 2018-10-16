@@ -471,15 +471,21 @@ a different name is returned."
                            ;; This macro allows short-circuiting the choice forms, only evaluating them when needed.
                            `(or ,@(cl-loop for choice in choices
                                            collect `(--when-let ,choice
+                                                      ;; NOTE: We check to see if strings are empty,
+                                                      ;; because apparently it can happen that an
+                                                      ;; mxid is something like "@:hostname", with
+                                                      ;; an empty displayname.  Sigh.
                                                       (if (listp it)
                                                           (cl-loop for this-choice in (-non-nil (-flatten it))
-                                                                   unless (--when-let (get-buffer this-choice)
-                                                                            ;; Allow reusing current name of current buffer
-                                                                            (not (equal it (oref* room extra buffer))))
+                                                                   unless (or (string-empty-p this-choice)
+                                                                              (--when-let (get-buffer this-choice)
+                                                                                ;; Allow reusing current name of current buffer
+                                                                                (not (equal it (oref* room extra buffer)))))
                                                                    return this-choice)
-                                                        (unless (--when-let (get-buffer it)
-                                                                  ;; Allow reusing current name of current buffer
-                                                                  (not (equal it (oref* room extra buffer))))
+                                                        (unless (or (string-empty-p it)
+                                                                    (--when-let (get-buffer it)
+                                                                      ;; Allow reusing current name of current buffer
+                                                                      (not (equal it (oref* room extra buffer)))))
                                                           it)))))))
     (pcase-let* (((eieio id name aliases members session) room)
                  ((eieio (user self)) session))
