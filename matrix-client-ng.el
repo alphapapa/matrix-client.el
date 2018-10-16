@@ -58,10 +58,6 @@ EVENT should be the `event' variable from the
 (defvar matrix-client-ng-sessions nil
   "List of active sessions.")
 
-(defvar matrix-client-ng-show-images
-  ;; FIXME: Copy defcustom.
-  nil)
-
 (defvar matrix-client-ng-mark-modified-rooms t)
 
 (defvar matrix-client-ng-input-prompt "▶ ")

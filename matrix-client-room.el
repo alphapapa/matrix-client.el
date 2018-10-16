@@ -938,7 +938,7 @@ includes the \"In reply to\" link to the quoted message ID)."
                                                                         (string (string-to-number transaction_id)))))
 
             ;; Start image insertion if necessary
-            (when matrix-client-ng-show-images
+            (when matrix-client-show-images
               (cl-loop for url in (-non-nil (append (matrix-client--image-urls message)
                                                     (list matrix-image-url)))
                        do (matrix-client-insert-image room event_id url)))
