@@ -2,6 +2,8 @@
 
 (require 'ordered-buffer)
 
+(require 'esxml)
+
 ;;;; Variables
 
 (defvar matrix-client-insert-prefix-fn nil
@@ -834,16 +836,8 @@ The purpose of this function is to add the
 `matrix-client-quoted-message' face to only the quoted message
 body, rather than the entire contents of the mx-reply tag (which
 includes the \"In reply to\" link to the quoted message ID)."
-  ;; NOTE: As long as the Matrix server sends formatted_body with mx-reply tags in this format, this
-  ;; should work.
-
   ;; TODO: Suggest that the Matrix server should send the quoted message as event metadata rather
   ;; than pseudo-HTML.  Then we wouldn't have to do this hacky parsing of the pseudo HTML.
-
-  ;; NOTE: `-let' makes destructuring the DOM pretty easy, but walking it and replacing parts of it
-  ;; is very messy, because we sometimes replace strings with lists, which must then be flattened
-  ;; and spliced back into the DOM.  If you're reading this and you can make this code prettier,
-  ;; please do.
   (cl-labels ((newline-to-br (string)
                              ;; I couldn't find an existing function to split a string by a regexp
                              ;; AND replace the matches with other elements of a number equal to the
@@ -857,6 +851,7 @@ includes the \"In reply to\" link to the quoted message ID)."
                                       append (-repeat (- match-end match-start) '(br nil))
                                       do (setq from match-end)))
               (walk-dom (dom)
+                        ;; Return DOM replacing newlines with `br' tag nodes to preserve newlines when the HTML is rendered.
                         (pcase dom
                           (`(,tag ,props . ,children) `((,tag ,props ,@(-flatten-n 1 (mapcar #'walk-dom children)))))
                           ((rx bos "\n" eos) '((br nil)))
@@ -864,15 +859,26 @@ includes the \"In reply to\" link to the quoted message ID)."
                                               (newline-to-br dom)
                                             ;; Always return a list so we can flatten it.  This is really messy.  Ugh.
                                             (list dom))))))
-    (-let* (((_mx-reply-tag _mx-reply-tag-props
-                            (_blockquote-tag _blockquote-tag-props
-                                             quoted-event-a
-                                             _blank-space
-                                             quoted-sender-a
-                                             _br-tag
-                                             . quoted-dom))
-             dom)
-            (quoted-dom (-flatten-n 1 (mapcar #'walk-dom quoted-dom)))
+    (-let* ((((quoted-event-a &as _a ((_href . event-url)) . _)
+              (quoted-sender-a &as _a _attrs sender) . quoted-dom)
+             (esxml-query-all "blockquote a" dom))
+            (quoted-dom (--> (esxml-query-all "blockquote *" dom)
+                             ;; This query selects more than we want, including the parts we already
+                             ;; selected in the previous query, so we use those queried elements to
+                             ;; remove them from this query, leaving only the quoted message
+                             ;; elements.
+                             (--remove (or (equal it quoted-event-a)
+                                           (equal it quoted-sender-a)
+                                           (equal it "In reply to")
+                                           (equal it sender))
+                                       it)
+                             ;; Remove blank lines before quoted message
+                             (cl-loop while (and (stringp it)
+                                                 (s-blank-str? (car it)))
+                                      do (pop it)
+                                      finally return it)
+                             (-map #'walk-dom it)
+                             (-flatten-n 1 it)))
             (dom `(html nil (body nil (blockquote nil ,@quoted-dom)))))
       (shr-tag-a quoted-event-a) (insert " ") (shr-tag-a quoted-sender-a) (insert ":")
       (let ((pos (point)))
