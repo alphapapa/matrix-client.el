@@ -150,23 +150,26 @@ With prefix, quote message or selected region of message."
   (interactive "P")
   (if (get-text-property (point) 'sender)
       ;; Start reply
-      (let ((display-name (get-text-property (point) 'displayname))
-            (quote (if quote-p
-                       ;; FIXME: Also quote in HTML format
-                       (--> (if (use-region-p)
-                                (buffer-substring (region-beginning) (region-end))
-                              (matrix-client-ng--this-message))
-                            (s-trim it)
-                            (prog1 it
-                              (remove-text-properties 0 (length it) '(read-only t) it))
-                            (replace-regexp-in-string (rx bol) "> " it)
-                            (concat it "\n\n"))
-                     ;; Not quoting
-                     ""))
-            (inhibit-read-only t))
-        ;; FIXME: Insert a link to username, and use a filter to transform to HTML before sending.
+      (let* ((display-name (get-text-property (point) 'displayname))
+             (sender (get-text-property (point) 'sender))
+             (event-id (get-text-property (point) 'event_id))
+             (quote (if quote-p
+                        (--> (if (use-region-p)
+                                 (buffer-substring (region-beginning) (region-end))
+                               (matrix-client-ng--this-message))
+                             (s-trim it)
+                             (prog1 it
+                               (remove-text-properties 0 (length it) '(read-only t) it)))
+                      ;; Not quoting
+                      ""))
+             ;; Sort of hacky but it will do for now.
+             (string (propertize (concat display-name ": " (propertize (replace-regexp-in-string (rx bol) "> " quote)
+                                                                       'quoted-body quote))
+                                 'event_id event-id
+                                 'sender sender))
+             (inhibit-read-only t))
         (goto-char (matrix-client--prompt-position))
-        (insert display-name ": " quote))
+        (insert string "\n\n"))
     ;; Do self-insert
     (call-interactively 'self-insert-command)))
 
@@ -182,11 +185,11 @@ If HTML is non-nil, treat input as HTML."
   (interactive)
   (goto-char (matrix-client--prompt-position))
   (pcase-let* ((room matrix-client-ng-room)
-               ((eieio session) room)
+               ((eieio session (id room-id)) room)
                ((eieio user txn-id) session)
-               (input (prog1
-                          (buffer-substring-no-properties (point) (point-max))
-                        (delete-region (point) (point-max))))
+               (input (let ((text (delete-and-extract-region (point) (point-max))))
+                        (remove-text-properties 0 (length text) '(read-only t) text)
+                        text))
                (first-word (when (string-match (rx bos "/" (group (1+ (not space)))) input)
                              (match-string 1 input)))
                (event-string (propertize input
@@ -205,6 +208,32 @@ If HTML is non-nil, treat input as HTML."
                                                                 'help-echo "Resend message"
                                                                 'transaction_id (1+ txn-id))))
                (format) (formatted-body) (extra-content))
+    (when (get-text-property 0 'event_id input)
+      ;; Quoting
+      ;; FIXME: This is getting ugly.  Needs refactoring.
+      (let* ((event-id (get-text-property 0 'event_id input))
+             (sender (get-text-property 0 'sender input))
+             (sender-displayname (matrix-user-displayname room sender))
+             (quoted-body-start-pos (text-property-not-all 0 (length input) 'quoted-body nil input))
+             (quoted-body (if quoted-body-start-pos
+                              (get-text-property quoted-body-start-pos 'quoted-body input)
+                            ""))
+             (input (let ((text (substring input (next-single-property-change 0 'event_id input))))
+                      ;; Not sure if removing read-only is necessary.
+                      (remove-text-properties 0 (length text) '(read-only t) text)
+                      text))
+             (byline (if (string-empty-p quoted-body)
+                         (format$ "<a href=\"https://matrix.to/#/$sender\">$sender-displayname</a>:")
+                       (format$ "<a href=\"https://matrix.to/#/$room-id/$event-id\">In reply to</a> <a href=\"https://matrix.to/#/$sender\">$sender-displayname</a><br>")))
+             (html (if (string-empty-p quoted-body)
+                       (concat byline input)
+                     (concat "<mx-reply><blockquote>" byline quoted-body "</blockquote></mx-reply>" input))))
+        (setq format "org.matrix.custom.html"
+              formatted-body html
+              input (concat "> <" sender "> " quoted-body "\n\n" input)
+              extra-content (a-list 'format format
+                                    'formatted_body formatted-body
+                                    'm.relates_to (list 'm.in_reply_to (a-list 'event_id event-id))))))
     (when html
       (setq format "org.matrix.custom.html"
             formatted-body input
@@ -239,6 +268,18 @@ If HTML is non-nil, treat input as HTML."
                                :error (apply-partially #'matrix-client-send-message-error-callback room
                                                        (1+ txn-id)))
           (matrix-client-ng-update-last-seen room))))))
+
+(defun matrix-client-ng--event-body (id)
+  "Return event message body for ID."
+  ;; NOTE: Currently unused, but leaving in because it may be useful.
+  (save-excursion
+    ;; NOTE: `matrix--prev-property-change' is actually returning the point at which the property
+    ;; CEASES to have the value, rather than where the value begins.  I don't like that, but
+    ;; changing that function would break a lot of other things, so I'm not going to do that now.
+    (when-let* ((metadata-start (matrix--prev-property-change (point-max) 'event_id id))
+                (message-start (next-single-property-change metadata-start 'face))
+                (message-end (next-single-property-change metadata-start 'event_id)))
+      (s-trim (buffer-substring message-start message-end)))))
 
 (defun matrix-client-ng--html-to-plain (html)
   "Return plain-text rendering of HTML."
