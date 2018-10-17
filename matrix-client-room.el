@@ -235,7 +235,7 @@ If HTML is non-nil, treat input as HTML."
               input (concat "> <" sender "> " quoted-body "\n\n" input)
               extra-content (a-list 'format format
                                     'formatted_body formatted-body
-                                    'm.relates_to (list 'm.in_reply_to (a-list 'event_id event-id))))))
+                                    'm.relates_to (a-list 'm.in_reply_to (a-list 'event_id event-id))))))
     (when html
       (setq format "org.matrix.custom.html"
             formatted-body input
