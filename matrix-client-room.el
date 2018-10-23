@@ -1,5 +1,9 @@
 (require 'shr)
 
+(require 'ordered-buffer)
+
+(require 'esxml)
+
 ;;;; Variables
 
 (defvar matrix-client-insert-prefix-fn nil
@@ -31,6 +35,10 @@ Used to add a button for pending messages.")
 (defcustom matrix-client-show-room-avatars t
   "Download and show room avatars."
   :type 'boolean)
+
+(defcustom matrix-client-ng-timestamp-header-delta 300
+  "Number of seconds between messages after which a timestamp header is shown."
+  :type 'integer)
 
 (defvar matrix-client-room-commands nil
   "List of room commands, without leading slash.
@@ -144,23 +152,26 @@ With prefix, quote message or selected region of message."
   (interactive "P")
   (if (get-text-property (point) 'sender)
       ;; Start reply
-      (let ((display-name (get-text-property (point) 'displayname))
-            (quote (if quote-p
-                       ;; FIXME: Also quote in HTML format
-                       (--> (if (use-region-p)
-                                (buffer-substring (region-beginning) (region-end))
-                              (matrix-client-ng--this-message))
-                            (s-trim it)
-                            (prog1 it
-                              (remove-text-properties 0 (length it) '(read-only t) it))
-                            (replace-regexp-in-string (rx bol) "> " it)
-                            (concat it "\n\n"))
-                     ;; Not quoting
-                     ""))
-            (inhibit-read-only t))
-        ;; FIXME: Insert a link to username, and use a filter to transform to HTML before sending.
+      (let* ((display-name (get-text-property (point) 'displayname))
+             (sender (get-text-property (point) 'sender))
+             (event-id (get-text-property (point) 'event_id))
+             (quote (if quote-p
+                        (--> (if (use-region-p)
+                                 (buffer-substring (region-beginning) (region-end))
+                               (matrix-client-ng--this-message))
+                             (s-trim it)
+                             (prog1 it
+                               (remove-text-properties 0 (length it) '(read-only t) it)))
+                      ;; Not quoting
+                      ""))
+             ;; Sort of hacky but it will do for now.
+             (string (propertize (concat display-name ": " (propertize (replace-regexp-in-string (rx bol) "> " quote)
+                                                                       'quoted-body quote))
+                                 'event_id event-id
+                                 'sender sender))
+             (inhibit-read-only t))
         (goto-char (matrix-client--prompt-position))
-        (insert display-name ": " quote))
+        (insert string "\n\n"))
     ;; Do self-insert
     (call-interactively 'self-insert-command)))
 
@@ -176,11 +187,11 @@ If HTML is non-nil, treat input as HTML."
   (interactive)
   (goto-char (matrix-client--prompt-position))
   (pcase-let* ((room matrix-client-ng-room)
-               ((eieio session) room)
+               ((eieio session (id room-id)) room)
                ((eieio user txn-id) session)
-               (input (prog1
-                          (buffer-substring-no-properties (point) (point-max))
-                        (delete-region (point) (point-max))))
+               (input (let ((text (delete-and-extract-region (point) (point-max))))
+                        (remove-text-properties 0 (length text) '(read-only t) text)
+                        text))
                (first-word (when (string-match (rx bos "/" (group (1+ (not space)))) input)
                              (match-string 1 input)))
                (event-string (propertize input
@@ -199,6 +210,32 @@ If HTML is non-nil, treat input as HTML."
                                                                 'help-echo "Resend message"
                                                                 'transaction_id (1+ txn-id))))
                (format) (formatted-body) (extra-content))
+    (when (get-text-property 0 'event_id input)
+      ;; Quoting
+      ;; FIXME: This is getting ugly.  Needs refactoring.
+      (let* ((event-id (get-text-property 0 'event_id input))
+             (sender (get-text-property 0 'sender input))
+             (sender-displayname (matrix-user-displayname room sender))
+             (quoted-body-start-pos (text-property-not-all 0 (length input) 'quoted-body nil input))
+             (quoted-body (if quoted-body-start-pos
+                              (get-text-property quoted-body-start-pos 'quoted-body input)
+                            ""))
+             (input (let ((text (substring input (next-single-property-change 0 'event_id input))))
+                      ;; Not sure if removing read-only is necessary.
+                      (remove-text-properties 0 (length text) '(read-only t) text)
+                      text))
+             (byline (if (string-empty-p quoted-body)
+                         (format$ "<a href=\"https://matrix.to/#/$sender\">$sender-displayname</a>:")
+                       (format$ "<a href=\"https://matrix.to/#/$room-id/$event-id\">In reply to</a> <a href=\"https://matrix.to/#/$sender\">$sender-displayname</a><br>")))
+             (html (if (string-empty-p quoted-body)
+                       (concat byline input)
+                     (concat "<mx-reply><blockquote>" byline quoted-body "</blockquote></mx-reply>" input))))
+        (setq format "org.matrix.custom.html"
+              formatted-body html
+              input (concat "> <" sender "> " quoted-body "\n\n" input)
+              extra-content (a-list 'format format
+                                    'formatted_body formatted-body
+                                    'm.relates_to (a-list 'm.in_reply_to (a-list 'event_id event-id))))))
     (when html
       (setq format "org.matrix.custom.html"
             formatted-body input
@@ -233,6 +270,18 @@ If HTML is non-nil, treat input as HTML."
                                :error (apply-partially #'matrix-client-send-message-error-callback room
                                                        (1+ txn-id)))
           (matrix-client-ng-update-last-seen room))))))
+
+(defun matrix-client-ng--event-body (id)
+  "Return event message body for ID."
+  ;; NOTE: Currently unused, but leaving in because it may be useful.
+  (save-excursion
+    ;; NOTE: `matrix--prev-property-change' is actually returning the point at which the property
+    ;; CEASES to have the value, rather than where the value begins.  I don't like that, but
+    ;; changing that function would break a lot of other things, so I'm not going to do that now.
+    (when-let* ((metadata-start (matrix--prev-property-change (point-max) 'event_id id))
+                (message-start (next-single-property-change metadata-start 'face))
+                (message-end (next-single-property-change metadata-start 'event_id)))
+      (s-trim (buffer-substring message-start message-end)))))
 
 (defun matrix-client-ng--html-to-plain (html)
   "Return plain-text rendering of HTML."
@@ -352,6 +401,15 @@ Update [pending] overlay."
                               'error "Can't find transaction"
                               :txn-id txn-id))))))
 
+(defvar matrix-client-ordered-buffer-point-fn
+  (lambda (timestamp)
+    (funcall #'ordered-buffer-point-fn
+             :backward-from #'matrix-client--prompt-position
+             :property 'timestamp
+             :value timestamp
+             :comparator #'<=))
+  "Used to override point function when fetching old messages.")
+
 (cl-defmethod matrix-client-ng-insert ((room matrix-room) string &key update)
   "Insert STRING into ROOM's buffer.
 STRING should have a `timestamp' text-property.
@@ -367,7 +425,6 @@ point positioned before the inserted message."
     (save-excursion
       (let* ((inhibit-read-only t)      ; MAYBE: use buffer-read-only mode instead
              (timestamp (get-text-property 0 'timestamp string))
-             (day-number (time-to-days timestamp))
              (event-id (get-text-property 0 'event_id string))
              (non-face-properties (cl-loop for (key val) on (text-properties-at 0 string) by #'cddr
                                            unless (eq key 'face)
@@ -377,24 +434,50 @@ point positioned before the inserted message."
                      ;; Inserting our own message, received back in /sync
                      (matrix-client-ng--replace-string update string))
           ;; Inserting someone else's message, or our own from earlier sessions
-          (goto-char (matrix-client-ng--insertion-pos timestamp))
-          ;; Ensure event before point doesn't have the same ID
-          (when (when-let ((previous-event-pos (matrix--prev-property-change (point) 'timestamp)))
-                  (string-equal event-id (get-text-property previous-event-pos 'event_id)))
-            ;; FIXME: This should probably only be an error when debugging is enabled.
-            (matrix-error (a-list 'event 'matrix-client-ng-insert
-                                  'message "Trying to insert duplicate event"
-                                  'event-id event-id)))
-          (when matrix-client-insert-prefix-fn
-            (funcall matrix-client-insert-prefix-fn))
-          ;; Insert the message
-          (insert string))
+          (let ((ordered-buffer-prefix-fn (apply-partially #'matrix-client-ng--ordered-buffer-prefix-fn timestamp))
+                (ordered-buffer-point-fn (apply-partially matrix-client-ordered-buffer-point-fn timestamp)))
+            ;; MAYBE: Ensure event before point doesn't have the same ID.  Removed this check when
+            ;; switched to ordered-buffer, not sure if necessary.
+            (ordered-buffer-insert string 'timestamp timestamp)))
         ;; Update tracking
         (unless (matrix-client-buffer-visible-p)
           (set-buffer-modified-p t)
           (when matrix-client-use-tracking
             ;; TODO handle faces when receving highlights
             (tracking-add-buffer (current-buffer))))))))
+
+(defun matrix-client-ng--ordered-buffer-prefix-fn (timestamp)
+  "Insert headers at point if necessary, depending on TIMESTAMP."
+  ;; FIXME: When inserting from point-min, this should look at the next event, not the previous one.
+  ;; May want to use a defvar, maybe something like `ordered-buffer-insertion-direction'.
+  (let* ((ordered-buffer-header-face 'matrix-client-date-header)
+         (previous-timestamp (unless (bobp)
+                               (get-text-property (1- (point)) 'timestamp)))
+         (day-number (time-to-days timestamp))
+         (previous-day-number (when previous-timestamp
+                                (time-to-days previous-timestamp))))
+    (when (or (not previous-day-number)
+              (not (= previous-day-number day-number)))
+      (let ((ordered-buffer-header-face '(:inherit matrix-client-date-header :height 1.5))
+            (ordered-buffer-header-suffix nil))
+        (ordered-buffer-insert-header (matrix-client--human-format-date timestamp)
+                                      'timestamp (->> timestamp
+                                                      (format-time-string "%Y-%m-%d 00:00:00")
+                                                      date-to-time
+                                                      time-to-seconds)
+                                      'matrix-client-day-header t)))
+    (when (or (not previous-timestamp)
+              (>= (abs (- timestamp previous-timestamp)) matrix-client-ng-timestamp-header-delta))
+      ;; NOTE: When retrieving earlier messages, this inserts a new hour:minute header before every
+      ;; batch of messages.  That's not consistent with `matrix-client-ng-timestamp-header-delta',
+      ;; but it does visually distinguish each batch of old messages, which is helpful, so I'm going
+      ;; to leave this behavior for now.  If we decide it's not what we want, we could do something
+      ;; like check the next timestamp rather than the previous one, when inserting newer messages.
+      (ordered-buffer-insert-header (format-time-string "%H:%M" timestamp)
+                                    'timestamp (->> timestamp
+                                                    (format-time-string "%Y-%m-%d %H:%M:00")
+                                                    date-to-time
+                                                    time-to-seconds)))))
 
 (cl-defmethod matrix-client-ng-update-last-seen ((room matrix-room) &rest _)
   "Move the last-seen overlay to after the last message in ROOM."
@@ -431,15 +514,21 @@ a different name is returned."
                            ;; This macro allows short-circuiting the choice forms, only evaluating them when needed.
                            `(or ,@(cl-loop for choice in choices
                                            collect `(--when-let ,choice
+                                                      ;; NOTE: We check to see if strings are empty,
+                                                      ;; because apparently it can happen that an
+                                                      ;; mxid is something like "@:hostname", with
+                                                      ;; an empty displayname.  Sigh.
                                                       (if (listp it)
                                                           (cl-loop for this-choice in (-non-nil (-flatten it))
-                                                                   unless (--when-let (get-buffer this-choice)
-                                                                            ;; Allow reusing current name of current buffer
-                                                                            (not (equal it (oref* room extra buffer))))
+                                                                   unless (or (string-empty-p this-choice)
+                                                                              (--when-let (get-buffer this-choice)
+                                                                                ;; Allow reusing current name of current buffer
+                                                                                (not (equal it (oref* room extra buffer)))))
                                                                    return this-choice)
-                                                        (unless (--when-let (get-buffer it)
-                                                                  ;; Allow reusing current name of current buffer
-                                                                  (not (equal it (oref* room extra buffer))))
+                                                        (unless (or (string-empty-p it)
+                                                                    (--when-let (get-buffer it)
+                                                                      ;; Allow reusing current name of current buffer
+                                                                      (not (equal it (oref* room extra buffer)))))
                                                           it)))))))
     (pcase-let* (((eieio id name aliases members session) room)
                  ((eieio (user self)) session))
@@ -665,20 +754,26 @@ If such text is not found, return nil."
 
 (defun matrix-client--update-date-headers ()
   "Update date headers in current buffer."
-  (save-excursion
-    (goto-char (point-min))
-    (cl-loop with inhibit-read-only = t
-             with limit = (matrix-client--prompt-position)
-             with timestamp
-             with new-header
-             for pos = (matrix--next-property-change (point) 'matrix-header-day-number nil limit)
-             while pos
-             do (goto-char pos)
-             for day-number = (get-text-property (point) 'matrix-header-day-number)
-             when day-number
-             do (progn
-                  (delete-region (point) (next-single-property-change (point) 'matrix-header-day-number nil limit))
-                  (matrix-client-room--insert-date-header (matrix--calendar-absolute-to-timestamp day-number))))))
+  (cl-flet ((next-header-pos () (matrix--next-property-change (point) 'matrix-client-day-header nil limit)))
+    (save-excursion
+      (goto-char (point-min))
+      (cl-loop with inhibit-read-only = t
+               with limit = (matrix-client--prompt-position)
+               with pos = (if (get-text-property (point) 'matrix-client-day-header)
+                              (point)
+                            (next-header-pos))
+               while pos
+               for timestamp = (get-text-property pos 'timestamp)
+               for new-date-string = (propertize (matrix-client--human-format-date timestamp)
+                                                 'timestamp timestamp
+                                                 'matrix-client-day-header t
+                                                 ;; FIXME: Put the face in a variable.
+                                                 'face '(:inherit matrix-client-date-header :height 1.5))
+               do (progn
+                    (goto-char pos)
+                    (setf (buffer-substring (+ 2 (point)) (1- (next-single-property-change (point) 'timestamp nil limit)))
+                          new-date-string))
+               do (setq pos (next-header-pos))))))
 
 (defun matrix-client--prompt-position ()
   "Return position of prompt in current buffer."
@@ -733,76 +828,6 @@ If string is not found or no properties change, return nil."
                (inhibit-read-only t))
     (add-text-properties beg end set-plist)))
 
-(defun matrix-client-ng--insertion-pos (timestamp)
-  "Return insertion position for TIMESTAMP.
-Creates a new header if necessary."
-  (let* ((header-pos (matrix-client--get-date-header timestamp))
-         (limit (or (matrix--next-property-change header-pos 'matrix-header-day-number)
-                    (1- (matrix-client--prompt-position))))
-         (next-timestamp-pos (matrix--next-property-change header-pos 'timestamp nil limit)))
-    (catch 'found
-      (while next-timestamp-pos
-        (when (>= (get-text-property next-timestamp-pos 'timestamp) timestamp)
-          ;; Found greater timestamp: return its position
-          (throw 'found next-timestamp-pos))
-        ;; Look for next timestamp
-        (setq next-timestamp-pos (matrix--next-property-change next-timestamp-pos 'timestamp nil limit)))
-      ;; No more timestamps: return limit
-      limit)))
-
-(defun matrix-client--get-date-header (timestamp)
-  "Return position of appropriate date header in current buffer for TIMESTAMP.
-Creates a new header if necessary."
-  (cl-labels ((prev-header-pos () (matrix--prev-property-change (point) 'matrix-header-day-number))
-              (current-header-day-number () (get-text-property (point) 'matrix-header-day-number)))
-    (let* ((target-day-number (time-to-days timestamp))
-           (prompt (1- (matrix-client--prompt-position)))
-           (inhibit-read-only t))
-      (goto-char prompt)
-      (catch 'found
-        (while t
-          (if-let ((prev-header-pos (prev-header-pos)))
-              (progn
-                ;; Found a previous header
-                (goto-char prev-header-pos)
-                (let ((current-header-day-number (current-header-day-number)))
-                  (cond ((= current-header-day-number target-day-number)
-                         ;; Found correct header
-                         (throw 'found prev-header-pos))
-                        ((< current-header-day-number target-day-number)
-                         ;; Found earlier header: insert new one after current header's position
-                         (goto-char (or (matrix--next-property-change (point) 'matrix-header-day-number nil prompt)
-                                        prompt))
-                         (matrix-client--update-date-headers)
-                         (matrix-client-room--insert-date-header timestamp)
-                         ;; Return position after new header (actually 1- it, see below)
-                         (throw 'found (1- (point))))))
-                ;; Wrong header: keep looking
-                )
-            ;; No more headers found: update other headers and insert new header here (this will
-            ;; happen when the current date changes and a new message arrives, as well as when a
-            ;; message arrives for the current date and is the first message in that room for the
-            ;; date).  FIXME: Maybe we could be smarter about whether to update the other date
-            ;; headers, to avoid doing it when unnecessary.
-            (matrix-client--update-date-headers)
-            (matrix-client-room--insert-date-header timestamp)
-            ;; Return one character before the end of the new header.  This is sort of a tiny hack
-            ;; that is simpler than handling the logic in `matrix-client-insert'.  It fixes the case
-            ;; when a new header for older messages is first inserted.
-            (throw 'found (1- (point)))))))))
-
-(defun matrix-client-room--insert-date-header (timestamp)
-  "Insert date header for TIMESTAMP at current position in current buffer."
-  (let* ((visible-header (propertize (concat " " (matrix-client--human-format-date timestamp) "\n")
-                                     'face 'matrix-client-date-header))
-         (whole-header (propertize (concat "\n"
-                                           visible-header
-                                           "\n")
-                                   'matrix-client-date-header t
-                                   'matrix-header-day-number (time-to-days timestamp)
-                                   'read-only t)))
-    (insert whole-header)))
-
 ;;;; Events
 
 (defun matrix-client-ng--shr-mx-reply (dom)
@@ -811,16 +836,8 @@ The purpose of this function is to add the
 `matrix-client-quoted-message' face to only the quoted message
 body, rather than the entire contents of the mx-reply tag (which
 includes the \"In reply to\" link to the quoted message ID)."
-  ;; NOTE: As long as the Matrix server sends formatted_body with mx-reply tags in this format, this
-  ;; should work.
-
   ;; TODO: Suggest that the Matrix server should send the quoted message as event metadata rather
   ;; than pseudo-HTML.  Then we wouldn't have to do this hacky parsing of the pseudo HTML.
-
-  ;; NOTE: `-let' makes destructuring the DOM pretty easy, but walking it and replacing parts of it
-  ;; is very messy, because we sometimes replace strings with lists, which must then be flattened
-  ;; and spliced back into the DOM.  If you're reading this and you can make this code prettier,
-  ;; please do.
   (cl-labels ((newline-to-br (string)
                              ;; I couldn't find an existing function to split a string by a regexp
                              ;; AND replace the matches with other elements of a number equal to the
@@ -834,6 +851,7 @@ includes the \"In reply to\" link to the quoted message ID)."
                                       append (-repeat (- match-end match-start) '(br nil))
                                       do (setq from match-end)))
               (walk-dom (dom)
+                        ;; Return DOM replacing newlines with `br' tag nodes to preserve newlines when the HTML is rendered.
                         (pcase dom
                           (`(,tag ,props . ,children) `((,tag ,props ,@(-flatten-n 1 (mapcar #'walk-dom children)))))
                           ((rx bos "\n" eos) '((br nil)))
@@ -841,15 +859,26 @@ includes the \"In reply to\" link to the quoted message ID)."
                                               (newline-to-br dom)
                                             ;; Always return a list so we can flatten it.  This is really messy.  Ugh.
                                             (list dom))))))
-    (-let* (((_mx-reply-tag _mx-reply-tag-props
-                            (_blockquote-tag _blockquote-tag-props
-                                             quoted-event-a
-                                             _blank-space
-                                             quoted-sender-a
-                                             _br-tag
-                                             . quoted-dom))
-             dom)
-            (quoted-dom (-flatten-n 1 (mapcar #'walk-dom quoted-dom)))
+    (-let* ((((quoted-event-a &as _a ((_href . event-url)) . _)
+              (quoted-sender-a &as _a _attrs sender) . quoted-dom)
+             (esxml-query-all "blockquote a" dom))
+            (quoted-dom (--> (esxml-query-all "blockquote *" dom)
+                             ;; This query selects more than we want, including the parts we already
+                             ;; selected in the previous query, so we use those queried elements to
+                             ;; remove them from this query, leaving only the quoted message
+                             ;; elements.
+                             (--remove (or (equal it quoted-event-a)
+                                           (equal it quoted-sender-a)
+                                           (equal it "In reply to")
+                                           (equal it sender))
+                                       it)
+                             ;; Remove blank lines before quoted message
+                             (cl-loop while (and (stringp it)
+                                                 (s-blank-str? (car it)))
+                                      do (pop it)
+                                      finally return it)
+                             (-map #'walk-dom it)
+                             (-flatten-n 1 it)))
             (dom `(html nil (body nil (blockquote nil ,@quoted-dom)))))
       (shr-tag-a quoted-event-a) (insert " ") (shr-tag-a quoted-sender-a) (insert ":")
       (let ((pos (point)))
@@ -1051,26 +1080,35 @@ as an async callback when the image is downloaded."
 
 ;;;; Update-room-at-once approach
 
-(cl-defmethod matrix-client-ng-update ((room matrix-room))
+(cl-defmethod matrix-client-ng-update ((room matrix-room) &key old-messages)
   "Update ROOM."
   (with-slots* (((extra state-new timeline-new ephemeral id) room))
-    ;; Process new timeline events
-    (dolist (event-list (list state-new timeline-new))
-      (seq-doseq (event event-list)
-        (matrix-client-ng-timeline room event)))
-    ;; Clear new events
-    (matrix-clear-state room)
-    (matrix-clear-timeline room)
-    ;; Process new ephemeral events
-    (seq-doseq (event ephemeral)
-      (pcase-let* (((map type) event))
-        (apply-if-fn (concat "matrix-client-event-" type)
-            (list room event)
-          (matrix-unimplemented (format$ "Unimplemented client method: $fn-name")))))
-    (setq ephemeral nil)                ; I think we can skip making a method for this.
-    ;; TODO: Update other room things: header, avatar, typers, topic, name, aliases, etc.
-    (matrix-client-ng-room-banner room nil)
-    ))
+    (let ((matrix-client-ordered-buffer-point-fn (if old-messages
+                                                     (lambda (timestamp)
+                                                       (funcall #'ordered-buffer-point-fn
+                                                                :forward-from #'point-min
+                                                                :property 'timestamp
+                                                                :value timestamp
+                                                                :comparator #'>))
+                                                   matrix-client-ordered-buffer-point-fn)))
+      ;; Process new timeline events
+      (dolist (event-list (list state-new timeline-new))
+        (when old-messages
+          (setq event-list (nreverse event-list)))
+        (seq-doseq (event event-list)
+          (matrix-client-ng-timeline room event)))
+      ;; Clear new events
+      (matrix-clear-state room)
+      (matrix-clear-timeline room)
+      ;; Process new ephemeral events
+      (seq-doseq (event ephemeral)
+        (pcase-let* (((map type) event))
+          (apply-if-fn (concat "matrix-client-event-" type)
+              (list room event)
+            (matrix-unimplemented (format$ "Unimplemented client method: $fn-name")))))
+      (setq ephemeral nil)                ; I think we can skip making a method for this.
+      ;; TODO: Update other room things: header, avatar, typers, topic, name, aliases, etc.
+      (matrix-client-ng-room-banner room nil))))
 
 (add-hook 'matrix-room-update-hook #'matrix-client-ng-update)
 

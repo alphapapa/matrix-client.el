@@ -53,3 +53,62 @@
 
 ;; (defun cowsay (s)
 ;;   (shell-command-to-string (format "cowsay %s" (shell-quote-argument s))))
+
+;;; Replay room
+
+(cl-defmethod matrix-client-ng-replay ((room matrix-room))
+  "Erase and replay events into ROOM's buffer."
+  (with-room-buffer room
+    (let ((inhibit-read-only t)
+          (matrix-client-ng-notifications nil))
+      (ov-clear)
+      (erase-buffer)
+      (matrix-client-ng-insert-prompt room)
+      (matrix-client-ng-insert-last-seen room)
+      (cl-loop for event in (reverse (oref room timeline))
+               do (matrix-client-ng-timeline room event)))))
+
+;;; ordered-buffer
+
+(defun ordered-buffer-test (&optional timestamp)
+  (interactive (list (cond (current-prefix-arg (- (string-to-number (format-time-string "%s"))
+                                                  (read-number "Seconds before now: ")))
+                           (t (string-to-number (format-time-string "%s"))))))
+  (with-current-buffer (get-buffer-create "*ordered-buffer-test*")
+    (let* ((string (concat (format-time-string "%H:%M:%S" timestamp)
+                           " "
+                           (s-trim (shell-command-to-string "cat /usr/share/dict/words | shuf -n1"))
+                           "\n"))
+           (inhibit-read-only t)
+           (ordered-buffer-prefix-fn (apply-partially #'matrix-client-ng--ordered-buffer-prefix-fn timestamp))
+           (ordered-buffer-point-fn (apply-partially #'ordered-buffer-point-fn
+                                                     :backward-from #'point-max
+                                                     :property 'timestamp
+                                                     :value timestamp
+                                                     :comparator #'<=)))
+      (ordered-buffer-insert string 'timestamp timestamp)
+      (pop-to-buffer (current-buffer)))))
+
+(defun timestamp-overlays ()
+  "Display overlays in margin in current buffer indicating `timestamp' text-property on each line.
+For debugging."
+  (interactive)
+  (setq left-margin-width 40)
+  (save-excursion
+    (goto-char (point-min))
+    (let ((inhibit-read-only t))
+      (ov-clear :timestamp-overlay)
+      (cl-loop for ts = (get-text-property (point) 'timestamp)
+               when ts
+               do (ov (point) (or (next-single-property-change (point) 'timestamp)
+                                  (point-max))
+                      'before-string (propertize "o"
+                                                 'display (list '(margin left-margin)
+                                                                (concat (number-to-string ts)
+                                                                        " "
+                                                                        (format-time-string "%Y-%m-%d %H:%M:%S" ts))))
+                      :timestamp-overlay t)
+               for next = (next-single-property-change (point) 'timestamp)
+               if next
+               do (goto-char next)
+               else return nil))))
