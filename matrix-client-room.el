@@ -2,7 +2,7 @@
 
 (require 'ordered-buffer)
 
-(require 'esxml)
+(require 'esxml-query)
 
 ;;;; Variables
 
