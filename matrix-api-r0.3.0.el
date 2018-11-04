@@ -1077,12 +1077,15 @@ TYPING should be t or nil."
                (file-contents (with-temp-buffer
                                 (insert-file-contents path)
                                 (buffer-string)))
+               (file-size (f-size path))
                (endpoint (url-encode-url (format$ "https://$server/_matrix/media/r0/upload?filename=$filename"))))
     (matrix-request-request session endpoint
                             :method "POST"
                             :success (apply-partially #'matrix-upload-callback room
-                                                      :cbargs (list :filename filename
-                                                                    :mime-type mime-type))
+                                                      :cbargs (list :path path
+                                                                    :filename filename
+                                                                    :mime-type mime-type
+                                                                    :size file-size))
                             :content-type mime-type
                             :raw-data file-contents)))
 
@@ -1091,16 +1094,25 @@ TYPING should be t or nil."
 Post the uploaded file to the room as an m.image or m.file
 message."
   :slots (id)
-  :body (-let* (((&plist :filename filename :mime-type mime-type) cbargs)
+  :body (-let* (((&plist :path path :filename filename :mime-type mime-type :size size) cbargs)
                 ((&alist 'content_uri url) data)
                 (msgtype (cond ((s-prefix? "image/" mime-type) "m.image")
-                               (t "m.file"))))
+                               (t "m.file")))
+                (info (a-list 'mimetype mime-type
+                              'size size)))
           (matrix-log (a-list 'fn 'matrix-upload-callback
                               'room id
                               'data data))
-          (matrix-send-message room (concat "File: " filename)
+          (pcase msgtype
+            ("m.image" ;; Get image dimensions
+             (-when-let* ((image (create-image path))
+                          ((width . height) (image-size image t)))
+               (map-put info 'w width)
+               (map-put info 'h height))))
+          (matrix-send-message room filename
                                :msgtype msgtype
-                               :extra-content (a-list 'url url))))
+                               :extra-content (a-list 'url url
+                                                      'info info))))
 
 ;;;; Footer
 
