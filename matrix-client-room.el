@@ -1085,11 +1085,11 @@ as an async callback when the image is downloaded."
   (with-slots* (((extra state-new timeline-new ephemeral id) room))
     (let ((matrix-client-ordered-buffer-point-fn (if old-messages
                                                      (lambda (timestamp)
-                                                       (funcall #'ordered-buffer-point-fn
-                                                                :forward-from #'point-min
-                                                                :property 'timestamp
-                                                                :value timestamp
-                                                                :comparator #'>))
+                                                       (ordered-buffer-point-fn
+                                                         :forward-from #'point-min
+                                                         :property 'timestamp
+                                                         :value timestamp
+                                                         :comparator #'>))
                                                    matrix-client-ordered-buffer-point-fn)))
       ;; Process new timeline events
       (dolist (event-list (list state-new timeline-new))
