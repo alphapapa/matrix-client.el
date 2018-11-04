@@ -25,7 +25,7 @@
 
 ;;;; Variables
 
-(defcustom matrix-client-ng-notifications t
+(defcustom matrix-client-notifications t
   "Enable notifications."
   ;; This variable may be let-bound to nil to disable notifications, e.g. when loading old messages.
   :type 'boolean)
@@ -44,8 +44,8 @@ Automatically trimmed to last 20 notifications.")
   "Run notify hooks and built-in notificataion for an event of EVENT-TYPE with DATA.
 Optional REST of args are also applied to hooks and function."
   ;; FIXME: Pass session so we can get its initial-sync-p
-  (when matrix-client-ng-notifications
-    (unless (oref (car matrix-client-ng-sessions) initial-sync-p)
+  (when matrix-client-notifications
+    (unless (oref (car matrix-client-sessions) initial-sync-p)
       (run-hook-with-args 'matrix-client-notify-hook event-type data rest)
       ;; Run built-in notification for this event type
       (let ((fn (intern-soft (concat "matrix-client-notify-" event-type))))

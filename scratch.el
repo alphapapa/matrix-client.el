@@ -39,7 +39,7 @@
 
 ;;; derp
 
-(cl-defmethod matrix-client-ng-room-command-cowsay ((room matrix-room) input)
+(cl-defmethod matrix-client-room-command-cowsay ((room matrix-room) input)
   "Cowsay!"
   (let* ((s (replace-regexp-in-string (rx bos "/" (1+ (not space)) (1+ space)) "" input))
          (cow-type (seq-random-elt '("-b" "-d" "-g" "-p" "-s" "-t" "-w" "-y")))
@@ -56,17 +56,17 @@
 
 ;;; Replay room
 
-(cl-defmethod matrix-client-ng-replay ((room matrix-room))
+(cl-defmethod matrix-client-replay ((room matrix-room))
   "Erase and replay events into ROOM's buffer."
   (with-room-buffer room
     (let ((inhibit-read-only t)
-          (matrix-client-ng-notifications nil))
+          (matrix-client-notifications nil))
       (ov-clear)
       (erase-buffer)
-      (matrix-client-ng-insert-prompt room)
-      (matrix-client-ng-insert-last-seen room)
+      (matrix-client-insert-prompt room)
+      (matrix-client-insert-last-seen room)
       (cl-loop for event in (reverse (oref room timeline))
-               do (matrix-client-ng-timeline room event)))))
+               do (matrix-client-timeline room event)))))
 
 ;;; ordered-buffer
 
@@ -80,7 +80,7 @@
                            (s-trim (shell-command-to-string "cat /usr/share/dict/words | shuf -n1"))
                            "\n"))
            (inhibit-read-only t)
-           (ordered-buffer-prefix-fn (apply-partially #'matrix-client-ng--ordered-buffer-prefix-fn timestamp))
+           (ordered-buffer-prefix-fn (apply-partially #'matrix-client--ordered-buffer-prefix-fn timestamp))
            (ordered-buffer-point-fn (apply-partially #'ordered-buffer-point-fn
                                                      :backward-from #'point-max
                                                      :property 'timestamp

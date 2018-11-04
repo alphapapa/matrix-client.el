@@ -7,10 +7,10 @@
 ;;;; Variables
 
 (defvar matrix-client-insert-prefix-fn nil
-  "When set, `matrix-client-ng-insert' will call this function before inserting.
+  "When set, `matrix-client-insert' will call this function before inserting.
 Used to add a button for pending messages.")
 
-(defvar matrix-client-ng-mode-map
+(defvar matrix-client-mode-map
   (let ((map (make-sparse-keymap))
         (mappings '(
                     "r" matrix-client-reply-or-insert
@@ -30,13 +30,13 @@ Used to add a button for pending messages.")
                                   (otherwise key))
                   fn))
     map)
-  "Keymap for `matrix-client-ng-mode'.")
+  "Keymap for `matrix-client-mode'.")
 
 (defcustom matrix-client-show-room-avatars t
   "Download and show room avatars."
   :type 'boolean)
 
-(defcustom matrix-client-ng-timestamp-header-delta 300
+(defcustom matrix-client-timestamp-header-delta 300
   "Number of seconds between messages after which a timestamp header is shown."
   :type 'integer)
 
@@ -44,13 +44,13 @@ Used to add a button for pending messages.")
   "List of room commands, without leading slash.
 Used for completion.")
 
-(defvar matrix-client-ng-shr-external-rendering-functions
-  (a-list 'mx-reply #'matrix-client-ng--shr-mx-reply)
+(defvar matrix-client-shr-external-rendering-functions
+  (a-list 'mx-reply #'matrix-client--shr-mx-reply)
   "Functions used to render HTML in Matrix messages.  See `shr-external-rendering-functions'.")
 
 ;;;; Macros
 
-(cl-defmacro matrix-client-ng-defevent (type docstring &key object-slots event-keys content-keys let body)
+(cl-defmacro matrix-client-defevent (type docstring &key object-slots event-keys content-keys let body)
   "Define a method on `matrix-room' to handle Matrix events of TYPE.
 
 TYPE should be a symbol representing the event type,
@@ -108,8 +108,8 @@ method without it."
        ;; to guarantee that the room has a buffer, since it seems
        ;; unclear what the first received event type for a joined room
        ;; will be.
-       (setq buffer (get-buffer-create (matrix-client-ng-display-name room)))
-       (matrix-client-ng-setup-room-buffer room))
+       (setq buffer (get-buffer-create (matrix-client-display-name room)))
+       (matrix-client-setup-room-buffer room))
      (with-current-buffer buffer
        ,@body)))
 
@@ -119,7 +119,7 @@ method without it."
   "Call `scroll-down-command'.  If point is at the top of the buffer, load history."
   (interactive)
   (if (= (line-number-at-pos (point)) 1)
-      (matrix-client-ng-fetch-history matrix-client-ng-room)
+      (matrix-client-fetch-history matrix-client-room)
     (let ((scroll-error-top-bottom t))
       (scroll-down-command))))
 
@@ -144,7 +144,7 @@ method without it."
   (let ((prompt (matrix-client--prompt-position)))
     (if (< (point) prompt)
         (goto-char prompt)
-      (call-interactively #'matrix-client-ng-send-input))))
+      (call-interactively #'matrix-client-send-input))))
 
 (defun matrix-client-reply-or-insert (&optional quote-p)
   "If point is on a previous message, begin a reply addressed to its sender.  Otherwise, self-insert.
@@ -158,7 +158,7 @@ With prefix, quote message or selected region of message."
              (quote (if quote-p
                         (--> (if (use-region-p)
                                  (buffer-substring (region-beginning) (region-end))
-                               (matrix-client-ng--this-message))
+                               (matrix-client--this-message))
                              (s-trim it)
                              (prog1 it
                                (remove-text-properties 0 (length it) '(read-only t) it)))
@@ -175,18 +175,18 @@ With prefix, quote message or selected region of message."
     ;; Do self-insert
     (call-interactively 'self-insert-command)))
 
-(defun matrix-client-ng-delete-backward-char (n &optional kill-flag)
+(defun matrix-client-delete-backward-char (n &optional kill-flag)
   "Delete backward unless the point is at the prompt or other read-only text."
   (interactive "p\nP")
   (unless (get-text-property (- (point) 2) 'read-only)
     (call-interactively #'delete-backward-char n kill-flag)))
 
-(cl-defun matrix-client-ng-send-input (&key html)
+(cl-defun matrix-client-send-input (&key html)
   "Send current input to current room.
 If HTML is non-nil, treat input as HTML."
   (interactive)
   (goto-char (matrix-client--prompt-position))
-  (pcase-let* ((room matrix-client-ng-room)
+  (pcase-let* ((room matrix-client-room)
                ((eieio session (id room-id)) room)
                ((eieio user txn-id) session)
                (input (let ((text (delete-and-extract-region (point) (point-max))))
@@ -239,13 +239,13 @@ If HTML is non-nil, treat input as HTML."
     (when html
       (setq format "org.matrix.custom.html"
             formatted-body input
-            input (matrix-client-ng--html-to-plain input)
+            input (matrix-client--html-to-plain input)
             extra-content (a-list 'format format
                                   'formatted_body formatted-body)))
     (unless (s-blank-str? input)
       (when matrix-client-save-outgoing-messages
         (push input kill-ring))
-      (apply-if-fn (concat "matrix-client-ng-room-command-" first-word)
+      (apply-if-fn (concat "matrix-client-room-command-" first-word)
           ;; Special command: apply command argument (i.e. without "/command ")
           (list room (s-chop-prefix (concat "/" first-word " ") input))
         (progn
@@ -269,9 +269,9 @@ If HTML is non-nil, treat input as HTML."
                                                          (1+ txn-id))
                                :error (apply-partially #'matrix-client-send-message-error-callback room
                                                        (1+ txn-id)))
-          (matrix-client-ng-update-last-seen room))))))
+          (matrix-client-update-last-seen room))))))
 
-(defun matrix-client-ng--event-body (id)
+(defun matrix-client--event-body (id)
   "Return event message body for ID."
   ;; NOTE: Currently unused, but leaving in because it may be useful.
   (save-excursion
@@ -283,7 +283,7 @@ If HTML is non-nil, treat input as HTML."
                 (message-end (next-single-property-change metadata-start 'event_id)))
       (s-trim (buffer-substring message-start message-end)))))
 
-(defun matrix-client-ng--html-to-plain (html)
+(defun matrix-client--html-to-plain (html)
   "Return plain-text rendering of HTML."
   ;; `shr-insert-document' insists on wrapping lines, so we disable the function it uses.
   (cl-letf (((symbol-function 'shr-fill-line) (lambda (&rest ignore) nil)))
@@ -295,7 +295,7 @@ If HTML is non-nil, treat input as HTML."
                          (buffer-substring-no-properties (point-min) (point-max)))))
       (s-trim plain-text))))
 
-(cl-defmethod matrix-client-ng-upload ((room matrix-room) path)
+(cl-defmethod matrix-client-upload ((room matrix-room) path)
   "Upload file at PATH to ROOM.
 PATH may be a local path, optionally prefixed with \"file://\",
 or a remote HTTP(S) path, in which case the file will be
@@ -321,12 +321,12 @@ path/URL without completion."
 
 ;;;; Methods
 
-(cl-defmethod matrix-client-ng-fetch-history ((room matrix-room))
+(cl-defmethod matrix-client-fetch-history ((room matrix-room))
   "Load earlier messages for ROOM."
-  (matrix-client-ng-room-banner room "Loading history...")
+  (matrix-client-room-banner room "Loading history...")
   (matrix-messages room ))
 
-(cl-defmethod matrix-client-ng-fetch-history-callback ((room matrix-room) &key data &allow-other-keys)
+(cl-defmethod matrix-client-fetch-history-callback ((room matrix-room) &key data &allow-other-keys)
   (pcase-let* (((map start end chunk) data)
                (matrix-client-enable-notifications nil)) ; Silence notifications for old messages
     ;; NOTE: We don't add the events to the timeline of the room object.
@@ -335,9 +335,9 @@ path/URL without completion."
     ;; NOTE: When direction is "b", as it is when fetching earlier messages, the "end" token is the
     ;; earliest chronologically, so it becomes the room's new "start" token.  Not confusing at
     ;; all... (maybe API 0.3.0 is better)
-    (matrix-client-ng-room-banner room nil)))
+    (matrix-client-room-banner room nil)))
 
-(cl-defmethod matrix-client-ng-room-banner ((room matrix-room) message)
+(cl-defmethod matrix-client-room-banner ((room matrix-room) message)
   "Display MESSAGE in a banner overlay at top of ROOM's buffer.
 If MESSAGE is nil, clear existing message."
   (with-room-buffer room
@@ -349,10 +349,10 @@ If MESSAGE is nil, clear existing message."
                                  'face 'font-lock-comment-face))))
       (ov-set ov 'before-string message))))
 
-(cl-defmethod matrix-client-ng--delete-event ((room matrix-room) plist)
+(cl-defmethod matrix-client--delete-event ((room matrix-room) plist)
   "Delete event with text properties in PLIST from ROOM's buffer."
   (with-room-buffer room
-    (-when-let* (((beg end) (matrix-client-ng--find-propertized-string plist))
+    (-when-let* (((beg end) (matrix-client--find-propertized-string plist))
                  (inhibit-read-only t))
       (delete-region beg end))))
 
@@ -368,7 +368,7 @@ Replacing pending button with normal message event."
                ((map event_id) data)
                (inhibit-read-only t))
     (with-room-buffer room
-      (-when-let* (((beg end) (matrix-client-ng--find-propertized-string (list 'transaction_id txn-id))))
+      (-when-let* (((beg end) (matrix-client--find-propertized-string (list 'transaction_id txn-id))))
         (add-text-properties beg end (list 'event_id event_id))
         ;; Remove "pending" overlay
         (--when-let (car (ov-in 'transaction_id txn-id))
@@ -410,7 +410,7 @@ Update [pending] overlay."
              :comparator #'<=))
   "Used to override point function when fetching old messages.")
 
-(cl-defmethod matrix-client-ng-insert ((room matrix-room) string &key update)
+(cl-defmethod matrix-client-insert ((room matrix-room) string &key update)
   "Insert STRING into ROOM's buffer.
 STRING should have a `timestamp' text-property.
 
@@ -432,9 +432,9 @@ point positioned before the inserted message."
              (string (apply #'propertize (concat string "\n") 'read-only t non-face-properties)))
         (unless (and update
                      ;; Inserting our own message, received back in /sync
-                     (matrix-client-ng--replace-string update string))
+                     (matrix-client--replace-string update string))
           ;; Inserting someone else's message, or our own from earlier sessions
-          (let ((ordered-buffer-prefix-fn (apply-partially #'matrix-client-ng--ordered-buffer-prefix-fn timestamp))
+          (let ((ordered-buffer-prefix-fn (apply-partially #'matrix-client--ordered-buffer-prefix-fn timestamp))
                 (ordered-buffer-point-fn (apply-partially matrix-client-ordered-buffer-point-fn timestamp)))
             ;; MAYBE: Ensure event before point doesn't have the same ID.  Removed this check when
             ;; switched to ordered-buffer, not sure if necessary.
@@ -446,7 +446,7 @@ point positioned before the inserted message."
             ;; TODO handle faces when receving highlights
             (tracking-add-buffer (current-buffer))))))))
 
-(defun matrix-client-ng--ordered-buffer-prefix-fn (timestamp)
+(defun matrix-client--ordered-buffer-prefix-fn (timestamp)
   "Insert headers at point if necessary, depending on TIMESTAMP."
   ;; FIXME: When inserting from point-min, this should look at the next event, not the previous one.
   ;; May want to use a defvar, maybe something like `ordered-buffer-insertion-direction'.
@@ -467,9 +467,9 @@ point positioned before the inserted message."
                                                       time-to-seconds)
                                       'matrix-client-day-header t)))
     (when (or (not previous-timestamp)
-              (>= (abs (- timestamp previous-timestamp)) matrix-client-ng-timestamp-header-delta))
+              (>= (abs (- timestamp previous-timestamp)) matrix-client-timestamp-header-delta))
       ;; NOTE: When retrieving earlier messages, this inserts a new hour:minute header before every
-      ;; batch of messages.  That's not consistent with `matrix-client-ng-timestamp-header-delta',
+      ;; batch of messages.  That's not consistent with `matrix-client-timestamp-header-delta',
       ;; but it does visually distinguish each batch of old messages, which is helpful, so I'm going
       ;; to leave this behavior for now.  If we decide it's not what we want, we could do something
       ;; like check the next timestamp rather than the previous one, when inserting newer messages.
@@ -479,7 +479,7 @@ point positioned before the inserted message."
                                                     date-to-time
                                                     time-to-seconds)))))
 
-(cl-defmethod matrix-client-ng-update-last-seen ((room matrix-room) &rest _)
+(cl-defmethod matrix-client-update-last-seen ((room matrix-room) &rest _)
   "Move the last-seen overlay to after the last message in ROOM."
   (with-room-buffer room
     ;; FIXME: Does this need to be when-let?  Shouldn't these always be found?
@@ -489,12 +489,12 @@ point positioned before the inserted message."
 
 ;;;;; Room metadata
 
-(cl-defmethod matrix-client-ng-rename-buffer ((room matrix-room))
+(cl-defmethod matrix-client-rename-buffer ((room matrix-room))
   "Rename ROOM's buffer."
   (with-room-buffer room
-    (rename-buffer (matrix-client-ng-display-name room))))
+    (rename-buffer (matrix-client-display-name room))))
 
-(cl-defmethod matrix-client-ng-display-name ((room matrix-room))
+(cl-defmethod matrix-client-display-name ((room matrix-room))
   "Return display name for ROOM.
 If a buffer already exists with the name that would be returned,
 a different name is returned."
@@ -552,7 +552,7 @@ a different name is returned."
                       ;; coding that right now, so we'll just use the room ID.
                       id))))))
 
-(cl-defmethod matrix-client-ng-update-header ((room matrix-room))
+(cl-defmethod matrix-client-update-header ((room matrix-room))
   "Update the header line of the current buffer for ROOM.
 Also update prompt with typers."
   (unless (and (boundp 'tabbar-mode) tabbar-mode)
@@ -567,38 +567,38 @@ Also update prompt with typers."
                    (prompt (if (> (length typers) 0)
                                (concat (propertize (concat "Typing: " typers-string)
                                                    'face 'font-lock-comment-face)
-                                       "\n" matrix-client-ng-input-prompt)
-                             matrix-client-ng-input-prompt)))
+                                       "\n" matrix-client-input-prompt)
+                             matrix-client-input-prompt)))
         (ov-set ov 'before-string prompt)
         (setq header-line-format (concat avatar
                                          ;; NOTE: Not sure if using `format' with an image-containing string works.
                                          (format$ "$name: $topic")))))))
 
-(add-hook 'matrix-room-metadata-hook #'matrix-client-ng-update-header)
+(add-hook 'matrix-room-metadata-hook #'matrix-client-update-header)
 
 ;;;;; Room buffer setup
 
-(cl-defmethod matrix-client-ng-setup-room-buffer ((room matrix-room))
+(cl-defmethod matrix-client-setup-room-buffer ((room matrix-room))
   "Prepare and switch to buffer for ROOM-ID, and return room object."
   (with-room-buffer room
-    (matrix-client-ng-mode)
+    (matrix-client-mode)
     (visual-line-mode 1)
     (setq buffer-undo-list t)
     ;; Unset buffer's modified status when it's selected
     ;; FIXME: Reactivate this.
-    ;; (when matrix-client-ng-mark-modified-rooms
-    ;;   (add-hook 'buffer-list-update-hook #'matrix-client-ng-buffer-list-update-hook 'append 'local))
+    ;; (when matrix-client-mark-modified-rooms
+    ;;   (add-hook 'buffer-list-update-hook #'matrix-client-buffer-list-update-hook 'append 'local))
     (erase-buffer)
     (switch-to-buffer (current-buffer))
     ;; FIXME: Remove these or update them.
     ;; (set (make-local-variable 'matrix-client-room-connection) con)
-    (setq-local matrix-client-ng-room room)
+    (setq-local matrix-client-room room)
     (when matrix-client-use-tracking
       (tracking-mode 1)))
-  (matrix-client-ng-insert-prompt room)
-  (matrix-client-ng-insert-last-seen room))
+  (matrix-client-insert-prompt room)
+  (matrix-client-insert-last-seen room))
 
-(cl-defmethod matrix-client-ng-insert-last-seen ((room matrix-room))
+(cl-defmethod matrix-client-insert-last-seen ((room matrix-room))
   "Insert last-seen overlay into ROOM's buffer."
   (with-room-buffer room
     (when-let ((prompt-ov (car (ov-in 'matrix-client-prompt)))
@@ -607,7 +607,7 @@ Also update prompt with typers."
           'before-string (concat "\n" (propertize "\n\n" 'face 'matrix-client-last-seen))
           'matrix-client-last-seen t))))
 
-(cl-defmethod matrix-client-ng-insert-prompt ((room matrix-room))
+(cl-defmethod matrix-client-insert-prompt ((room matrix-room))
   "Insert prompt into ROOM's buffer."
   (with-room-buffer room
     (let ((inhibit-read-only t)
@@ -618,12 +618,12 @@ Also update prompt with typers."
       (ov (point) (point)
           'before-string (concat (propertize "\n"
                                              'face '(:height 0.1))
-                                 matrix-client-ng-input-prompt)
+                                 matrix-client-input-prompt)
           'matrix-client-prompt t))))
 
 ;;;;; Room commands
 
-(cl-defmacro matrix-client-ng-def-room-command (name &key docstring message (msgtype "m.text") insert)
+(cl-defmacro matrix-client-def-room-command (name &key docstring message (msgtype "m.text") insert)
   "Define a room command that sends the return value of FN as a message.
 
 In all expressions evaluated, the variable `room' is bound to the
@@ -641,7 +641,7 @@ which is inserted in the room buffer.  This happens after MESSAGE
 is sent, if any."
   (declare (indent defun))
   (let* ((command (symbol-name name))
-         (method-name (intern (concat "matrix-client-ng-room-command-" command))))
+         (method-name (intern (concat "matrix-client-room-command-" command))))
     `(progn
        (cl-defmethod ,method-name ((room matrix-room) input)
          ,docstring
@@ -649,16 +649,16 @@ is sent, if any."
            (matrix-send-message room it :msgtype ,msgtype))
          (--when-let ,insert
            (let ((matrix-client-insert-prefix-fn nil))
-             (matrix-client-ng-insert room (matrix-client-ng--notice-string it))))
-         (matrix-client-ng-update-last-seen room))
+             (matrix-client-insert room (matrix-client--notice-string it))))
+         (matrix-client-update-last-seen room))
        (add-to-list 'matrix-client-room-commands ,command))))
 
-(matrix-client-ng-def-room-command me
+(matrix-client-def-room-command me
   :message input
   :msgtype "m.emote"
   :docstring "Send emote to room.")
 
-(matrix-client-ng-def-room-command who
+(matrix-client-def-room-command who
   :insert (with-slots (members) room
             (concat "Room members: "
                     (--> members
@@ -668,7 +668,7 @@ is sent, if any."
                          (s-join ", " it))))
   :docstring "Print list of room members.")
 
-(matrix-client-ng-def-room-command join
+(matrix-client-def-room-command join
   :insert (pcase-let* (((eieio session) room))
             ;; Only accept one room
             (if (> (length (s-split (rx (1+ space)) input)) 1)
@@ -678,15 +678,15 @@ is sent, if any."
   :docstring "Join room on session.
 INPUT should be, e.g. \"#room:matrix.org\".")
 
-(cl-defmethod matrix-client-ng-room-command-html ((room matrix-room) input)
+(cl-defmethod matrix-client-room-command-html ((room matrix-room) input)
   "Send HTML message to ROOM.
 INPUT should be, e.g. \"/html <b>...\"."
   ;; HACK: Reinsert HTML without "/html" and call send-input again
   (insert input)
-  (matrix-client-ng-send-input :html t))
+  (matrix-client-send-input :html t))
 
-(matrix-client-ng-def-room-command upload
-  :insert (when (matrix-client-ng-upload room input)
+(matrix-client-def-room-command upload
+  :insert (when (matrix-client-upload room input)
             (concat "Uploading: " input))
   :docstring "Upload file at local path or URL to ROOM.")
 
@@ -694,8 +694,8 @@ INPUT should be, e.g. \"/html <b>...\"."
 
 ;;;;; Support
 
-(defun matrix-client-ng--notice-string (s)
-  "Return string S propertized for insertion with `matrix-client-ng-insert'.
+(defun matrix-client--notice-string (s)
+  "Return string S propertized for insertion with `matrix-client-insert'.
 Adds timestamp text-property at current time and sets notice face."
   (propertize s
               'timestamp (time-to-seconds)
@@ -710,7 +710,7 @@ limit automatically."
               (t #'matrix--prev-property-change))))
     (funcall fn (point) 'event_id nil limit)))
 
-(defun matrix-client-ng--this-message ()
+(defun matrix-client--this-message ()
   "Return message point is on."
   (let* ((beg (previous-single-property-change (point) 'event_id))
          (end (next-single-property-change (point) 'event_id))
@@ -718,18 +718,18 @@ limit automatically."
          (message-beg (next-single-property-change beg 'face)))
     (buffer-substring message-beg end)))
 
-(defun matrix-client-ng--replace-string (plist string)
+(defun matrix-client--replace-string (plist string)
   "Replace text in buffer, which has text properties and values found in PLIST, with STRING.
 If such text is not found, return nil."
   (save-excursion
     (goto-char (point-max))
-    (-when-let* (((beg end) (matrix-client-ng--find-propertized-string plist)))
+    (-when-let* (((beg end) (matrix-client--find-propertized-string plist)))
       (goto-char beg)
       (delete-region beg end)
       (insert string)
       t)))
 
-(defun matrix-client-ng--find-propertized-string (plist)
+(defun matrix-client--find-propertized-string (plist)
   "Return list of beginning and ending positions in buffer that have text properties in PLIST."
   (save-excursion
     (goto-char (point-max))
@@ -821,16 +821,16 @@ doesn't change after POS, return nil."
                          (equal value-at-pos value)))
            return pos))
 
-(defun matrix-client-ng--propertize-buffer-string (find-plist set-plist)
+(defun matrix-client--propertize-buffer-string (find-plist set-plist)
   "Find string in buffer having text properties in FIND-PLIST, then add the properties in SET-PLIST.
 If string is not found or no properties change, return nil."
-  (-when-let* (((beg end) (matrix-client-ng--find-propertized-string find-plist))
+  (-when-let* (((beg end) (matrix-client--find-propertized-string find-plist))
                (inhibit-read-only t))
     (add-text-properties beg end set-plist)))
 
 ;;;; Events
 
-(defun matrix-client-ng--shr-mx-reply (dom)
+(defun matrix-client--shr-mx-reply (dom)
   "Insert formatted text for DOM rooted at mx-reply tag.
 The purpose of this function is to add the
 `matrix-client-quoted-message' face to only the quoted message
@@ -891,7 +891,7 @@ includes the \"In reply to\" link to the quoted message ID)."
                                                                (if (not shr-use-fonts)
                                                                    (length string)
                                                                  (frame-char-width))))
-                  ((symbol-function 'shr-fill-line) (symbol-function 'matrix-client-ng--shr-fill-line)))
+                  ((symbol-function 'shr-fill-line) (symbol-function 'matrix-client--shr-fill-line)))
           (shr-insert-document dom))
         (add-face-text-property pos (point) 'matrix-client-quoted-message)
         ;; Insert extra newline after blockquote.  (I think shr doesn't insert a blank line after
@@ -899,9 +899,9 @@ includes the \"In reply to\" link to the quoted message ID)."
         (insert "\n")))))
 
 ;; Copy the function's definition so we can use it later; an alias would not be correct.
-(fset 'matrix-client-ng--shr-fill-line (symbol-function 'shr-fill-line))
+(fset 'matrix-client--shr-fill-line (symbol-function 'shr-fill-line))
 
-(matrix-client-ng-defevent m.room.message
+(matrix-client-defevent m.room.message
   "Process m.room.message EVENT in ROOM."
   :object-slots ((room session)
                  (session user initial-sync-p))
@@ -923,14 +923,14 @@ includes the \"In reply to\" link to the quoted message ID)."
                            (pcase msgtype
                              ("m.emote"
                               (format$ "* $body"))
-                             ((guard (and matrix-client-ng-render-html (string= "org.matrix.custom.html" format)))
+                             ((guard (and matrix-client-render-html (string= "org.matrix.custom.html" format)))
                               (with-temp-buffer
                                 ;; Because some unknown Matrix clients insert newlines between HTML
                                 ;; tags, we must remove them to make the DOM easier to parse with
-                                ;; `-let*' in `matrix-client-ng--shr-mx-reply'.  This should be good
+                                ;; `-let*' in `matrix-client--shr-mx-reply'.  This should be good
                                 ;; enough.
                                 (insert (replace-regexp-in-string (rx ">" (1+ "\n") "<") "><" formatted_body))
-                                (let* ((shr-external-rendering-functions matrix-client-ng-shr-external-rendering-functions)
+                                (let* ((shr-external-rendering-functions matrix-client-shr-external-rendering-functions)
                                        (dom (libxml-parse-html-region (point-min) (point-max))))
                                   (erase-buffer)
                                   (cl-letf (((symbol-function 'shr-fill-line) (lambda (&rest ignore) nil)))
@@ -940,8 +940,8 @@ includes the \"In reply to\" link to the quoted message ID)."
                               (setq matrix-image-url (matrix-transform-mxc-uri session (or url thumbnail_url)))
                               (concat body
                                       ": "
-                                      (matrix-client-ng-linkify-urls matrix-image-url)))
-                             (_ (matrix-client-ng-linkify-urls body)))))
+                                      (matrix-client-linkify-urls matrix-image-url)))
+                             (_ (matrix-client-linkify-urls body)))))
             ;; Apply face for own messages
             (let (metadata-face message-face)
               (cond ((equal sender user)
@@ -959,8 +959,8 @@ includes the \"In reply to\" link to the quoted message ID)."
 
             ;; Delete existing event, and insert metadata with message and add text properties
             (when event_id
-              (matrix-client-ng--delete-event room (list 'event_id event_id)))
-            (matrix-client-ng-insert room (propertize (concat metadata message)
+              (matrix-client--delete-event room (list 'event_id event_id)))
+            (matrix-client-insert room (propertize (concat metadata message)
                                                       'timestamp timestamp
                                                       'displayname displayname
                                                       'sender sender
@@ -978,21 +978,21 @@ includes the \"In reply to\" link to the quoted message ID)."
 
             ;; Move last-seen line if it's our own message
             (when (equal sender user)
-              (matrix-client-ng-update-last-seen room))
+              (matrix-client-update-last-seen room))
 
             ;; Notification
             (unless (or initial-sync-p
                         (equal sender user))
               (matrix-client-notify "m.room.message" event :room room)))))
 
-(matrix-client-ng-defevent m.room.member
+(matrix-client-defevent m.room.member
   "Say that member in EVENT joined/left ROOM."
   :object-slots ((room session)
                  (session initial-sync-p))
   :event-keys (state_key sender)
   :content-keys (displayname membership)
   :let ((displayname (or displayname sender))
-        (timestamp (matrix-client-ng-event-timestamp event))
+        (timestamp (matrix-client-event-timestamp event))
         (action (pcase membership
                   ("join" "joined")
                   ("leave" "left")
@@ -1006,34 +1006,34 @@ includes the \"In reply to\" link to the quoted message ID)."
   :body (progn
           (unless initial-sync-p
             ;; FIXME: This does not seem to work; on initial connect, "user joined" messages still show up from when the user initially joined the room.
-            (matrix-client-ng-insert room msg)
+            (matrix-client-insert room msg)
             (with-room-buffer room
-              (rename-buffer (matrix-client-ng-display-name room) 'unique)))))
+              (rename-buffer (matrix-client-display-name room) 'unique)))))
 
-(matrix-client-ng-defevent m.typing
+(matrix-client-defevent m.typing
   "Handle m.typing events."
   :object-slots ((room typers))
   :content-keys (user_ids)
   :body (progn
           (setq typers user_ids)
-          (matrix-client-ng-update-header room)))
+          (matrix-client-update-header room)))
 
-(matrix-client-ng-defevent m.room.topic
+(matrix-client-defevent m.room.topic
   "Handle m.room.topic events."
   :object-slots ((room topic))
   :body (--when-let (a-get content 'topic)
           ;; We can't use :content-keys to get the topic, because it shadows the room slot.
           (setq topic it)
-          (matrix-client-ng-update-header room)))
+          (matrix-client-update-header room)))
 
-(matrix-client-ng-defevent m.room.avatar
+(matrix-client-defevent m.room.avatar
   "Handle room avatar events."
   :object-slots ((room avatar session)
                  (session initial-sync-p user))
   :content-keys (sender url)
   :let ((username (matrix-user-displayname room sender))
         (own-username (matrix-user-displayname room user))
-        (timestamp (matrix-client-ng-event-timestamp event))
+        (timestamp (matrix-client-event-timestamp event))
         (time-string (format-time-string "[%T]" (seconds-to-time timestamp)))
         (action (if url "changed" "removed"))
         (message (unless initial-sync-p
@@ -1055,12 +1055,12 @@ includes the \"In reply to\" link to the quoted message ID)."
             (setq avatar nil)
             ;; TODO: A function to automatically propertize a string with its related event data would be nice.
             (when message
-              (matrix-client-ng-insert room message))
-            (matrix-client-ng-update-header room))
+              (matrix-client-insert room message))
+            (matrix-client-update-header room))
 
           ;; Move last-seen line if it's our own message
           (when (equal own-username username)
-            (matrix-client-ng-update-last-seen room))))
+            (matrix-client-update-last-seen room))))
 
 (cl-defmethod matrix-client-room-avatar-callback (&key (room matrix-room) message data &allow-other-keys)
   "Set avatar for ROOM.
@@ -1074,13 +1074,13 @@ as an async callback when the image is downloaded."
                                (insert " ")
                                (buffer-string))))
       (setq avatar image-string)
-      (matrix-client-ng-update-header room)
+      (matrix-client-update-header room)
       (when message
-        (matrix-client-ng-insert room message)))))
+        (matrix-client-insert room message)))))
 
 ;;;; Update-room-at-once approach
 
-(cl-defmethod matrix-client-ng-update ((room matrix-room) &key old-messages)
+(cl-defmethod matrix-client-update ((room matrix-room) &key old-messages)
   "Update ROOM."
   (with-slots* (((extra state-new timeline-new ephemeral id) room))
     (let ((matrix-client-ordered-buffer-point-fn (if old-messages
@@ -1096,7 +1096,7 @@ as an async callback when the image is downloaded."
         (when old-messages
           (setq event-list (nreverse event-list)))
         (seq-doseq (event event-list)
-          (matrix-client-ng-timeline room event)))
+          (matrix-client-timeline room event)))
       ;; Clear new events
       (matrix-clear-state room)
       (matrix-clear-timeline room)
@@ -1108,9 +1108,9 @@ as an async callback when the image is downloaded."
             (matrix-unimplemented (format$ "Unimplemented client method: $fn-name")))))
       (setq ephemeral nil)                ; I think we can skip making a method for this.
       ;; TODO: Update other room things: header, avatar, typers, topic, name, aliases, etc.
-      (matrix-client-ng-room-banner room nil))))
+      (matrix-client-room-banner room nil))))
 
-(add-hook 'matrix-room-update-hook #'matrix-client-ng-update)
+(add-hook 'matrix-room-update-hook #'matrix-client-update)
 
 ;;;; Footer
 

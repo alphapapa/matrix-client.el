@@ -1,4 +1,4 @@
-;;; matrix-client-ng.el --- A matrix client ---  -*- lexical-binding: t; -*-
+;;; matrix-client.el --- A matrix client ---  -*- lexical-binding: t; -*-
 
 ;; Copyright (C) 2018 Adam Poter
 ;; Author: Adam Porter <adam@alphapapa.net>
@@ -11,12 +11,12 @@
 
 ;; This file is not part of GNU Emacs.
 
-;; matrix-client-ng.el is free software: you can redistribute it and/or
+;; matrix-client.el is free software: you can redistribute it and/or
 ;; modify it under the terms of the GNU General Public License as published by
 ;; the Free Software Foundation, either version 3 of the License, or (at your
 ;; option) any later version.
 ;;
-;; matrix-client-ng.el is distributed in the hope that it will be useful, but
+;; matrix-client.el is distributed in the hope that it will be useful, but
 ;; WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
 ;; FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
 ;; details.
@@ -79,34 +79,34 @@ EVENT should be the `event' variable from the
 
 ;;;; Variables
 
-(defvar matrix-client-ng-sessions nil
+(defvar matrix-client-sessions nil
   "List of active sessions.")
 
-(defvar matrix-client-ng-mark-modified-rooms t)
+(defvar matrix-client-mark-modified-rooms t)
 
-(defvar matrix-client-ng-input-prompt "▶ ")
+(defvar matrix-client-input-prompt "▶ ")
 
-(defvar matrix-client-ng-midnight-timer nil
+(defvar matrix-client-midnight-timer nil
   "Timer used to update date headers at midnight.")
 
-(defcustom matrix-client-ng-render-presence t
+(defcustom matrix-client-render-presence t
   "Show presence changes in the main buffer windows."
   :type 'boolean)
 
-(defcustom matrix-client-ng-render-membership t
+(defcustom matrix-client-render-membership t
   "Show membership changes in the main buffer windows."
   :type 'boolean)
 
-(defcustom matrix-client-ng-render-html (featurep 'shr)
+(defcustom matrix-client-render-html (featurep 'shr)
   "Render HTML messages in buffers. These are currently the
 ad-hoc 'org.matrix.custom.html' messages that Vector emits."
   :type 'boolean)
 
-(defcustom matrix-client-ng-save-token nil
+(defcustom matrix-client-save-token nil
   "Save username and access token upon successful login."
   :type 'boolean)
 
-(defcustom matrix-client-ng-save-token-file "~/.cache/matrix-client.el.token"
+(defcustom matrix-client-save-token-file "~/.cache/matrix-client.el.token"
   "Save username and access token to this file."
   :type 'file)
 
@@ -128,25 +128,25 @@ user can recover it from the kill ring instead of retyping it."
 
 ;;;; Mode
 
-(define-derived-mode matrix-client-ng-mode fundamental-mode "Matrix"
+(define-derived-mode matrix-client-mode fundamental-mode "Matrix"
   "Mode for Matrix room buffers."
-  :group 'matrix-client-ng
+  :group 'matrix-client
   ;; TODO: Add a new abbrev table that uses usernames, rooms, etc.
-  :keymap matrix-client-ng-mode-map)
+  :keymap matrix-client-mode-map)
 
 ;;;; Connect / disconnect
 
 ;;;###autoload
-(defun matrix-client-ng-connect (&optional user password access-token server)
+(defun matrix-client-connect (&optional user password access-token server)
   "Matrix Client NG"
   (interactive)
-  (if matrix-client-ng-sessions
+  (if matrix-client-sessions
       ;; TODO: Already have active session: display list of buffers
       ;; FIXME: If login fails, it still shows as active.
       (message "Already active")
     ;; No existing session
-    (if-let ((enabled matrix-client-ng-save-token)
-             (saved (matrix-client-ng-load-token)))
+    (if-let ((enabled matrix-client-save-token)
+             (saved (matrix-client-load-token)))
         ;; Use saved token
         ;; FIXME: Change "username" to "user" when we no longer need compatibility with old code
         (setq user (a-get saved 'username)
@@ -163,36 +163,36 @@ user can recover it from the kill ring instead of retyping it."
                               it)))))
     (if access-token
         ;; Use saved token and call post-login hook
-        (matrix-client-ng-login-hook (matrix-session :user user
-                                                     :server server
-                                                     :access-token access-token
-                                                     :txn-id txn-id
-                                                     :initial-sync-p t))
+        (matrix-client-login-hook (matrix-session :user user
+                                                  :server server
+                                                  :access-token access-token
+                                                  :txn-id txn-id
+                                                  :initial-sync-p t))
       ;; Log in with username and password
       (matrix-login (matrix-session :user user
                                     :server server
                                     :initial-sync-p t)
                     password))))
 
-(cl-defmethod matrix-client-ng-login-hook ((session matrix-session))
+(cl-defmethod matrix-client-login-hook ((session matrix-session))
   "Callback for successful login.
 Add session to sessions list and run initial sync."
-  (push session matrix-client-ng-sessions)
+  (push session matrix-client-sessions)
   (matrix-sync session)
-  (when matrix-client-ng-save-token
-    (matrix-client-ng-save-token session))
+  (when matrix-client-save-token
+    (matrix-client-save-token session))
   ;; NOTE: What happens if the system is asleep at midnight?
-  (setq matrix-client-ng-midnight-timer (run-at-time "00:00" 86400 #'matrix-client-ng-update-all-date-headers))
+  (setq matrix-client-midnight-timer (run-at-time "00:00" 86400 #'matrix-client-update-all-date-headers))
   (message "Jacked in to %s.  Syncing..." (oref session server)))
 
-(add-hook 'matrix-login-hook #'matrix-client-ng-login-hook)
+(add-hook 'matrix-login-hook #'matrix-client-login-hook)
 
-(cl-defmethod matrix-client-ng-save-token ((session matrix-session))
+(cl-defmethod matrix-client-save-token ((session matrix-session))
   "Save username and access token for session SESSION to file."
   ;; FIXME: This does not work with multiple sessions.
   ;; MAYBE: Could we use `savehist-additional-variables' instead of our own code for this?
   ;; TODO: Check if file exists; if so, ensure it has a proper header so we know it's ours.
-  (with-temp-file matrix-client-ng-save-token-file
+  (with-temp-file matrix-client-save-token-file
     (with-slots (user server access-token txn-id) session
       ;; FIXME: Change "username" to "user" when we no longer need compatibility with old code
       ;; FIXME: Change token to access-token for clarity.
@@ -202,24 +202,24 @@ Add session to sessions list and run initial sync."
                      'txn-id txn-id)
              (current-buffer))))
   ;; Ensure permissions are safe
-  (chmod matrix-client-ng-save-token-file #o600))
+  (chmod matrix-client-save-token-file #o600))
 
-(defun matrix-client-ng-load-token ()
+(defun matrix-client-load-token ()
   "Return saved username and access token from file."
-  (when (f-exists? matrix-client-ng-save-token-file)
-    (read (f-read matrix-client-ng-save-token-file))))
+  (when (f-exists? matrix-client-save-token-file)
+    (read (f-read matrix-client-save-token-file))))
 
-(defun matrix-client-ng-disconnect (&optional logout)
+(defun matrix-client-disconnect (&optional logout)
   "Unplug from the Matrix.
 If LOGOUT is non-nil, actually log out, canceling access
 tokens (username and password will be required again)."
   (interactive "P")
-  (cond (logout (seq-do #'matrix-logout matrix-client-ng-sessions)
+  (cond (logout (seq-do #'matrix-logout matrix-client-sessions)
                 ;; Remove saved token
-                (f-delete matrix-client-ng-save-token-file))
+                (f-delete matrix-client-save-token-file))
         ;; FIXME: This does not work for multiple sessions.
-        (t (matrix-client-ng-save-token (car matrix-client-ng-sessions))))
-  (--each matrix-client-ng-sessions
+        (t (matrix-client-save-token (car matrix-client-sessions))))
+  (--each matrix-client-sessions
     ;; Kill pending sync response buffer processes
     (with-slots (pending-syncs disconnect) it
       (setq disconnect t)
@@ -232,23 +232,23 @@ tokens (username and password will be required again)."
         (kill-buffer (oref* it extra buffer))))
     ;; Try to GC the session object.  Hopefully no timers or processes or buffers still hold a ref...
     (setf it nil))
-  (cancel-timer matrix-client-ng-midnight-timer)
-  (setq matrix-client-ng-midnight-timer nil)
-  (setq matrix-client-ng-sessions nil))
+  (cancel-timer matrix-client-midnight-timer)
+  (setq matrix-client-midnight-timer nil)
+  (setq matrix-client-sessions nil))
 
 ;;;; Rooms
 
-(defun matrix-client-ng-update-all-date-headers ()
+(defun matrix-client-update-all-date-headers ()
   "Update date headers in all rooms.
 Intended to be called from a timer that runs at midnight."
-  (dolist (session matrix-client-ng-sessions)
+  (dolist (session matrix-client-sessions)
     (dolist (room (oref session rooms))
       (with-room-buffer room
         (matrix-client--update-date-headers)))))
 
 ;;;;; Timeline
 
-(cl-defmethod matrix-client-ng-timeline ((room matrix-room) event)
+(cl-defmethod matrix-client-timeline ((room matrix-room) event)
   "Process EVENT in ROOM."
   (pcase-let* (((map type) event))
     (apply-if-fn (concat "matrix-client-event-" type)
@@ -257,7 +257,7 @@ Intended to be called from a timer that runs at midnight."
 
 ;;;; Helper functions
 
-(defun matrix-client-ng-event-timestamp (data)
+(defun matrix-client-event-timestamp (data)
   "Return timestamp of event DATA."
   (let ((server-ts (float (a-get* data 'origin_server_ts)))
         (event-age (float (or (a-get* data 'unsigned 'age)
@@ -269,7 +269,7 @@ Intended to be called from a timer that runs at midnight."
     ;; seconds, but we keep millisecond resolution by using floats.
     (/ (- server-ts event-age) 1000)))
 
-(defun matrix-client-ng-linkify-urls (text)
+(defun matrix-client-linkify-urls (text)
   "Return TEXT with URLs in it made clickable."
   (with-temp-buffer
     (insert text)
@@ -283,7 +283,7 @@ Intended to be called from a timer that runs at midnight."
                                   'follow-link t))
     (buffer-string)))
 
-(defun matrix-client-ng-buffer-visible-p (&optional buffer)
+(defun matrix-client-buffer-visible-p (&optional buffer)
   "Return non-nil if BUFFER is currently visible.
 If BUFFER is nil, use the current buffer."
   (let ((buffer (or buffer (current-buffer))))
@@ -325,6 +325,6 @@ optional."
 
 ;;;; Footer
 
-(provide 'matrix-client-ng)
+(provide 'matrix-client)
 
-;;; matrix-client-ng.el ends here
+;;; matrix-client.el ends here

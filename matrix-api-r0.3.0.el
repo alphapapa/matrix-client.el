@@ -627,7 +627,7 @@ requests, and we make a new request."
             ;; FIXME: This violates separation of API and client code.  There should be an
             ;; after-initial-sync hook on the client side for this.
             (dolist (room rooms)
-              (matrix-client-ng-rename-buffer room)))
+              (matrix-client-rename-buffer room)))
           (setq initial-sync-p nil
                 next-batch (a-get data 'next_batch)
                 sync-retry-delay 0)
@@ -818,7 +818,7 @@ maximum number of events to return (default 10)."
   :slots (id timeline timeline-new timeline-event-ids prev-batch last-full-sync)
   :body (pcase-let* (((map start end chunk) data)
                      ;; Disable notifications while loading old messages.
-                     (matrix-client-ng-notifications nil)
+                     (matrix-client-notifications nil)
                      (new-events-p))
 
           (matrix-log (a-list 'type 'matrix-messages-callback

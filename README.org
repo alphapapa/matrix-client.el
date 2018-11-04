@@ -8,7 +8,7 @@ it further, fixing bugs, and providing long-term goals for the project.
 * Installation
 
 ~matrix-client~ can only be installed manually. Simply put this directory onto
-your load path, and ~(require 'matrix-client-ng)~. Once the project achieves a
+your load path, and ~(require 'matrix-client)~. Once the project achieves a
 sufficiently high quality or demand, it may be submitted to melpa.
 
 When installing manually, you will need to ensure all dependencies are also
@@ -17,7 +17,7 @@ installed properly.
 ** Quelpa
 
 #+BEGIN_SRC emacs-lisp
-  (quelpa '(matrix-client-ng
+  (quelpa '(matrix-client
             :fetcher github
             :repo "jgkamat/matrix-client-el"))
 #+END_SRC
