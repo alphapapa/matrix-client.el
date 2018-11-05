@@ -72,10 +72,10 @@ EVENT should be the `event' variable from the
                                          :app-icon nil
                                          :actions '("default" "Show")
                                          :on-action #'matrix-client-notification-show)))
-    (map-put matrix-client-notifications id (a-list 'buffer buffer
-                                                    'event_id event_id))
+    (map-put matrix-client-notifications-ring id (a-list 'buffer buffer
+                                                         'event_id event_id))
     ;; Trim the list
-    (setq matrix-client-notifications (-take 20 matrix-client-notifications))))
+    (setq matrix-client-notifications-ring (-take 20 matrix-client-notifications-ring))))
 
 ;;;; Variables
 

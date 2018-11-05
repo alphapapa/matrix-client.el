@@ -34,7 +34,7 @@
   "List of functions called for events.
 Each is called with the event-type and the event data.")
 
-(defvar matrix-client-notifications nil
+(defvar matrix-client-notifications-ring nil
   "Alist of recent notifications mapping notification ID to related buffer.
 Automatically trimmed to last 20 notifications.")
 
@@ -84,7 +84,7 @@ DATA should be the `data' variable from the
   "Show the buffer for a notification.
 This function is called by `notifications-notify' when the user
 activates a notification."
-  (pcase-let* (((map (id notification)) matrix-client-notifications)
+  (pcase-let* (((map (id notification)) matrix-client-notifications-ring)
                ((map buffer event_id) notification)
                (window (get-buffer-window buffer)))
     (raise-frame)
