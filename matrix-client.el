@@ -187,6 +187,17 @@ Add session to sessions list and run initial sync."
 
 (add-hook 'matrix-login-hook #'matrix-client-login-hook)
 
+(cl-defmethod matrix-client-rename-room-buffers ((session matrix-session))
+  "Rename all room buffers in SESSION.
+Should be called after initial sync."
+  ;; After initial sync timelines are processed, we run the room metadata hook to set the
+  ;; room buffer names (which we do not do during processing of timelines during initial
+  ;; sync, because doing so for every user "join" event is very slow.
+  (dolist (room (oref session rooms))
+    (matrix-client-rename-buffer room)))
+
+(add-hook 'matrix-after-initial-sync-hook #'matrix-client-rename-room-buffers)
+
 (cl-defmethod matrix-client-save-token ((session matrix-session))
   "Save username and access token for session SESSION to file."
   ;; FIXME: This does not work with multiple sessions.

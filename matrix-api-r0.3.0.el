@@ -49,6 +49,11 @@ tokens.  Logs should be sanitized before sharing.")
 (defvar matrix-warn-unimplemented nil
   "Give warnings for unimplemented event handlers.")
 
+(defvar matrix-after-initial-sync-hook nil
+  "Hooks run with session as argument after initial sync.
+Called after the sync response is parsed into the session
+objects, before returning from the sync callback.")
+
 ;;;; Macros
 
 (defmacro matrix-defclass (name superclasses slots &rest options-and-doc)
@@ -607,11 +612,10 @@ requests, and we make a new request."
 (matrix-defcallback sync matrix-session
   "Callback function for successful sync request."
   ;; https://matrix.org/docs/spec/client_server/r0.3.0.html#id167
-  :slots (rooms next-batch initial-sync-p sync-retry-delay pending-syncs)
+  :slots (next-batch initial-sync-p sync-retry-delay pending-syncs)
   :body (progn
           (matrix-log (a-list 'type 'matrix-sync-callback
                               'headers headers
-
                               'data data))
           (cl-loop for param in '(rooms presence account_data to_device device_lists)
                    ;; Assume that methods called will signal errors if anything goes wrong, so
@@ -620,14 +624,7 @@ requests, and we make a new request."
                           (list session (a-get data param))
                         (matrix-unimplemented (format$ "Unimplemented API method: $fn-name"))))
           (when initial-sync-p
-            ;; After initial sync timelines are processed, we run the room metadata hook to set the
-            ;; room buffer names (which we do not do during processing of timelines during initial
-            ;; sync, because doing so for every user "join" event is very slow.
-
-            ;; FIXME: This violates separation of API and client code.  There should be an
-            ;; after-initial-sync hook on the client side for this.
-            (dolist (room rooms)
-              (matrix-client-rename-buffer room)))
+            (run-hook-with-args 'matrix-after-initial-sync-hook session))
           (setq initial-sync-p nil
                 next-batch (a-get data 'next_batch)
                 sync-retry-delay 0)
