@@ -586,12 +586,12 @@ requests, and we make a new request."
                         'next-batch next-batch
                         'timeout timeout))
     (cl-case disconnect
-      ;; FIXME: This seems a bit inelegant, but it may be the best way to stop syncs from continuing
-      ;; after the user has decided to disconnect.
+      ;; This seems a bit inelegant, but it may be the best way to stop syncs from continuing after
+      ;; the user has decided to disconnect.
       ('t (matrix-log (a-list 'event 'matrix-sync
                               'disconnect disconnect)))
       ('nil (unless access-token
-              ;; FIXME: This should never happen.  If it does, maybe we should handle it differently.
+              ;; This should never happen.
               (error "Missing access token for session"))
             (when-let ((response-buffer (matrix-get session 'sync
                                           :data (a-list 'since next-batch
