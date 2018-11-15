@@ -248,7 +248,7 @@ If HTML is non-nil, treat input as HTML."
         (push input kill-ring))
       (apply-if-fn (concat "matrix-client-room-command-" first-word)
           ;; Special command: apply command argument (i.e. without "/command ")
-          (list room (s-chop-prefix (concat "/" first-word " ") input))
+          (list room (s-trim (s-chop-prefix (concat "/" first-word) input)))
         (progn
           ;; Normal message
           (matrix-client-event-m.room.message
