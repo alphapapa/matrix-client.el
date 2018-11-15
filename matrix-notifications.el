@@ -1,4 +1,4 @@
-;;; matrix-notifications.el --- Notifications support for matrix-client  -*- lexical-binding: t; -*-
+;;; matrix-notifications.el --- Notifications support  -*- lexical-binding: t; -*-
 
 ;;; Commentary:
 
@@ -23,12 +23,29 @@
 
 (require 'notifications)
 
-;;;; Variables
+;;;; Customization
+
+(defgroup matrix-client-notifications nil
+  "Notifications settings."
+  :group 'matrix-client)
 
 (defcustom matrix-client-notifications t
   "Enable notifications."
   ;; This variable may be let-bound to nil to disable notifications, e.g. when loading old messages.
   :type 'boolean)
+
+(defcustom matrix-client-room-notification-rules nil
+  "Per-room notification rules.
+An alist mapping room IDs to nil (meaning to never notify),
+t (meaning to always notify), or a predicate function which takes
+two arguments, the room object and the event, and returns non-nil
+when a notification should fire."
+  :type '(alist :key-type (string :tag "Room ID")
+                :value-type (choice (const :tag "Never" nil)
+                                    (const :tag "Always" t)
+                                    (function :tag "Predicate function"))))
+
+;;;; Variables
 
 (defvar matrix-client-notify-hook nil
   "List of functions called for events.
@@ -38,12 +55,48 @@ Each is called with the event-type and the event data.")
   "Alist of recent notifications mapping notification ID to related buffer.
 Automatically trimmed to last 20 notifications.")
 
+(defvar matrix-client-notification-rules
+  (a-list "always" t
+          "never" nil
+          "mention" #'matrix-client-event-mentions-user-p)
+  "Alist mapping friendly string names to notification rules.")
+
+;;;; Commands
+
+(matrix-client-def-room-command notify
+  :docstring "Set room notification setting.
+Without argument, displays help and current setting."
+  :insert (pcase input
+            ("" (pcase-let* (((eieio client-data id) room)
+                             ((eieio notification-rules) client-data)
+                             (current-rule notification-rules)
+                             (current-rule-name (car (cl-rassoc current-rule matrix-client-notification-rules :test #'equal)))
+                             (available-rules (s-join ", " (-map #'car matrix-client-notification-rules))))
+                  (format "Current notification rule: %s.  Available rules: %s." current-rule-name available-rules)))
+            (_ (let* ((rule (map-elt matrix-client-notification-rules input nil #'equal))
+                      (rule-name (car (cl-rassoc rule matrix-client-notification-rules :test #'equal))))
+                 ;; NOTE: If the user enters an invalid rule, it will default to "never".
+                 (matrix-client-set-notification-rule room rule)
+                 (format "Notification rule set: %s." rule-name)))))
+
 ;;;; Functions
+
+(cl-defmethod matrix-client-set-notification-rule ((room matrix-room) rule)
+  "Set notification RULE for ROOM.
+See `matrix-client-notification-rules' for rules."
+  (with-slots* (((client-data id) room)
+                ((notification-rules) client-data))
+    (setq notification-rules rule)
+    (map-put matrix-client-room-notification-rules id rule)
+    ;; MAYBE: Persist the variable at a different time (or even use a different system for
+    ;; persistence), because calling `customize-save-variable' is a bit slow.
+    (customize-save-variable 'matrix-client-room-notification-rules matrix-client-room-notification-rules)))
 
 (defun matrix-client-notify (event-type data &rest rest)
   "Run notify hooks and built-in notificataion for an event of EVENT-TYPE with DATA.
 Optional REST of args are also applied to hooks and function."
-  ;; FIXME: Pass session so we can get its initial-sync-p
+  ;; FIXME: Pass session so we can get its initial-sync-p.  Probably should be a method specialized
+  ;; on session.
   (when matrix-client-notifications
     (unless (oref (car matrix-client-sessions) initial-sync-p)
       (run-hook-with-args 'matrix-client-notify-hook event-type data rest)
@@ -58,27 +111,30 @@ Optional REST of args are also applied to hooks and function."
 
 (cl-defun matrix-client-notify-m.room.message (event &key room &allow-other-keys)
   "Show notification for m.room.message events.
-DATA should be the `data' variable from the
+EVENT should be the `event' variable from the
 `defmatrix-client-handler'.  ROOM should be the room object."
-  (pcase-let* (((map content sender event_id) event)
-               ((map body) content)
-               (display-name (matrix-user-displayname room sender))
-               (buffer (oref* room client-data buffer))
-               (id (notifications-notify :title (format "<b>%s</b>" display-name)
-                                         ;; Encode the message as ASCII because dbus-notify
-                                         ;; can't handle some Unicode chars.  And
-                                         ;; `ignore-errors' doesn't work to ignore errors
-                                         ;; from it.  Don't ask me why.
-                                         :body (encode-coding-string body 'us-ascii)
-                                         :category "im.received"
-                                         :timeout 5000
-                                         :app-icon nil
-                                         :actions '("default" "Show")
-                                         :on-action #'matrix-client-notification-show)))
-    (map-put matrix-client-notifications id (a-list 'buffer buffer
-                                                    'event_id event_id))
-    ;; Trim the list
-    (setq matrix-client-notifications (-take 20 matrix-client-notifications))))
+  ;; NOTE: Adding notification rule suport
+  (when (matrix-client-notify-p room event)
+    (pcase-let* (((map content sender event_id) event)
+                 ((map body) content)
+                 ((eieio client-data) room)
+                 ((eieio buffer) client-data)
+                 (display-name (matrix-user-displayname room sender))
+                 (id (notifications-notify :title (format$ "<b>$display-name</b>")
+                                           ;; Encode the message as ASCII because dbus-notify
+                                           ;; can't handle some Unicode chars.  And
+                                           ;; `ignore-errors' doesn't work to ignore errors
+                                           ;; from it.  Don't ask me why.
+                                           :body (encode-coding-string body 'us-ascii)
+                                           :category "im.received"
+                                           :timeout 5000
+                                           :app-icon nil
+                                           :actions '("default" "Show")
+                                           :on-action #'matrix-client-notification-show)))
+      (map-put matrix-client-notifications-ring id (a-list 'buffer buffer
+                                                           'event_id event_id))
+      ;; Trim the list
+      (setq matrix-client-notifications-ring (-take 20 matrix-client-notifications-ring)))))
 
 (defun matrix-client-notification-show (id key)
   "Show the buffer for a notification.
@@ -99,6 +155,29 @@ activates a notification."
                          (goto-char pos)))
         ;; Not found: go to last line
         (goto-char (point-max)))))
+
+;;;;; Predicates
+
+(cl-defmethod matrix-client-notify-p ((room matrix-room) event)
+  "Return non-nil if notification should be displayed for EVENT in ROOM."
+  ;; FIXME: Initialize to a user-defined default.
+  (pcase (oref* room client-data notification-rules)
+    ((and fn (pred functionp)) (funcall fn room event))
+    ('nil nil)
+    ('t t)))
+
+(cl-defmethod matrix-client-event-mentions-user-p ((room matrix-room) event)
+  "Return non-nil if EVENT mentions logged-in user in ROOM.
+Uses user's displayname in ROOM."
+  (pcase-let* (((map content) event)
+               ((map body) content)
+               ((eieio session) room)
+               ((eieio user) session)
+               (displayname (matrix-user-displayname room user))
+               (regexp (rx-to-string `(seq (or ,user ,displayname)))))
+    (string-match-p regexp body)))
+
+;; MAYBE: Define these rules with a macro.
 
 ;;;; Footer
 
