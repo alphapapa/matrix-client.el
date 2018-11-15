@@ -1,3 +1,4 @@
+(require 'dnd)
 (require 'shr)
 
 (require 'ordered-buffer)
@@ -593,6 +594,20 @@ Also update prompt with typers."
     ;; FIXME: Remove these or update them.
     ;; (set (make-local-variable 'matrix-client-room-connection) con)
     (setq-local matrix-client-room room)
+    ;; Drag-and-drop support
+    (setq-local dnd-protocol-alist
+                ;; Support dropping URLs, e.g. from Dolphin or Firefox.  Copied from `dnd-protocol-alist'.
+
+                ;; NOTE: Chrome/Chromium does not properly handle the XDndActionPrivate action, so
+                ;; drag-and-drops from Chrome/Chromium fail.  Google has failed to fix this bug in
+                ;; nearly 4 years since it was reported, and automatically closed the bug report a
+                ;; year ago because it was "old, likely obsolete."  See
+                ;; <https://bugs.chromium.org/p/chromium/issues/detail?id=461390>,
+                ;; <https://debbugs.gnu.org/cgi/bugreport.cgi?bug=19885>.
+                '(("^file:///" . matrix-client--dnd-open-local-file)
+                  ("^file://" . matrix-client--dnd-open-file)
+                  ("^file:" . matrix-client--dnd-open-local-file)
+                  ("^\\(https?\\|ftp\\|file\\|nfs\\)://" . matrix-client--dnd-open-file)))
     (when matrix-client-use-tracking
       (tracking-mode 1)))
   (matrix-client-insert-prompt room)
@@ -691,6 +706,25 @@ INPUT should be, e.g. \"/html <b>...\"."
   :docstring "Upload file at local path or URL to ROOM.")
 
 ;;;; Functions
+
+;;;;; Drag-and-drop
+
+(defun matrix-client--dnd-open-local-file (uri _action)
+  "Handle drag-and-drop event by offering to upload file at URI to current room."
+  (if-let* ((path (dnd-get-local-file-name uri t))
+            (readable (file-readable-p path)))
+      (when (matrix-client-upload matrix-client-room path)
+        ;; Return `private' to the sending app (this appears to be redundant, because, as
+        ;; implemented, Emacs only returns the private event type).
+        'private)
+    (error "Can't read file: %s" uri)))
+
+(defun matrix-client--dnd-open-file (uri _action)
+  "Handle drag-and-drop event by offering to upload file at URI to current room."
+  (when (matrix-client-upload matrix-client-room uri)
+    ;; Return `private' to the sending app (this appears to be redundant, because, as
+    ;; implemented, Emacs only returns the private event type).
+    'private))
 
 ;;;;; Support
 
