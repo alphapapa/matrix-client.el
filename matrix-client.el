@@ -50,33 +50,6 @@
 (require 'matrix-notifications)
 (require 'matrix-client-images)
 
-;;;; TEMP
-
-(cl-defun matrix-client-notify-m.room.message (event &key room &allow-other-keys)
-  "Show notification for m.room.message events.
-EVENT should be the `event' variable from the
-`defmatrix-client-handler'.  ROOM should be the room object."
-  (pcase-let* (((map content sender event_id) event)
-               ((map body) content)
-               ((eieio client-data) room)
-               ((eieio buffer) client-data)
-               (display-name (matrix-user-displayname room sender))
-               (id (notifications-notify :title (format$ "<b>$display-name</b>")
-                                         ;; Encode the message as ASCII because dbus-notify
-                                         ;; can't handle some Unicode chars.  And
-                                         ;; `ignore-errors' doesn't work to ignore errors
-                                         ;; from it.  Don't ask me why.
-                                         :body (encode-coding-string body 'us-ascii)
-                                         :category "im.received"
-                                         :timeout 5000
-                                         :app-icon nil
-                                         :actions '("default" "Show")
-                                         :on-action #'matrix-client-notification-show)))
-    (map-put matrix-client-notifications-ring id (a-list 'buffer buffer
-                                                         'event_id event_id))
-    ;; Trim the list
-    (setq matrix-client-notifications-ring (-take 20 matrix-client-notifications-ring))))
-
 ;;;; Variables
 
 (defvar matrix-client-sessions nil

@@ -594,6 +594,10 @@ Also update prompt with typers."
     ;; FIXME: Remove these or update them.
     ;; (set (make-local-variable 'matrix-client-room-connection) con)
     (setq-local matrix-client-room room)
+    ;; Load notification settings for room
+    (with-slots (id client-data) room
+      (when-let* ((rules (a-get matrix-client-room-notification-rules id)))
+        (oset client-data notification-rules rules)))
     ;; Drag-and-drop support
     (setq-local dnd-protocol-alist
                 ;; Support dropping URLs, e.g. from Dolphin or Firefox.  Copied from `dnd-protocol-alist'.
