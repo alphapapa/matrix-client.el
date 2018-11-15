@@ -58,8 +58,8 @@ EVENT should be the `event' variable from the
 `defmatrix-client-handler'.  ROOM should be the room object."
   (pcase-let* (((map content sender event_id) event)
                ((map body) content)
-               ((eieio extra) room)
-               ((eieio buffer) extra)
+               ((eieio client-data) room)
+               ((eieio buffer) client-data)
                (display-name (matrix-user-displayname room sender))
                (id (notifications-notify :title (format$ "<b>$display-name</b>")
                                          ;; Encode the message as ASCII because dbus-notify
@@ -122,9 +122,11 @@ user can recover it from the kill ring instead of retyping it."
 
 ;;;; Classes
 
-(matrix-defclass matrix-room-extra ()
-  ((buffer :initarg :buffer))
-  "Extra data stored in room objects.")
+(matrix-defclass matrix-room-client-data ()
+  ((buffer :initarg :buffer)
+   (notification-rules :initarg :notification-rules
+                       :documentation "List of functions to test events against; if one returns non-nil, a notification should be displayed."))
+  "Client data data stored in room objects.")
 
 ;;;; Mode
 
@@ -240,7 +242,7 @@ tokens (username and password will be required again)."
     ;; Kill buffers
     (with-slots (rooms) it
       (--each rooms
-        (kill-buffer (oref* it extra buffer))))
+        (kill-buffer (oref* it client-data buffer))))
     ;; Try to GC the session object.  Hopefully no timers or processes or buffers still hold a ref...
     (setf it nil))
   (cancel-timer matrix-client-midnight-timer)

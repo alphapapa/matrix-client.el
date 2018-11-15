@@ -204,8 +204,8 @@ The sync error handler should increase this for consecutive errors, up to a maxi
                   :type list
                   :initform nil
                   :documentation "List of response buffers for pending /sync requests.  This should generally be a list of zero or one buffers.  This is used to cancel pending /sync requests when the user disconnects.")
-   (extra :initarg :extra
-          :documentation "Reserved for users of the library, who may store whatever they want here."))
+   (client-data :initarg :client-data
+                :documentation "Reserved for users of the library, who may store whatever they want here."))
   :allow-nil-initform t)
 
 ;;;;; Room
@@ -244,10 +244,9 @@ The sync error handler should increase this for consecutive errors, up to a maxi
    (end-token :initarg :end-token
               :initform nil
               :documentation "The most recent event-id in a room, used to push read-receipts to the server.")
-   (extra :initarg :extra
-          ;; FIXME: Need clean way to do this.
-          :initform (matrix-room-extra)
-          :documentation "Reserved for users of the library, who may store whatever they want here."))
+   (client-data :initarg :client-data
+                :initform (matrix-room-client-data)
+                :documentation "Reserved for users of the library, who may store whatever they want here."))
   :allow-nil-initform t)
 
 (cl-defmethod matrix-user-displayname ((room matrix-room) user-id)

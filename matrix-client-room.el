@@ -102,8 +102,8 @@ method without it."
 
 (defmacro with-room-buffer (room &rest body)
   (declare (debug (sexp body)) (indent defun))
-  `(with-slots* (((extra id) room)
-                 ((buffer) extra))
+  `(with-slots* (((client-data id) room)
+                 ((buffer) client-data))
      (unless buffer
        ;; Make buffer if necessary.  This seems like the easiest way
        ;; to guarantee that the room has a buffer, since it seems
@@ -524,12 +524,12 @@ a different name is returned."
                                                                    unless (or (string-empty-p this-choice)
                                                                               (--when-let (get-buffer this-choice)
                                                                                 ;; Allow reusing current name of current buffer
-                                                                                (not (equal it (oref* room extra buffer)))))
+                                                                                (not (equal it (oref* room client-data buffer)))))
                                                                    return this-choice)
                                                         (unless (or (string-empty-p it)
                                                                     (--when-let (get-buffer it)
                                                                       ;; Allow reusing current name of current buffer
-                                                                      (not (equal it (oref* room extra buffer)))))
+                                                                      (not (equal it (oref* room client-data buffer)))))
                                                           it)))))))
     (pcase-let* (((eieio id name aliases members session) room)
                  ((eieio (user self)) session))
@@ -1116,7 +1116,7 @@ as an async callback when the image is downloaded."
 
 (cl-defmethod matrix-client-update ((room matrix-room) &key old-messages)
   "Update ROOM."
-  (with-slots* (((extra state-new timeline-new ephemeral id) room))
+  (with-slots* (((client-data state-new timeline-new ephemeral id) room))
     (let ((matrix-client-ordered-buffer-point-fn (if old-messages
                                                      (lambda (timestamp)
                                                        (ordered-buffer-point-fn

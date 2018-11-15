@@ -63,7 +63,7 @@ DATA should be the `data' variable from the
   (pcase-let* (((map content sender event_id) event)
                ((map body) content)
                (display-name (matrix-user-displayname room sender))
-               (buffer (oref* room extra buffer))
+               (buffer (oref* room client-data buffer))
                (id (notifications-notify :title (format "<b>%s</b>" display-name)
                                          ;; Encode the message as ASCII because dbus-notify
                                          ;; can't handle some Unicode chars.  And

@@ -49,8 +49,8 @@ RESCALE-ARGS are passed to `matrix-client-rescale-image'."
                        (mm-disable-multibyte)
                        ;; Point is where the body starts, after the headers
                        (buffer-substring (point) (point-max))))
-               ((eieio extra) room)
-               ((eieio buffer) extra))
+               ((eieio client-data) room)
+               ((eieio buffer) client-data))
     (with-current-buffer buffer
       ;; Rescale image in room buffer to get proper size
       (apply #'matrix-client-rescale-image data rescale-args))))
@@ -86,7 +86,7 @@ determined by the size of the buffer's window."
 Image is passed from parser as DATA, which should be an image
 object made with `create-image'.  This function should be called
 as an async callback when the image is downloaded."
-  (with-current-buffer (oref* room extra buffer)
+  (with-current-buffer (oref* room client-data buffer)
     (save-excursion
       ;; Starting with last message, search backward to find message
       (cl-loop initially do (goto-char (point-max))
