@@ -972,9 +972,13 @@ includes the \"In reply to\" link to the quoted message ID)."
                                 (buffer-string)))
                              ("m.image"
                               (setq matrix-image-url (matrix-transform-mxc-uri session (or url thumbnail_url)))
-                              (concat body
-                                      ": "
-                                      (matrix-client-linkify-urls matrix-image-url)))
+                              ;; TODO: Make a function that calls `make-text-button'.
+                              (make-text-button body nil
+                                                'mouse-face 'highlight
+                                                'face 'link
+                                                'help-echo matrix-image-url
+                                                'action #'browse-url-at-mouse
+                                                'follow-link t))
                              (_ (matrix-client-linkify-urls body)))))
             ;; Apply face for own messages
             (let (metadata-face message-face)

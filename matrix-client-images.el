@@ -86,16 +86,17 @@ determined by the size of the buffer's window."
 Image is passed from parser as DATA, which should be an image
 object made with `create-image'.  This function should be called
 as an async callback when the image is downloaded."
-  (with-current-buffer (oref* room client-data buffer)
+  (with-room-buffer room
     (save-excursion
       ;; Starting with last message, search backward to find message
-      (cl-loop initially do (goto-char (point-max))
+      (cl-loop initially do (goto-char (1- (matrix-client--prompt-position)))
                for event_id = (get-text-property (point) 'event_id)
                until (equal event_id message-id)
                do (goto-char (previous-single-property-change (point) 'event_id)))
       ;; Find beginning and end of message text
       (let* ((beg (point))
-             (end (next-single-property-change beg 'event_id))
+             (end (or (next-single-property-change beg 'event_id)
+                      (matrix-client--prompt-position)))
              (inhibit-read-only t)
              (props (text-properties-at beg))
              (string (with-temp-buffer
@@ -109,8 +110,11 @@ as an async callback when the image is downloaded."
                        (apply #'propertize (buffer-string) props))))
         ;; Find URL and insert image after it
         (goto-char beg)
-        (re-search-forward (regexp-quote url) end)
-        (goto-char (match-end 0))
+        (cond ((re-search-forward (regexp-quote url) end 'noerror)
+               ;; Found plain URL string in buffer
+               (goto-char (match-end 0)))
+              ;; No plain URL found; might be a text-button.  Just insert at end of message.
+              ((goto-char end)))
         (insert string)
         (forward-char)))))
 
