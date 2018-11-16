@@ -411,17 +411,24 @@ Update [pending] overlay."
              :comparator #'<=))
   "Used to override point function when fetching old messages.")
 
-(cl-defmethod matrix-client-insert ((room matrix-room) string &key update)
+(cl-defmethod matrix-client-insert ((room matrix-room) string &key update timestamp-prefix)
   "Insert STRING into ROOM's buffer.
-STRING should have a `timestamp' text-property.
+STRING should have a `timestamp' text-property, or the current
+timestamp will be added.
 
 UPDATE may be a plist, in which case the buffer will be searched
 for an existing item having text properties matching the keys and
 values in UPDATE; if found, it will be replaced with STRING,
 otherwise a new item will be inserted.
 
+If TIMESTAMP-PREFIX is non-nil, STRING will be prefixed with the
+formatted timestamp.
+
 If `matrix-client-insert-prefix-fn' is non-nil, call that function with
 point positioned before the inserted message."
+  ;; TODO: Convert more callers to use `timestamp-prefix'.
+  (unless (get-text-property 0 'timestamp string)
+    (put-text-property 0 (length string) 'timestamp (string-to-number (format-time-string "%s"))))
   (with-room-buffer room
     (save-excursion
       (let* ((inhibit-read-only t)      ; MAYBE: use buffer-read-only mode instead
@@ -430,7 +437,11 @@ point positioned before the inserted message."
              (non-face-properties (cl-loop for (key val) on (text-properties-at 0 string) by #'cddr
                                            unless (eq key 'face)
                                            append (list key val)))
-             (string (apply #'propertize (concat string "\n") 'read-only t non-face-properties)))
+             (timestamp-prefix (when timestamp-prefix
+                                 ;; Apply face property from beginning of `string'.
+                                 (propertize (concat (format-time-string "[%T]" timestamp) " ")
+                                             'face (get-text-property 0 'face string))))
+             (string (apply #'propertize (concat timestamp-prefix string "\n") 'read-only t non-face-properties)))
         (unless (and update
                      ;; Inserting our own message, received back in /sync
                      (matrix-client--replace-string update string))
@@ -664,7 +675,8 @@ is sent, if any."
            (matrix-send-message room it :msgtype ,msgtype))
          (--when-let ,insert
            (let ((matrix-client-insert-prefix-fn nil))
-             (matrix-client-insert room (matrix-client--notice-string it))))
+             (matrix-client-insert room (matrix-client--notice-string it)
+                                   :timestamp-prefix t)))
          (matrix-client-update-last-seen room))
        (add-to-list 'matrix-client-room-commands ,command))))
 
