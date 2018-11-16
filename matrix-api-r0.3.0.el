@@ -1007,6 +1007,36 @@ standard event content object."
                             'room-id id
                             'data data)))
 
+(cl-defmethod matrix-send-state ((room matrix-room)
+                                 &key data type success error)
+  "Send state event of TYPE to ROOM with DATA.
+
+TYPE should be, e.g. \"m.room.topic\"."
+  (with-slots* (((id session) room))
+    (let* ((endpoint (format$ "rooms/$id/state/$type"))
+           (success (or success (apply-partially #'matrix-send-state-callback room))))
+      (matrix-put session endpoint
+        :data data
+        :success success
+        :error error
+        :timeout 30))))
+
+(matrix-defcallback send-state matrix-room
+  "Callback for send-state."
+  ;; For now, just log it, because we'll get it back when we sync anyway.
+  :slots (id)
+  :body (matrix-log (a-list 'event 'matrix-send-state-callback
+                            'room-id id
+                            'data data)))
+
+(cl-defmethod matrix-set-name ((room matrix-room) name)
+  "Set ROOM name to NAME."
+  (matrix-send-state room :type "m.room.name" :data (a-list 'name name)))
+
+(cl-defmethod matrix-set-topic ((room matrix-room) topic)
+  "Set ROOM topic to TOPIC."
+  (matrix-send-state room :type "m.room.topic" :data (a-list 'topic topic)))
+
 (cl-defmethod matrix-leave ((room matrix-room))
   "Leave room."
   ;; https://matrix.org/docs/spec/client_server/r0.3.0.html#id203

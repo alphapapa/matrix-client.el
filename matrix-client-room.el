@@ -705,6 +705,10 @@ is sent, if any."
   :docstring "Join room on session.
 INPUT should be, e.g. \"#room:matrix.org\".")
 
+(matrix-client-def-room-command topic
+  :insert (when (matrix-set-topic room input)
+            (concat "Changing topic to: " input)))
+
 (cl-defmethod matrix-client-room-command-html ((room matrix-room) input)
   "Send HTML message to ROOM.
 INPUT should be, e.g. \"/html <b>...\"."
@@ -1072,9 +1076,16 @@ includes the \"In reply to\" link to the quoted message ID)."
 (matrix-client-defevent m.room.topic
   "Handle m.room.topic events."
   :object-slots ((room topic))
-  :body (--when-let (a-get content 'topic)
-          ;; We can't use :content-keys to get the topic, because it shadows the room slot.
-          (setq topic it)
+  :event-keys (sender)
+  :content-keys (('topic new-topic))
+  :let ((timestamp (matrix-client-event-timestamp event))
+        (displayname (matrix-user-displayname room sender))
+        (message (propertize (format "%s changed room topic: %s" displayname new-topic)
+                             'timestamp timestamp
+                             'face 'matrix-client-notice)))
+  :body (progn
+          (setq topic new-topic)
+          (matrix-client-insert room message :timestamp-prefix t)
           (matrix-client-update-header room)))
 
 (matrix-client-defevent m.room.avatar
