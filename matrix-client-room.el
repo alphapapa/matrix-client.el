@@ -999,14 +999,14 @@ includes the \"In reply to\" link to the quoted message ID)."
             (when event_id
               (matrix-client--delete-event room (list 'event_id event_id)))
             (matrix-client-insert room (propertize (concat metadata message)
-                                                      'timestamp timestamp
-                                                      'displayname displayname
-                                                      'sender sender
-                                                      'event_id event_id
-                                                      'transaction_id (cl-typecase transaction_id
-                                                                        (number transaction_id)
-                                                                        ;; The server treats txn-ids as strings.
-                                                                        (string (string-to-number transaction_id)))))
+                                                   'timestamp timestamp
+                                                   'displayname displayname
+                                                   'sender sender
+                                                   'event_id event_id
+                                                   'transaction_id (cl-typecase transaction_id
+                                                                     (number transaction_id)
+                                                                     ;; The server treats txn-ids as strings.
+                                                                     (string (string-to-number transaction_id)))))
 
             ;; Start image insertion if necessary
             (when matrix-client-show-images
