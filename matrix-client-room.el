@@ -1031,22 +1031,23 @@ includes the \"In reply to\" link to the quoted message ID)."
   :content-keys (displayname membership)
   :let ((displayname (or displayname sender))
         (timestamp (matrix-client-event-timestamp event))
+        (timestamp-string (format-time-string "%T" (seconds-to-time timestamp)))
         (action (pcase membership
                   ("join" "joined")
                   ("leave" "left")
                   (_ membership)))
-        (msg (propertize (format$ "$displayname $action")
-                         'face 'matrix-client-notice
-                         'event_id event_id
-                         'sender sender
-                         'timestamp timestamp)))
+        (message (propertize (format$ "[$timestamp-string] $displayname $action")
+                             'face 'matrix-client-notice
+                             'event_id event_id
+                             'sender sender
+                             'timestamp timestamp)))
   ;; MAYBE: Get displayname from API room object's membership list.
-  :body (progn
-          (unless initial-sync-p
-            ;; FIXME: This does not seem to work; on initial connect, "user joined" messages still show up from when the user initially joined the room.
-            (matrix-client-insert room msg)
-            (with-room-buffer room
-              (rename-buffer (matrix-client-display-name room) 'unique)))))
+  :body (unless initial-sync-p
+          ;; FIXME: This does not seem to work; on initial connect, "user joined" messages still
+          ;; show up from when the user initially joined the room.
+          (matrix-client-insert room message)
+          (with-room-buffer room
+            (rename-buffer (matrix-client-display-name room) 'unique))))
 
 (matrix-client-defevent m.typing
   "Handle m.typing events."
