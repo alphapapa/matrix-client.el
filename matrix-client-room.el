@@ -709,6 +709,10 @@ INPUT should be, e.g. \"#room:matrix.org\".")
   :insert (when (matrix-set-topic room input)
             (concat "Changing topic to: " input)))
 
+(matrix-client-def-room-command name
+  :insert (when (matrix-set-name room input)
+            (concat "Changing name to: " input)))
+
 (cl-defmethod matrix-client-room-command-html ((room matrix-room) input)
   "Send HTML message to ROOM.
 INPUT should be, e.g. \"/html <b>...\"."
