@@ -706,10 +706,12 @@ is sent, if any."
 INPUT should be, e.g. \"#room:matrix.org\".")
 
 (matrix-client-def-room-command topic
+  :docstring "Set room topic."
   :insert (when (matrix-set-topic room input)
             (concat "Changing topic to: " input)))
 
 (matrix-client-def-room-command name
+  :docstring "Set room name."
   :insert (when (matrix-set-name room input)
             (concat "Changing name to: " input)))
 
