@@ -219,10 +219,8 @@ The sync error handler should increase this for consecutive errors, up to a maxi
    (avatar :initarg :avatar
            :documentation "A string containing the room avatar image in its text properties.")
    (typers :initarg :typers)
-   (name :initarg :name
-         :type string)
-   (topic :initarg :topic
-          :type string)
+   (name :initarg :name)
+   (topic :initarg :topic)
    (aliases :initarg :aliases)
    (members :documentation "List of room members, as user objects."
             :type list)
