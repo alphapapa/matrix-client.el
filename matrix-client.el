@@ -249,6 +249,29 @@ tokens (username and password will be required again)."
   (setq matrix-client-midnight-timer nil)
   (setq matrix-client-sessions nil))
 
+;;;; Commands
+
+(defun matrix-client-switch-buffer ()
+  "Prompt for a Matrix buffer and switch to it."
+  (interactive)
+  (--when-let (read-buffer "Room: " nil 'require-match
+                           (lambda (buffer)
+                             ;; This rigmarole is necessary because, for some reason, when `helm-mode' is enabled,
+                             ;; it also passes a list of closed, non-existent buffers (or names thereof) to this
+                             ;; predicate, and if we try to `with-current-buffer' one of them, it raises an error.
+                             ;; I hate to put Helm-specific code in here, but I want it to work with `helm-mode'
+                             ;; enabled.
+
+                             ;; TODO: Upgrade Helm to latest version and see if problem persists.
+                             (when (and (setq buffer (pcase buffer
+                                                       ((pred stringp) buffer)
+                                                       (`(,(and (pred stringp) buf)) buf)
+                                                       (`(,_name . ,buf) buf)))
+                                        (buffer-live-p buffer))
+                               (with-current-buffer buffer
+                                 (derived-mode-p 'matrix-client-mode)))))
+    (switch-to-buffer it)))
+
 ;;;; Rooms
 
 (defun matrix-client-update-all-date-headers ()
