@@ -1136,15 +1136,10 @@ Image is passed from parser as DATA, which should be an image
 object made with `create-image'.  This function should be called
 as an async callback when the image is downloaded."
   (with-slots (avatar) room
-    (when-let ((image-string (with-temp-buffer
-                               (insert " ")
-                               (insert-image data)
-                               (insert " ")
-                               (buffer-string))))
-      (setq avatar image-string)
-      (matrix-client-update-header room)
-      (when message
-        (matrix-client-insert room message)))))
+    (setq avatar (propertize " " 'display data))
+    (matrix-client-update-header room)
+    (when message
+      (matrix-client-insert room message))))
 
 ;;;; Update-room-at-once approach
 
