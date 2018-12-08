@@ -76,6 +76,7 @@ determined by the size of the buffer's window."
            ;; This should not happen with the fixes above, but just in case:
            (warn "Weird error rescaling image, please report.  Buffer: %s" (current-buffer))))
     (create-image data 'imagemagick 'data-p
+                  :ascent 'center
                   :max-width max-width
                   :max-height max-height)))
 
