@@ -1130,6 +1130,8 @@ includes the \"In reply to\" link to the quoted message ID)."
                                'timestamp timestamp
                                'face 'matrix-client-notice))))
   :body (when matrix-client-show-room-avatars
+          ;; FIXME: We need to check the "replaces" key for the room avatar events, and only update
+          ;; it if it's a new one.  See note in `matrix-client-update'.
           (if url
               ;; New avatar
               ;; TODO: Maybe display the new avatar in the chat list, like Riot.
@@ -1176,8 +1178,16 @@ as an async callback when the image is downloaded."
                                                          :value timestamp
                                                          :comparator #'>))
                                                    matrix-client-ordered-buffer-point-fn)))
-      ;; Process new timeline events
-      (dolist (event-list (list state-new timeline-new))
+      ;; Process new timeline events.
+
+      ;; NOTE: There's a weird problem that happens when a room's avatar was recently changed: the
+      ;; server sends the old avatar in the state events list, and the new avatar in the timeline
+      ;; events list, and since we process both with the same event handlers, depending on which
+      ;; list we process first, the old avatar can replace the new one.  For some reason, even
+      ;; though the old avatar is in the state list, when we process the timeline list first, the
+      ;; new avatar correctly replaces the old one.  This is very confusing, but at least this works
+      ;; around the problem for now.
+      (dolist (event-list (list timeline-new state-new))
         (when old-messages
           (setq event-list (nreverse event-list)))
         (seq-doseq (event event-list)
