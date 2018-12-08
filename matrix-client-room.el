@@ -37,6 +37,20 @@ Used to add a button for pending messages.")
   "Download and show room avatars."
   :type 'boolean)
 
+(defcustom matrix-client-show-room-avatars-in-buffer-names t
+  "Show room avatars in buffer names."
+  :type 'boolean)
+
+(defcustom matrix-client-room-avatar-in-buffer-name-size (default-font-height)
+  "Size of room avatars in buffer names."
+  :type '(choice (const :tag "Default font height" default-font-height)
+                 (integer :tag "Size in pixels")
+                 (function :tag "Custom function (should return integer)"))
+  :set (lambda (option value)
+         (set-default option (cl-typecase value
+                               (function (funcall value))
+                               (integer value)))))
+
 (defcustom matrix-client-timestamp-header-delta 300
   "Number of seconds between messages after which a timestamp header is shown."
   :type 'integer)
@@ -542,27 +556,34 @@ a different name is returned."
                                                                       ;; Allow reusing current name of current buffer
                                                                       (not (equal it (oref* room client-data buffer)))))
                                                           it)))))))
-    (pcase-let* (((eieio id name aliases members session) room)
-                 ((eieio (user self)) session))
-      (pcase (1- (length members))
-        (1 (pick-name (matrix-user-displayname room (caar (members-without-self)))
-                      name aliases id))
-        (2 (pick-name name aliases
-                      (s-join ", " (displaynames-sorted-by-id (members-without-self)))
-                      id))
-        ((or `nil (pred (< 0))) ;; More than 2
-         (pick-name name
-                    ;; FIXME: The API docs say to use the canonical_alias instead of aliases.
-                    aliases
-                    (format "%s and %s others"
-                            (car (displaynames-sorted-by-id (members-without-self)))
-                            (- (length members) 2))
-                    id))
-        (_ (pick-name name aliases
-                      ;; FIXME: The API says to use names of previous room
-                      ;; members if nothing else works, but I don't feel like
-                      ;; coding that right now, so we'll just use the room ID.
-                      id))))))
+    (pcase-let* (((eieio id name avatar aliases members session) room)
+                 ((eieio (user self)) session)
+                 (avatar (when (and avatar matrix-client-show-room-avatars-in-buffer-names)
+                           ;; Make a new image to avoid modifying the avatar in the header.
+                           (setq avatar (copy-list (get-text-property 0 'display avatar)))
+                           (setf (image-property avatar :max-width) matrix-client-room-avatar-in-buffer-name-size)
+                           (setf (image-property avatar :max-height) matrix-client-room-avatar-in-buffer-name-size)
+                           (setq avatar (concat (propertize " " 'display avatar) " ")))))
+      (concat avatar
+              (pcase (1- (length members))
+                (1 (pick-name (matrix-user-displayname room (caar (members-without-self)))
+                              name aliases id))
+                (2 (pick-name name aliases
+                              (s-join ", " (displaynames-sorted-by-id (members-without-self)))
+                              id))
+                ((or `nil (pred (< 0))) ;; More than 2
+                 (pick-name name
+                            ;; FIXME: The API docs say to use the canonical_alias instead of aliases.
+                            aliases
+                            (format "%s and %s others"
+                                    (car (displaynames-sorted-by-id (members-without-self)))
+                                    (- (length members) 2))
+                            id))
+                (_ (pick-name name aliases
+                              ;; FIXME: The API says to use names of previous room
+                              ;; members if nothing else works, but I don't feel like
+                              ;; coding that right now, so we'll just use the room ID.
+                              id)))))))
 
 (cl-defmethod matrix-client-update-header ((room matrix-room))
   "Update the header line of the current buffer for ROOM.
@@ -1138,6 +1159,7 @@ as an async callback when the image is downloaded."
   (with-slots (avatar) room
     (setq avatar (propertize " " 'display data))
     (matrix-client-update-header room)
+    (matrix-client-rename-buffer room)
     (when message
       (matrix-client-insert room message))))
 
