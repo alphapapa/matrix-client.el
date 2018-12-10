@@ -120,6 +120,10 @@ This way, in the event that a message gets lost in transit, the
 user can recover it from the kill ring instead of retyping it."
   :type 'boolean)
 
+(defcustom matrix-client-show-user-avatars t
+  "Show user avatars."
+  :type 'boolean)
+
 ;;;; Classes
 
 (matrix-defclass matrix-room-client-data ()

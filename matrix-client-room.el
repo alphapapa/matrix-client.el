@@ -980,7 +980,7 @@ includes the \"In reply to\" link to the quoted message ID)."
 
 (matrix-client-defevent m.room.message
   "Process m.room.message EVENT in ROOM."
-  :object-slots ((room session)
+  :object-slots ((room session members)
                  (session user initial-sync-p))
   :content-keys (body format formatted_body msgtype thumbnail_url url)
   :let (;; We don't use `matrix-client-event-data-timestamp', because for
@@ -988,12 +988,15 @@ includes the \"In reply to\" link to the quoted message ID)."
         (timestamp (/ origin_server_ts 1000))
         ;; FIXME: Not sure we need to call `seconds-to-time' here.
         (timestamp-string (format-time-string "%T" (seconds-to-time timestamp)))
+        (avatar (a-get* members sender 'avatar))
         (displayname (matrix-user-displayname room sender))
         ((map transaction_id) unsigned)
         (metadata) (msg) (matrix-image-url))
   :body (progn
           (when content
             ;; Redacted messages have no content, so we should do nothing for them.
+            (when (and (stringp avatar) matrix-client-show-user-avatars)
+              (setq displayname (concat avatar " " displayname)))
             (setq metadata (format$ "[$timestamp-string] $displayname> "))
             (setq message (string-trim
                            ;; Trim messages because HTML ones can have extra newlines
@@ -1068,10 +1071,10 @@ includes the \"In reply to\" link to the quoted message ID)."
 
 (matrix-client-defevent m.room.member
   "Say that member in EVENT joined/left ROOM."
-  :object-slots ((room session)
+  :object-slots ((room session members)
                  (session initial-sync-p))
   :event-keys (state_key sender)
-  :content-keys (displayname membership)
+  :content-keys (displayname membership avatar_url)
   :let ((displayname (or displayname sender))
         (timestamp (matrix-client-event-timestamp event))
         (timestamp-string (format-time-string "%T" (seconds-to-time timestamp)))
@@ -1085,12 +1088,37 @@ includes the \"In reply to\" link to the quoted message ID)."
                              'sender sender
                              'timestamp timestamp)))
   ;; MAYBE: Get displayname from API room object's membership list.
-  :body (unless initial-sync-p
-          ;; FIXME: This does not seem to work; on initial connect, "user joined" messages still
-          ;; show up from when the user initially joined the room.
-          (matrix-client-insert room message)
-          (with-room-buffer room
-            (rename-buffer (matrix-client-display-name room) 'unique))))
+  :body (progn
+          (unless initial-sync-p
+            ;; FIXME: This does not seem to work; on initial connect, "user joined" messages still
+            ;; show up from when the user initially joined the room.
+            (matrix-client-insert room message)
+            (with-room-buffer room
+              (rename-buffer (matrix-client-display-name room) 'unique))
+            (when (and avatar_url matrix-client-show-user-avatars)
+              (unless (a-get* members sender 'avatar)
+                (matrix-client-user-avatar room :user-id sender :url avatar_url))))))
+
+(cl-defmethod matrix-client-user-avatar ((room matrix-room) &key user-id url)
+  "Download avatar for user ID and store in ROOM's member list."
+  (with-slots (members) room
+    (unless (a-get* members user-id 'avatar)
+      ;; Avoid multiple outstanding requests for the same avatar, especially on initial sync.
+      (map-put (map-elt members user-id) 'avatar 'fetching )
+      (matrix-url-with-retrieve-async (matrix-transform-mxc-uri (oref room session) url)
+        ;; FIXME: Not sure if we really need to pass room to the parser.
+        :parser (apply-partially #'matrix-client-parse-image room)
+        :success (apply-partially #'matrix-client-user-avatar-callback
+                                  :room room
+                                  :user user-id)))))
+
+(cl-defmethod matrix-client-user-avatar-callback (&key (room matrix-room) data user &allow-other-keys)
+  "Set avatar for USER in ROOM.
+Image is passed from parser as DATA, which should be an image
+object made with `create-image'.  This function should be called
+as an async callback when the image is downloaded."
+  (with-slots (members) room
+    (setf (cdr (assoc user members)) (propertize " " 'display data))))
 
 (matrix-client-defevent m.typing
   "Handle m.typing events."
