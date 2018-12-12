@@ -7,7 +7,7 @@
 ;; Keywords: web, comm
 ;; Homepage: https://github.com/jgkamat/matrix-client-el
 ;; Package-Version: 0.1.0
-;; Package-Requires: ((emacs "25.1") (dash "2.13.0") (f "0.17.2") (request "0.2.0") (a "0.1.0") (ov "1.0.6") (s "1.12.0") (tracking "2.9") (esxml "0.3.4") (ht "2.2"))
+;; Package-Requires: ((emacs "25.1") (dash "2.13.0") (dash-functional "1.2.0") (f "0.17.2") (request "0.2.0") (a "0.1.0") (ov "1.0.6") (s "1.12.0") (tracking "2.9") (esxml "0.3.4") (ht "2.2"))
 
 ;; This file is not part of GNU Emacs.
 

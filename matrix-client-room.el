@@ -3,6 +3,7 @@
 
 (require 'ordered-buffer)
 
+(require 'dash-functional)
 (require 'esxml-query)
 
 ;;;; Variables
