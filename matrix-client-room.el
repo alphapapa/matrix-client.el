@@ -413,7 +413,7 @@ Update [pending] overlay."
             (insert (propertize "[FAILED] "
                                 'face 'matrix-client-failed-messages)))
         ;; Message not found
-        (matrix-error (a-list 'event 'matrix-client-send-message-callback
+        (matrix-error (a-list 'event 'matrix-client-send-message-error-callback
                               'error "Can't find transaction"
                               :txn-id txn-id))))))
 
