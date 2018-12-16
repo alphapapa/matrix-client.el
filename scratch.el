@@ -112,3 +112,9 @@ For debugging."
                if next
                do (goto-char next)
                else return nil))))
+
+(defun hl-event (event-id)
+  "Highlight the event with EVENT-ID in the current buffer."
+  (-when-let* (((beg end) (matrix-client--find-propertized-string (list 'event_id event-id))))
+    (goto-char beg)
+    (set-mark end)))

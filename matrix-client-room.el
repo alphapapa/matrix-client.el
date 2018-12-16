@@ -817,11 +817,7 @@ If such text is not found, return nil."
     (goto-char (point-max))
     (-let* (((first-property first-value rest) (list (car plist) (cadr plist) (cddr plist))))
       (cl-loop for pos = (matrix--prev-property-change (point) first-property first-value)
-               ;; NOTE: We subtract 1 from pos because
-               ;; `previous-single-property-change' returns the position
-               ;; *after* the property is set, so checking that position will
-               ;; find no value, and then the loop will skip to where the
-               ;; property *starts*.
+               ;; MAYBE: Subtract one from `pos' here instead of in `matrix--prev-property-change'.
                while pos
                when (and pos
                          (cl-loop for (property value) on rest by #'cddr
@@ -831,7 +827,16 @@ If such text is not found, return nil."
                ;; correct, we should check all of the properties and find the
                ;; first place any of them change, but that probably isn't
                ;; necessary, and it would be slower.
-               return (list (previous-single-property-change pos first-property) pos)
+               return (list (or (previous-single-property-change pos first-property)
+                                ;; These are not strictly necessary, but they try to guard against
+                                ;; any weird little bugs caused by text-property idiosyncrasies.
+                                (next-single-property-change (point-min) first-property)
+                                (point-min))
+                            ;; We return one more than the pos, which seems like the right thing to
+                            ;; do, because it seems to be what works best.  But I can't completely
+                            ;; explain why, because working with text-property boundaries is very
+                            ;; confusing.
+                            (1+ pos))
                do (goto-char pos)))))
 
 (defun matrix-client--update-date-headers ()
@@ -870,6 +875,14 @@ doesn't change before POS, return nil."
   (cl-loop do (setq pos (previous-single-property-change pos property nil limit))
            ;; NOTE: We have to test `limit' ourselves, because `previous-single-property-change'
            ;; returns `limit' if nothing is found until it.
+           when pos
+           ;; We decrement the position.  Why?  It's hard to explain.  We just do.  Because
+           ;; text-property positions are confusing to me.  Because it just works.  And although
+           ;; there might be a more correct way to do this, that would require adjusting 3 or 4
+           ;; other functions that use the results of this, and all of them currently work
+           ;; correctly, so NO TOUCHING!
+           ;; MAYBE: Subtract one from `pos' in `matrix-client--find-propertized-string' instead of here.
+           do (cl-decf pos)
            while (and pos
                       (or (not limit)
                           (> pos limit)))
