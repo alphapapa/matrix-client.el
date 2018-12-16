@@ -49,6 +49,7 @@
 (require 'matrix-client-room)
 (require 'matrix-notifications)
 (require 'matrix-client-images)
+(require 'matrix-client-rainbow)
 
 ;;;; Variables
 

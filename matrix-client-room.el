@@ -514,6 +514,18 @@ point positioned before the inserted message."
                (target-pos (1- (matrix-client--prompt-position))))
       (ov-move seen-ov target-pos target-pos))))
 
+(cl-defmethod matrix-client-replay ((room matrix-room))
+  "Erase and replay events into ROOM's buffer."
+  (with-room-buffer room
+    (let ((inhibit-read-only t)
+          (matrix-client-notifications nil))
+      (ov-clear)
+      (erase-buffer)
+      (matrix-client-insert-prompt room)
+      (matrix-client-insert-last-seen room)
+      (cl-loop for event in (reverse (oref room timeline))
+               do (matrix-client-timeline room event)))))
+
 ;;;;; Room metadata
 
 (cl-defmethod matrix-client-rename-buffer ((room matrix-room))
@@ -612,6 +624,10 @@ Also update prompt with typers."
 
 ;;;;; Room buffer setup
 
+(defvar matrix-client-setup-room-buffer-hook nil
+  "Hook run after a room buffer is set up.
+Called from inside the room's buffer.")
+
 (cl-defmethod matrix-client-setup-room-buffer ((room matrix-room))
   "Prepare and switch to buffer for ROOM-ID, and return room object."
   (with-room-buffer room
@@ -646,9 +662,10 @@ Also update prompt with typers."
                   ("^file:" . matrix-client--dnd-open-local-file)
                   ("^\\(https?\\|ftp\\|file\\|nfs\\)://" . matrix-client--dnd-open-file)))
     (when matrix-client-use-tracking
-      (tracking-mode 1)))
-  (matrix-client-insert-prompt room)
-  (matrix-client-insert-last-seen room))
+      (tracking-mode 1))
+    (matrix-client-insert-prompt room)
+    (matrix-client-insert-last-seen room)
+    (run-hooks 'matrix-client-setup-room-buffer-hook)))
 
 (cl-defmethod matrix-client-insert-last-seen ((room matrix-room))
   "Insert last-seen overlay into ROOM's buffer."
