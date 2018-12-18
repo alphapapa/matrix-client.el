@@ -87,12 +87,12 @@ PAIRS should be of the form (SLOT VALUE SLOT VALUE...)."
   ;; `buffer-list-update-hook', and the fact that it's called in so
   ;; many places in Emacs, it would be better to do this a different
   ;; way altogether.  Maybe we could use `window-configuration-change-hook'.
-  (when-let ((room matrix-client-room-object)
-             (buffer (oref room buffer))
-             (window (get-buffer-window buffer))
-             (window-active-p (equal window (selected-window)))
-             (not-one-window-p (not (= 1 (length (window-list))))))
-    (when (matrix-client-buffer-visible-p)
+  (when-let* ((room matrix-client-room)
+              (buffer (oref* room client-data buffer))
+              (window (get-buffer-window buffer))
+              (window-active-p (equal window (selected-window)))
+              (not-one-window-p (not (= 1 (length (window-list))))))
+    (when (get-buffer-window buffer 'visible)
       ;; FIXME: Need a way to move the seen line when there's one
       ;; window visible and the user has seen it.  Unfortunately,
       ;; there seems to be no way to detect whether the Emacs frame
@@ -110,12 +110,12 @@ PAIRS should be of the form (SLOT VALUE SLOT VALUE...)."
         'before-string (concat "\n" (propertize "\n\n" 'face 'matrix-client-last-seen))
         'matrix-client-last-seen t)))
 
-(defun matrix-client-buffer-visible-p (&optional buffer)
-  "Return non-nil if BUFFER is currently visible.
-If BUFFER is nil, use the current buffer."
-  (let ((buffer (or buffer (current-buffer))))
-    (or (eq buffer (window-buffer (selected-window)))
-        (get-buffer-window buffer))))
+;; (defun matrix-client-buffer-visible-p (&optional buffer)
+;; FIXME: Remove this if we don't need it anymore.
+;;   "Return non-nil if BUFFER is currently visible.
+;; If BUFFER is nil, use the current buffer."
+;;   (let ((buffer (or buffer (current-buffer))))
+;;     (get-buffer-window buffer 'visible)))
 
 (defun matrix-client-delete-backward-char (n &optional kill-flag)
   "Delete backward unless the point is at the prompt or other read-only text."

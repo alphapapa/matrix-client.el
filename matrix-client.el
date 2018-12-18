@@ -56,12 +56,13 @@
 (defvar matrix-client-sessions nil
   "List of active sessions.")
 
-(defvar matrix-client-mark-modified-rooms t)
-
 (defvar matrix-client-input-prompt "▶ ")
 
 (defvar matrix-client-midnight-timer nil
   "Timer used to update date headers at midnight.")
+
+(defcustom matrix-client-mark-modified-rooms t
+  "Mark room buffers as modified when new events arrive.")
 
 (defcustom matrix-client-render-presence t
   "Show presence changes in the main buffer windows."

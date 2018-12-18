@@ -633,9 +633,8 @@ Called from inside the room's buffer.")
     (visual-line-mode 1)
     (setq buffer-undo-list t)
     ;; Unset buffer's modified status when it's selected
-    ;; FIXME: Reactivate this.
-    ;; (when matrix-client-mark-modified-rooms
-    ;;   (add-hook 'buffer-list-update-hook #'matrix-client-buffer-list-update-hook 'append 'local))
+    (when matrix-client-mark-modified-rooms
+      (add-hook 'buffer-list-update-hook #'matrix-client-buffer-list-update-hook 'append 'local))
     (erase-buffer)
     (switch-to-buffer (current-buffer))
     ;; FIXME: Remove these or update them.
