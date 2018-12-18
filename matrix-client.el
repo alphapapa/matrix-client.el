@@ -61,8 +61,12 @@
 (defvar matrix-client-midnight-timer nil
   "Timer used to update date headers at midnight.")
 
-(defcustom matrix-client-mark-modified-rooms t
-  "Mark room buffers as modified when new events arrive.")
+(defcustom matrix-client-mark-modified-rooms nil
+  "Mark room buffers as modified when new events arrive.
+This is disabled by default, because marking room buffers as
+not modified when the user sees them requires adding a function
+to `buffer-list-modified-hook', which carries some risk of
+interfering with Emacs behavior and degrading its performance.")
 
 (defcustom matrix-client-render-presence t
   "Show presence changes in the main buffer windows."
