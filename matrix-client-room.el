@@ -569,7 +569,7 @@ a different name is returned."
                                                                       ;; Allow reusing current name of current buffer
                                                                       (not (equal it (oref* room client-data buffer)))))
                                                           it)))))))
-    (pcase-let* (((eieio id name avatar aliases members session) room)
+    (pcase-let* (((eieio id name avatar aliases canonical-alias members session) room)
                  ((eieio (user self)) session)
                  (avatar (when (and avatar matrix-client-show-room-avatars-in-buffer-names)
                            ;; Make a new image to avoid modifying the avatar in the header.
@@ -580,19 +580,17 @@ a different name is returned."
       (concat avatar
               (pcase (1- (length members))
                 (1 (pick-name (matrix-user-displayname room (caar (members-without-self)))
-                              name aliases id))
-                (2 (pick-name name aliases
+                              name canonical-alias aliases id))
+                (2 (pick-name name canonical-alias aliases
                               (s-join ", " (displaynames-sorted-by-id (members-without-self)))
                               id))
                 ((or `nil (pred (< 0))) ;; More than 2
-                 (pick-name name
-                            ;; FIXME: The API docs say to use the canonical_alias instead of aliases.
-                            aliases
+                 (pick-name name canonical-alias aliases
                             (format "%s and %s others"
                                     (car (displaynames-sorted-by-id (members-without-self)))
                                     (- (length members) 2))
                             id))
-                (_ (pick-name name aliases
+                (_ (pick-name name canonical-alias aliases
                               ;; FIXME: The API says to use names of previous room
                               ;; members if nothing else works, but I don't feel like
                               ;; coding that right now, so we'll just use the room ID.

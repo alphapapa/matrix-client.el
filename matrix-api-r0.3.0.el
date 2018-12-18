@@ -222,6 +222,7 @@ The sync error handler should increase this for consecutive errors, up to a maxi
    (name :initarg :name)
    (topic :initarg :topic)
    (aliases :initarg :aliases)
+   (canonical-alias :initarg :canonical-alias)
    (members :documentation "List of room members, as user objects."
             :type list)
    (state :documentation "Updates to the state, between the time indicated by the since parameter, and the start of the timeline (or all state up to the start of the timeline, if since is not given, or full_state is true).")
@@ -771,6 +772,12 @@ requests, and we make a new request."
   "Process m.room.name EVENT in ROOM."
   (with-slots (name) room
     (setq name (a-get* event 'content 'name))
+    (run-hook-with-args 'matrix-room-metadata-hook room)))
+
+(cl-defmethod matrix-event-m.room.canonical_alias ((room matrix-room) event)
+  "Process m.room.canonical_alias EVENT in ROOM."
+  (with-slots (canonical-alias) room
+    (setq canonical-alias (a-get* event 'content 'alias))
     (run-hook-with-args 'matrix-room-metadata-hook room)))
 
 (defvar matrix-room-metadata-hook nil
