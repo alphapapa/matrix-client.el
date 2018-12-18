@@ -54,6 +54,11 @@ tokens.  Logs should be sanitized before sharing.")
 Called after the sync response is parsed into the session
 objects, before returning from the sync callback.")
 
+(defvar matrix-after-sync-hook nil
+  "Hooks run with session as argument after every sync.
+Called after the sync response is parsed into the session
+objects, before returning from the sync callback.")
+
 ;;;; Macros
 
 (defmacro matrix-defclass (name superclasses slots &rest options-and-doc)
@@ -628,6 +633,7 @@ requests, and we make a new request."
                 sync-retry-delay 0)
           (setq pending-syncs (delete (current-buffer) pending-syncs))
           (matrix-log "Sync callback complete.  Calling sync again...")
+          (run-hook-with-args 'matrix-after-sync-hook session)
           (matrix-sync session)))
 
 (matrix-defcallback sync-error matrix-session
