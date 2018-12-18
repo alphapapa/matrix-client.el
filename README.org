@@ -44,6 +44,34 @@ the most useful:
 
 Many more settings are documented through customize.
 
+** Use with [[https://github.com/alphapapa/frame-purpose.el][frame-purpose]]
+
+~frame-purpose~ works well with this package.  For example, this code:
+
+#+BEGIN_SRC elisp
+  (frame-purpose-make-frame
+   :modes '(matrix-client-mode)
+   :title "Matrix"
+   ;; Note the path to the logo.png file from the matrix-client.el repo.
+   :icon-type (expand-file-name "~/src/emacs/matrix-client.el/images/logo.png")
+   :sidebar 'right
+   :buffer-sort-fns (list (-on #'string< #'buffer-name)
+                          (-on #'> (lambda (buffer)
+                                     ;; Sort by most recent event in room.
+                                     (or (when-let* ((room (buffer-local-value 'matrix-client-room buffer))
+                                                     (last-event (car (oref* room timeline))))
+                                           (a-get* last-event 'origin_server_ts))
+                                         0)))
+                          (lambda (a b)
+                            ;; Sort modified rooms first (i.e. rooms with unseen events).
+                            (and (buffer-modified-p a)
+                                 (not (buffer-modified-p b))))))
+#+END_SRC
+
+...can be used to get a window like this:
+
+[[images/frame-purpose-example.png]]
+
 * Contributing
 
 Contributions are much appreciated, and what help this project stay afloat! If
