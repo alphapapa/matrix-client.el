@@ -1061,6 +1061,7 @@ TYPE should be, e.g. \"m.room.topic\"."
   :slots (session)
   ;; TODO: Verify that this works in more circumstances.  `equal' is
   ;; used, and it works in the test, but will it always work?
+  ;; TODO: Optionally kill room buffer.
   :body (object-remove-from-list session :rooms room))
 
 (cl-defmethod matrix-forget ((room matrix-room))

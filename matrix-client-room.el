@@ -745,6 +745,11 @@ is sent, if any."
   :docstring "Join room on session.
 INPUT should be, e.g. \"#room:matrix.org\".")
 
+(matrix-client-def-room-command leave
+  :insert (when (matrix-leave room)
+            "Leaving room...")
+  :docstring "Leave current room.")
+
 (matrix-client-def-room-command topic
   :docstring "Set room topic."
   :insert (when (matrix-set-topic room input)
