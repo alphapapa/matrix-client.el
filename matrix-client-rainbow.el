@@ -52,14 +52,6 @@ See `rainbow-identifiers-cie-l*a*b*-saturation'."
         (advice-remove it #'matrix-client-rainbow--room-event))
       (matrix-client-replay matrix-client-room))))
 
-(matrix-client-def-room-command rainbow
-  :docstring "Toggle `matrix-client-rainbow-mode' in current room."
-  :insert (progn
-            (message (if (call-interactively #'matrix-client-rainbow-mode)
-                         "Look at all the colors!!"
-                       "Boring mode engaged."))
-            nil))
-
 (defun matrix-client-rainbow--room-event (room event)
   "Colorize EVENT in ROOM according to sender.
 To be used as :after advice to `matrix-client-event-m.room.message'."

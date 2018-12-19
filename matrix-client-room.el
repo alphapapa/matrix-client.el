@@ -2,6 +2,7 @@
 (require 'dnd)
 (require 'shr)
 
+(require 'matrix-client-rainbow)
 (require 'ordered-buffer)
 
 (require 'dash-functional)
@@ -721,9 +722,15 @@ is sent, if any."
          (matrix-client-update-last-seen room))
        (add-to-list 'matrix-client-room-commands ,command))))
 
-;; HACK: This feature requires the room command macro.  I should figure out a cleaner way to
-;; organize things like this.
-(require 'matrix-client-rainbow)
+;; HACK: This /rainbow command cannot be defined in matrix-client-rainbow.el because the
+;; byte-compiler fails for some weird reason.
+(matrix-client-def-room-command rainbow
+  :docstring "Toggle `matrix-client-rainbow-mode' in current room."
+  :insert (progn
+            (message (if (call-interactively #'matrix-client-rainbow-mode)
+                         "Look at all the colors!!"
+                       "Boring mode engaged."))
+            nil))
 
 (matrix-client-def-room-command me
   :message input
