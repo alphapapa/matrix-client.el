@@ -10,24 +10,26 @@
 ;; "password") to save more time, but of course, be careful with saving your password to disk in a
 ;; text file, be careful not to share the file, etc.
 
+(setq debug-on-error t)
+
 ;; package.el
 
 (require 'package)
+(setq package-menu-async nil)
 (setq package-archives '(("gnu" . "https://elpa.gnu.org/packages/")
                          ("melpa" . "https://melpa.org/packages/")))
 (package-initialize)
 
 ;; Quelpa
 
-(unless (package-installed-p 'quelpa-use-package)
+(unless (require 'quelpa-use-package nil t)
   (defun install-quelpa ()
-    (package-install 'quelpa-use-package))
+    (package-install 'quelpa-use-package)
+    (require 'quelpa-use-package nil t))
   (add-hook 'package--post-download-archives-hook #'install-quelpa)
   (add-hook 'package--post-download-archives-hook (lambda ()
                                                     (switch-to-buffer "test-clean.el")))
   (package-list-packages))
-
-(require 'quelpa-use-package)
 
 ;; matrix-client
 
@@ -38,5 +40,6 @@
 
 (setq matrix-log t)
 (setq matrix-warn-unimplemented t)
+(setq matrix-client-show-images t)
 
 (matrix-client-frame)
