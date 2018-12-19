@@ -1,3 +1,5 @@
+;; -*- lexical-binding: t; -*-
+
 (require 'shr)
 
 (require 'request)
@@ -25,8 +27,8 @@ to match until the next whitespace character."
 (defun matrix-client--image-urls (text)
   "Return list of supported image URLs in TEXT."
   (cl-loop for regexp in matrix-client-image-url-prefixes
-           for regexp = (rx-to-string `(seq (regexp ,regexp) (1+ (not space))))
-           append (-map #'first (s-match-strings-all regexp text))))
+           for re = (rx-to-string `(seq (regexp ,regexp) (1+ (not space))))
+           append (-map #'first (s-match-strings-all re text))))
 
 (cl-defmethod matrix-client-insert-image ((room matrix-room) message-id url)
   "Download image from URL and insert it at message MESSAGE-ID in ROOM."
@@ -80,8 +82,8 @@ determined by the size of the buffer's window."
                   :max-width max-width
                   :max-height max-height)))
 
-(cl-defmethod matrix-client-insert-image-callback (&key (room matrix-room) message-id url
-                                                        data error-thrown symbol-status response
+(cl-defmethod matrix-client-insert-image-callback (&key (room matrix-room)
+                                                        message-id url data
                                                         &allow-other-keys)
   "Insert image into proper place at URL in message MESSAGE-ID in ROOM.
 Image is passed from parser as DATA, which should be an image
