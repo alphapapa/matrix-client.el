@@ -2,8 +2,6 @@
 (require 'dash-functional)
 (require 'frame-purpose)
 
-(require 'matrix-client)
-
 (defvar matrix-client-frame nil
   "The current Matrix Client frame.")
 
