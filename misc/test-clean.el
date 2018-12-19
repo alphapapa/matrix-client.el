@@ -12,7 +12,7 @@
 
 (setq debug-on-error t)
 
-;; package.el
+;;; package.el
 
 (require 'package)
 (setq package-menu-async nil)
@@ -20,7 +20,7 @@
                          ("melpa" . "https://melpa.org/packages/")))
 (package-initialize)
 
-;; Quelpa
+;;; Quelpa
 
 (unless (require 'quelpa-use-package nil t)
   (defun install-quelpa ()
@@ -31,7 +31,7 @@
                                                     (switch-to-buffer "test-clean.el")))
   (package-list-packages))
 
-;; matrix-client
+;;; matrix-client
 
 (use-package matrix-client
   :quelpa ((matrix-client :fetcher github :repo "jgkamat/matrix-client-el"
@@ -40,6 +40,16 @@
 
 (setq matrix-log t)
 (setq matrix-warn-unimplemented t)
+(setq matrix-client-show-room-avatars t)
 (setq matrix-client-show-images t)
+(setq matrix-client-mark-modified-rooms t)
 
-(matrix-client-frame)
+;;;; Connect
+
+;; Use this to log in manually.
+(call-interactively #'matrix-client-frame)
+
+;; Use this to do it all automatically:
+;; (progn
+;;   (matrix-client-connect "username" "password" nil "server")
+;;   (call-interactively #'matrix-client-frame))
