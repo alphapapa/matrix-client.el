@@ -619,7 +619,7 @@ Also update prompt with typers."
         (ov-set ov 'before-string prompt)
         (setq header-line-format (concat avatar
                                          ;; NOTE: Not sure if using `format' with an image-containing string works.
-                                         (format$ "$name: $topic")))))))
+                                         (format$ " $name: $topic")))))))
 
 (add-hook 'matrix-room-metadata-hook #'matrix-client-update-header)
 
