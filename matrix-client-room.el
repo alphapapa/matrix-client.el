@@ -2,6 +2,7 @@
 (require 'dnd)
 (require 'shr)
 
+(require 'matrix-macros)
 (require 'matrix-client-rainbow)
 (require 'ordered-buffer)
 
