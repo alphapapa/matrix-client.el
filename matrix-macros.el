@@ -4,6 +4,17 @@
 (require 'subr-x)
 (require 'url-http)
 
+(defmacro apply-if-fn (fn-name args else)
+  "If FN-NAME is a function, return result of applying ARGS to it, otherwise eval ELSE form.
+FN-NAME should be a string, and is available in the ELSE form as `fn-name'."
+  (declare (debug (form listp form)))
+  ;; FIXME: Probably use with-gensyms* here.
+  `(let* ((fn-name ,fn-name)
+          (fn (intern-soft ,fn-name)))
+     (if (functionp fn)
+         (apply fn ,args)
+       ,else)))
+(put 'apply-if-fn 'lisp-indent-function 2)
 
 (defmacro format$ (string &rest objects)
   "Interpolated `format'.
