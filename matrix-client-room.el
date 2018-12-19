@@ -1,3 +1,4 @@
+(require 'cl-lib)
 (require 'dnd)
 (require 'shr)
 
@@ -573,7 +574,7 @@ a different name is returned."
                  ((eieio (user self)) session)
                  (avatar (when (and avatar matrix-client-show-room-avatars-in-buffer-names)
                            ;; Make a new image to avoid modifying the avatar in the header.
-                           (setq avatar (copy-list (get-text-property 0 'display avatar)))
+                           (setq avatar (cl-copy-list (get-text-property 0 'display avatar)))
                            (setf (image-property avatar :max-width) matrix-client-room-avatar-in-buffer-name-size)
                            (setf (image-property avatar :max-height) matrix-client-room-avatar-in-buffer-name-size)
                            (setq avatar (concat (propertize " " 'display avatar) " ")))))
