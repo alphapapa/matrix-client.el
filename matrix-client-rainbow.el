@@ -1,3 +1,5 @@
+(require 'rainbow-identifiers)
+
 (defvar matrix-client-room nil)
 
 (defgroup matrix-client-rainbow nil
