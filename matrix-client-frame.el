@@ -8,13 +8,13 @@
 ;;;###autoload
 (defun matrix-client-frame (&optional side)
   "Open and return the Matrix Client frame on SIDE.
-SIDE may be `left', `right', `above', or `below'.
+SIDE may be `left', `right', `top', or `bottom'.
 
 Only one such frame should be open at a time.  If more than one
 is, only the latest one will have its sidebar updated
 automatically."
   (interactive (list (if current-prefix-arg
-                         (intern (completing-read "Side: " '(left right above below)))
+                         (intern (completing-read "Side: " '(left right top bottom)))
                        'right)))
   (matrix-client-connect)
   (add-hook 'matrix-after-sync-hook #'matrix-client-frame-update-sidebar)
