@@ -7,20 +7,33 @@ it further, fixing bugs, and providing long-term goals for the project.
 
 * Installation
 
-~matrix-client~ can only be installed manually. Simply put this directory onto
-your load path, and ~(require 'matrix-client)~. Once the project achieves a
-sufficiently high quality or demand, it may be submitted to melpa.
-
-When installing manually, you will need to ensure all dependencies are also
-installed properly.
-
 ** Quelpa
 
+[[https://framagit.org/steckerhalter/quelpa][Quelpa]] makes it easy to install Emacs packages directly from source repos, so this is probably how you'll want to install.  We recommend doing it like this:
+
+1.  Install [[https://framagit.org/steckerhalter/quelpa-use-package][quelpa-use-package]] (which can be installed directly from MELPA).
+2.  Add this form to your init file:
+
 #+BEGIN_SRC emacs-lisp
-  (quelpa '(matrix-client
-            :fetcher github
-            :repo "jgkamat/matrix-client-el"))
+  (use-package matrix-client
+    :quelpa ((matrix-client :fetcher github :repo "jgkamat/matrix-client-el"
+                            :files (:defaults "logo.png"))))
 #+END_SRC
+
+After installation, upgrading must be done manually, e.g. with @@html:<kbd>@@C-u M-x quelpa RET matrix-client RET@@html:</kbd>@@.  If you want to always upgrade to the latest version every time Emacs starts, add the ~:upgrade t~ option, like this:
+
+#+BEGIN_SRC emacs-lisp
+  (use-package matrix-client
+    :quelpa ((matrix-client :fetcher github :repo "jgkamat/matrix-client-el"
+                            :files (:defaults "logo.png"))
+             :upgrade t))
+#+END_SRC
+
+** Manually
+
+Simply put this repo's directory onto your ~load-path~, and eval ~(require 'matrix-client)~.  Once the project achieves a sufficiently high quality or demand, it may be submitted to MELPA.
+
+Note that when installing manually, you will also need to manually install all dependencies.
 
 * Usage
 
