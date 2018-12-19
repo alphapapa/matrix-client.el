@@ -5,6 +5,8 @@
 (require 'request)
 (require 's)
 
+(require 'matrix-macros)
+
 (defcustom matrix-client-show-images nil
   "Download and show images posted to rooms."
   :type 'boolean
