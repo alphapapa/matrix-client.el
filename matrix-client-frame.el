@@ -16,6 +16,7 @@ automatically."
   (interactive (list (if current-prefix-arg
                          (intern (completing-read "Side: " '(left right above below)))
                        'right)))
+  (matrix-client-connect)
   (add-hook 'matrix-after-sync-hook #'matrix-client-frame-update-sidebar)
   (setq matrix-client-frame
         (frame-purpose-make-frame
