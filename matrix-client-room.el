@@ -720,6 +720,10 @@ is sent, if any."
          (matrix-client-update-last-seen room))
        (add-to-list 'matrix-client-room-commands ,command))))
 
+;; HACK: This feature requires the room command macro.  I should figure out a cleaner way to
+;; organize things like this.
+(require 'matrix-client-rainbow)
+
 (matrix-client-def-room-command me
   :message input
   :msgtype "m.emote"
