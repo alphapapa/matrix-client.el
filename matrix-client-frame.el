@@ -41,6 +41,7 @@ automatically."
                                                         collect (oref* room client-data buffer))))
          :sidebar-auto-update nil
          :sidebar-update-on-buffer-switch t
+         :sidebar-header " Rooms"
          :require-mode nil)))
 
 (defun matrix-client-frame-update-sidebar (&rest _ignore)
