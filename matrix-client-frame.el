@@ -22,7 +22,7 @@ automatically."
         (frame-purpose-make-frame
          :modes '(matrix-client-mode)
          :title "Matrix"
-         :icon-type (expand-file-name "images/logo.png")
+         :icon-type (expand-file-name "logo.png" (file-name-directory (locate-library "matrix-client-frame")))
          :sidebar side
          :buffer-sort-fns (list (-on #'string< #'buffer-name)
                                 (-on #'> (lambda (buffer)
