@@ -7,9 +7,22 @@ it further, fixing bugs, and providing long-term goals for the project.
 
 * Installation
 
+** Standalone client
+
+The easiest way to start using this package is to download the script =matrix-client-standalone.el= ([[https://github.com/jgkamat/matrix-client-el/blob/master/misc/matrix-client-standalone.el][GitHub link]]), make it executable, and run it from a shell (not from within Emacs).  If any packages are missing, it uses Emacs's built-in =package.el= to install =quelpa= from MELPA, and =quelpa= then installs this client and its dependencies.  Then it runs the "standalone" client, which doesn't load any user configuration files.
+
+The script accepts these options:
+
++  =--upgrade=: Upgrade the client to the latest version before connecting.  (This also upgrades the script in the package directory, but any changes to it won't take effect until the next time it's run.)
++  =--debug=: Enable ~debug-on-error~ in the Emacs session.
+
+Since the script doesn't load any user configuration files, it's basically like a clean Emacs config.  However, it does initialize and use the existing Emacs packages directory (e.g. =~/.emacs.d/elpa=), so keep that in mind; any necessary packages will be installed there, and all autoload files will be read (which means that you can load any themes that you already have installed!).
+
+After using the "standalone" client, the packages will be installed to your Emacs packages directory, so then you can also use it in your main Emacs config.
+
 ** Quelpa
 
-[[https://framagit.org/steckerhalter/quelpa][Quelpa]] makes it easy to install Emacs packages directly from source repos, so this is probably how you'll want to install.  We recommend doing it like this:
+Installing directly with [[https://framagit.org/steckerhalter/quelpa][Quelpa]] into your Emacs config is also very easy:
 
 1.  Install [[https://framagit.org/steckerhalter/quelpa-use-package][quelpa-use-package]] (which can be installed directly from MELPA).
 2.  Add this form to your init file:
@@ -20,41 +33,31 @@ it further, fixing bugs, and providing long-term goals for the project.
                             :files (:defaults "logo.png" "misc/matrix-client-standalone.el"))))
 #+END_SRC
 
-After installation, upgrading must be done manually, e.g. with @@html:<kbd>@@C-u M-x quelpa RET matrix-client RET@@html:</kbd>@@.  If you want to always upgrade to the latest version every time Emacs starts, add the ~:upgrade t~ option, like this:
-
-#+BEGIN_SRC emacs-lisp
-  (use-package matrix-client
-    :quelpa ((matrix-client :fetcher github :repo "jgkamat/matrix-client-el"
-                            :files (:defaults "logo.png" "misc/matrix-client-standalone.el"))
-             :upgrade t))
-#+END_SRC
+After installation, upgrading can be done through =quelpa=, e.g. with @@html:<kbd>@@C-u M-x quelpa RET matrix-client RET@@html:</kbd>@@.
 
 ** Manually
 
-Simply put this repo's directory onto your ~load-path~, and eval ~(require 'matrix-client)~.  Once the project achieves a sufficiently high quality or demand, it may be submitted to MELPA.
+Simply put this repo's directory onto your ~load-path~, and eval ~(require 'matrix-client)~.  Note that when installing manually, you will also need to manually install all dependencies.  
 
-Note that when installing manually, you will also need to manually install all dependencies.
+Once the project achieves a sufficiently high quality or demand, it may be submitted to MELPA, but that probably won't happen anytime soon.
 
 * Usage
 
-Either deploy your own homeserver or register account on the public homeserver
-https://matrix.org/beta/#/login . After you've done that, =M-x matrix-client=
-will set you up with buffers corresponding to your Matrix rooms. You can join
-new ones with /join, leave with /leave or /part, and hook in to the custom
-functions provided by =matrix-client=.
+Either deploy your own homeserver or register an account on the [[https://matrix.org/beta/#/login][public homeserver]] .
 
-Use the ~matrix-client-frame~ command to open a dedicated frame, like this (also seen here is the optional ~matrix-client-rainbow-mode~ that colorizes events according to sender):
+Then run the command ~matrix-client-connect~ or ~matrix-client-frame~ to connect.  These commands are available in a room:
+
++  Join a room: =/join #room:server=
++  Leave the current room: =/leave=
++  Upload a file: =/upload PATH-OR-URL= or drag-and-drop files or URLs onto the room buffer
++  Send HTML messages: =/html=
++  See the user list: =/who=
++  Adjust notification settings: =/notify=
++  Enable pretty colors: =/rainbow=
+
+The command ~matrix-client-frame~ opens a dedicated frame, like this (also seen here is the optional ~matrix-client-rainbow-mode~ that colorizes events according to sender):
 
 [[images/frame-purpose-example.png]]
-
-** Standalone client
-
-A unique feature is that the file =matrix-client-standalone.el= ([[https://github.com/jgkamat/matrix-client-el/blob/master/misc/matrix-client-standalone.el][GitHub link]]) can be executed from a shell as a Bash script.  It accepts these options:
-
-+  =--upgrade=: Upgrade the client to the latest version before connecting.  (This also upgrades the script in the package directory, but any changes to it won't take effect until the next time it's run.)
-+  =--debug=: Enable ~debug-on-error~ in the Emacs session.
-
-The script does not load any user configuration files, so it's basically like a clean Emacs config.  However, it does initialize and use the existing Emacs packages directory (e.g. =~/.emacs.d/elpa=), so keep that in mind; any necessary packages will be installed there, and all autoload files will be read.
 
 * Configuration
 
