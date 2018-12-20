@@ -10,7 +10,12 @@
 (defcustom matrix-client-show-images nil
   "Download and show images posted to rooms."
   :type 'boolean
-  :group 'matrix-client)
+  :group 'matrix-client
+  :set (lambda (option value)
+         (if (fboundp 'imagemagick-types)
+             (set-default option value)
+           (set-default option nil)
+           (user-error "This Emacs was not built with ImageMagick support, so images can't be displayed"))))
 
 (defcustom matrix-client-image-url-prefixes
   (list (rx bow "http" (optional "s") "://"
