@@ -26,7 +26,7 @@ After using the "standalone" client, the packages will be installed to your Emac
 
 Installing directly with [[https://framagit.org/steckerhalter/quelpa][Quelpa]] into your Emacs config is also very easy:
 
-1.  Install [[https://framagit.org/steckerhalter/quelpa-use-package][quelpa-use-package]] (which can be installed directly from MELPA).
+1.  Install [[https://framagit.org/steckerhalter/quelpa-use-package#installation][quelpa-use-package]] (which can be installed directly from MELPA).
 2.  Add this form to your init file:
 
 #+BEGIN_SRC emacs-lisp
