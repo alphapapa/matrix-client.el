@@ -314,16 +314,17 @@ If HTML is non-nil, treat input as HTML."
                          (buffer-substring-no-properties (point-min) (point-max)))))
       (s-trim plain-text))))
 
-(cl-defmethod matrix-client-upload ((room matrix-room) path)
+(defun matrix-client-upload (room path)
   "Upload file at PATH to ROOM.
 PATH may be a local path, optionally prefixed with \"file://\",
 or a remote HTTP(S) path, in which case the file will be
 downloaded and then uploaded.  Prompts for confirmation before
 uploading.
 
-Interactively, completes local file path; with prefix, reads
-path/URL without completion."
-  (interactive (list (if current-prefix-arg
+Interactively, uploads to current buffer's room, and completes
+local file path; with prefix, reads path/URL without completion."
+  (interactive (list matrix-client-room
+                     (if current-prefix-arg
                          (read-string "Path/URL: ")
                        (read-file-name "Upload file: " nil nil 'confirm))))
   (when (yes-or-no-p (format "Really upload %s? " path))
