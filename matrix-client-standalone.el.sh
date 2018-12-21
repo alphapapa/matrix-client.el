@@ -1,24 +1,63 @@
 #!/bin/bash
-# -*- mode: emacs-lisp; -*-
+
+#;;; Bash script
 
 #;; This file can be executed directly as a "standalone" Emacs Matrix
 #;; client that does not load any user configuration files.  The Bash
 #;; process substitution trick above was inspired by:
 #;; https://superuser.com/a/821624
 
-bash_end_line=$((2 + $(grep -n -m 1 -x "exit" "$0" \
-                            | grep -o -E '[[:digit:]]+')))
+# * Defaults
 
 recipe_part=":fetcher github :repo \"jgkamat/matrix-client-el\""
 
+# * Functions
+
+function die {
+    echo "$@" >&2
+    exit 1
+}
+
+function usage {
+    cat <<EOF
+This script launches matrix-client.el with a mostly clean Emacs configuration.
+
+It's only "mostly" clean because it uses the local ELPA package
+installation directory.  This allows you to, e.g. load themes you
+already have installed, and it means that, after running this script,
+matrix-client will be usable in your main Emacs config.
+
+Options:
+
+  --debug        Enable debug-on-error in Emacs
+  --help         You're lookin' at it
+  --local PATH   Use git repo at PATH instead of official one on GitHub (helpful for development)
+  --upgrade      Upgrade matrix-client.el and required dependency upgrades before connecting
+EOF
+}
+
+# * Args
+
 while [[ $1 ]]
 do
-[[ $1 == --upgrade ]] && upgrade=" (setq upgrade-matrix-client t) (setq quelpa-update-melpa-p t)"
 [[ $1 == --debug ]] && debug="(setq debug-on-error t)"
-[[ $1 == --local ]] && recipe_part=":fetcher git :url ,(expand-file-name \"~/src/emacs/matrix-client.el\")"
+[[ $1 == --help ]] && usage && exit
+[[ $1 == --local ]] && {
+    shift
+    [[ -d $1/.git ]] && [[ -r $1/.git ]] || die "Not a readable directory (should be a Git repo): $1"
+    recipe_part=":fetcher git :url ,(expand-file-name \"$1\")"
+}
+[[ $1 == --upgrade ]] && upgrade="(setq upgrade-matrix-client t) (setq quelpa-update-melpa-p t)"
 shift
 done
 
+# * Main
+
+# Find end of bash script
+bash_end_line=$((2 + $(grep -n -m 1 -x "exit" "$0" \
+                            | grep -o -E '[[:digit:]]+')))
+
+# Run Emacs
 emacs -q --insert <(tail -n +$bash_end_line "$0") --eval="(progn
 (defvar upgrade-matrix-client nil)
 (defvar quelpa-update-melpa-p nil)
@@ -29,13 +68,11 @@ $upgrade $debug
 
 exit
 
-;;; matrix-client-standalone.el
-
-;; NOTE: If you move the elisp header above, you must also change the line number passed to tail.
+;;; # * matrix-client-standalone.el
 
 (setq tool-bar-mode nil)
 
-;;; package.el
+;;;# package.el
 
 (require 'package)
 (setq package-menu-async nil)
@@ -43,7 +80,7 @@ exit
                          ("melpa" . "https://melpa.org/packages/")))
 (package-initialize)
 
-;;; Quelpa
+;;;# Quelpa
 
 ;; Install Quelpa if necessary.
 (unless (require 'quelpa-use-package nil t)
@@ -58,17 +95,17 @@ exit
 (let ((current-prefix-arg upgrade-matrix-client))
   (quelpa recipe))
 
-;;; matrix-client
+;;;# matrix-client
 
 (use-package matrix-client
-  :custom
-  (matrix-client-save-token t)
-  (matrix-client-show-images t)
-  (matrix-log t)
-  (matrix-client-show-room-avatars t)
-  (matrix-client-mark-modified-rooms t))
+ :custom
+ (matrix-client-save-token t)
+ (matrix-client-show-images t)
+ (matrix-log t)
+ (matrix-client-show-room-avatars t)
+ (matrix-client-mark-modified-rooms t))
 
-;;;; Connect
+;;;;# Connect
 
 (add-hook 'matrix-client-setup-room-buffer-hook
           (lambda (&rest _ignore)
@@ -77,3 +114,7 @@ exit
 (with-selected-frame
     (call-interactively #'matrix-client-frame)
   (delete-other-frames))
+
+;; Local Variables:
+;; eval: (aggressive-indent-mode -1)
+;; End:
