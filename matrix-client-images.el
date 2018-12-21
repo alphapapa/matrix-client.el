@@ -15,7 +15,8 @@
          (if (fboundp 'imagemagick-types)
              (set-default option value)
            (set-default option nil)
-           (user-error "This Emacs was not built with ImageMagick support, so images can't be displayed"))))
+           (when value
+             (warn "This Emacs was not built with ImageMagick support, so images can't be displayed in Matrix")))))
 
 (defcustom matrix-client-image-url-prefixes
   (list (rx bow "http" (optional "s") "://"
