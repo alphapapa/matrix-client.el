@@ -45,6 +45,42 @@ when a notification should fire."
                                     (const :tag "Always" t)
                                     (function :tag "Predicate function"))))
 
+(defcustom matrix-client-room-settings nil
+  "Per-room settings.
+An alist mapping room IDs to an alist of per-room settings."
+  :type '(alist :key-type (string :tag "Room ID")
+                :value-type alist))
+
+(defun matrix-client-room-setting (room-or-id setting)
+  "Return the value of SETTING for ROOM-OR-ID.
+SETTING should be a symbol, not a string."
+  ;; TODO: Make a gv setter.
+  (let* ((id (cl-typecase room-or-id
+               (matrix-room (oref room-or-id id))
+               (string room-or-id))))
+    (alist-get setting (alist-get id matrix-client-room-settings nil nil #'string=))))
+
+(gv-define-setter matrix-client-room-setting (value room-or-id setting)
+  ;; HACK: This works, but there is probably a way better than duplicating the code above.
+  `(setf (let* ((id (cl-typecase ,room-or-id
+                      (matrix-room (oref ,room-or-id id))
+                      (string ,room-or-id))))
+           (alist-get ,setting
+                      (alist-get id matrix-client-room-settings nil nil #'string=)
+                      nil nil #'equal))
+         ,value))
+
+(defun matrix-client-room-set (room-or-id setting value)
+  "Set VALUE of SETTING for ROOM-OR-ID.
+SETTING should be a symbol, not a string."
+  ;; This seems nicer to use than plain `setf'.
+  (let* ((id (cl-typecase room-or-id
+               (matrix-room (oref room-or-id id))
+               (string room-or-id))))
+    (setf (alist-get setting (alist-get id matrix-client-room-settings nil nil #'string=)
+                     nil nil #'equal)
+          value)))
+
 ;;;; Variables
 
 (defvar matrix-client-notify-hook nil
@@ -87,10 +123,10 @@ See `matrix-client-notification-rules' for rules."
   (with-slots* (((client-data id) room)
                 ((notification-rules) client-data))
     (setq notification-rules rule)
-    (map-put matrix-client-room-notification-rules id rule)
+    (matrix-client-room-set id 'notification-rules rule)
     ;; MAYBE: Persist the variable at a different time (or even use a different system for
     ;; persistence), because calling `customize-save-variable' is a bit slow.
-    (customize-save-variable 'matrix-client-room-notification-rules matrix-client-room-notification-rules)))
+    (customize-save-variable 'matrix-client-room-settings matrix-client-room-settings)))
 
 (defun matrix-client-notify (event-type data &rest rest)
   "Run notify hooks and built-in notificataion for an event of EVENT-TYPE with DATA.

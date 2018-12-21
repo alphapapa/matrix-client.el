@@ -646,7 +646,7 @@ Called from inside the room's buffer.")
     (setq-local matrix-client-room room)
     ;; Load notification settings for room
     (with-slots (id client-data) room
-      (when-let* ((rules (a-get matrix-client-room-notification-rules id)))
+      (when-let* ((rules (a-get* matrix-client-room-settings id 'notification-rules)))
         (oset client-data notification-rules rules)))
     ;; Drag-and-drop support
     (setq-local dnd-protocol-alist
