@@ -6,16 +6,24 @@
 #;; process substitution trick above was inspired by:
 #;; https://superuser.com/a/821624
 
+bash_end_line=$((2 + $(grep -n -m 1 -x "exit" "$0" \
+                            | grep -o -E '[[:digit:]]+')))
+
+recipe_part=":fetcher github :repo \"jgkamat/matrix-client-el\""
+
 while [[ $1 ]]
 do
 [[ $1 == --upgrade ]] && upgrade=" (setq upgrade-matrix-client t) (setq quelpa-update-melpa-p t)"
 [[ $1 == --debug ]] && debug="(setq debug-on-error t)"
+[[ $1 == --local ]] && recipe_part=":fetcher git :url ,(expand-file-name \"~/src/emacs/matrix-client.el\")"
 shift
 done
 
-emacs -q --insert <(tail -n +24 $0) --eval="(progn
+emacs -q --insert <(tail -n +$bash_end_line "$0") --eval="(progn
 (defvar upgrade-matrix-client nil)
 (defvar quelpa-update-melpa-p nil)
+(setq recipe \`(matrix-client $recipe_part
+	                  :files (:defaults \"logo.png\" \"matrix-client-standalone.el.sh\")))
 $upgrade $debug
 (eval-buffer))"
 
@@ -24,7 +32,6 @@ exit
 ;;; matrix-client-standalone.el
 
 ;; NOTE: If you move the elisp header above, you must also change the line number passed to tail.
-;; TODO: To be super slick, we could get the line number with grep.
 
 (setq tool-bar-mode nil)
 
@@ -49,8 +56,7 @@ exit
 ;; Install/upgrade Matrix Client. Quelpa makes it very difficult to force an upgrade.  It says if
 ;; you add ":upgrade t", it will, but it doesn't work.  So we have to bind `current-prefix-arg'.
 (let ((current-prefix-arg upgrade-matrix-client))
-  (quelpa '(matrix-client :fetcher github :repo "jgkamat/matrix-client-el"
-	                  :files (:defaults "logo.png" "misc/matrix-client-standalone.el"))))
+  (quelpa recipe))
 
 ;;; matrix-client
 

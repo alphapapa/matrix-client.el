@@ -11,7 +11,7 @@ it further, fixing bugs, and providing long-term goals for the project.
 
 ** Standalone client
 
-The easiest way to start using this package is to download the script =matrix-client-standalone.el= ([[https://github.com/jgkamat/matrix-client-el/blob/master/misc/matrix-client-standalone.el][GitHub link]]), make it executable, and run it from a shell (not from within Emacs).  If any packages are missing, it uses Emacs's built-in =package.el= to install =quelpa= from MELPA, and =quelpa= then installs this client and its dependencies.  Then it runs the "standalone" client, which doesn't load any user configuration files.
+The easiest way to start using this package is to download the script =matrix-client-standalone.el.sh= ([[https://github.com/jgkamat/matrix-client-el/blob/master/misc/matrix-client-standalone.el][GitHub link]]), make it executable, and run it from a shell (not from within Emacs).  If any packages are missing, it uses Emacs's built-in =package.el= to install =quelpa= from MELPA, and =quelpa= then installs this client and its dependencies.  Then it runs the "standalone" client, which doesn't load any user configuration files.
 
 The script accepts these options:
 
@@ -21,6 +21,8 @@ The script accepts these options:
 Since the script doesn't load any user configuration files, it's basically like a clean Emacs config.  However, it does initialize and use the existing Emacs packages directory (e.g. =~/.emacs.d/elpa=), so keep that in mind; any necessary packages will be installed there, and all autoload files will be read (which means that you can load any themes that you already have installed!).
 
 After using the "standalone" client, the packages will be installed to your Emacs packages directory, so then you can also use it in your main Emacs config.
+
+Of course, this is a rather unorthodox way to install and use an Emacs package, so if you are uncomfortable with this method, please do inspect the code yourself, or use another installation method.
 
 ** Quelpa
 
@@ -32,7 +34,7 @@ Installing directly with [[https://framagit.org/steckerhalter/quelpa][Quelpa]] i
 #+BEGIN_SRC emacs-lisp
   (use-package matrix-client
     :quelpa ((matrix-client :fetcher github :repo "jgkamat/matrix-client-el"
-                            :files (:defaults "logo.png" "misc/matrix-client-standalone.el"))))
+                            :files (:defaults "logo.png" "matrix-client-standalone.el.sh"))))
 #+END_SRC
 
 After installation, upgrading can be done through =quelpa=, e.g. with @@html:<kbd>@@C-u M-x quelpa RET matrix-client RET@@html:</kbd>@@.
