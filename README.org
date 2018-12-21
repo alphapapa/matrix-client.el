@@ -7,6 +7,8 @@ it further, fixing bugs, and providing long-term goals for the project.
 
 * Installation
 
+*Note:* This package currently requires Emacs 26 or greater.
+
 ** Standalone client
 
 The easiest way to start using this package is to download the script =matrix-client-standalone.el= ([[https://github.com/jgkamat/matrix-client-el/blob/master/misc/matrix-client-standalone.el][GitHub link]]), make it executable, and run it from a shell (not from within Emacs).  If any packages are missing, it uses Emacs's built-in =package.el= to install =quelpa= from MELPA, and =quelpa= then installs this client and its dependencies.  Then it runs the "standalone" client, which doesn't load any user configuration files.
