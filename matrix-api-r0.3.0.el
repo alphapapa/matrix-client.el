@@ -135,10 +135,9 @@ automatically, and other keys are allowed."
          :documentation "The fully qualified user ID, e.g. @user:matrix.org.")
    (server :initarg :server
            :instance-initform (or server
-                                  (let ((server (nth 2 (s-match (rx "@" (group (1+ (not (any ":"))))
-                                                                    ":" (group (1+ anything)))
-                                                                user))))
-                                    (matrix-lookup server)))
+                                  (nth 2 (s-match (rx "@" (group (1+ (not (any ":"))))
+                                                      ":" (group (1+ anything)))
+                                                  user)))
            :documentation "FQDN of server, e.g. \"matrix.org\" for the official homeserver.  Derived automatically when not explicitly set.")
    (api-url-prefix :type string
                    :instance-initform (concat "https://" server "/_matrix/client/r0/")
@@ -199,7 +198,11 @@ The sync error handler should increase this for consecutive errors, up to a maxi
                   :initform nil
                   :documentation "List of response buffers for pending /sync requests.  This should generally be a list of zero or one buffers.  This is used to cancel pending /sync requests when the user disconnects.")
    (client-data :initarg :client-data
-                :documentation "Reserved for users of the library, who may store whatever they want here."))
+                :documentation "Reserved for users of the library, who may store whatever they want here.")
+   (login-attempts :initarg :login-attempts
+                   :initform 0
+                   :type integer
+                   :documentation "Number of login attempts."))
   :allow-nil-initform t)
 
 ;;;;; Room
@@ -305,7 +308,7 @@ the standard Matrix port."
                                           (1+ digit) " "
                                           (1+ digit) " "
                                           (group (1+ digit)) " "
-                                          (group (1+ nonl))))
+                                          (group (1+ nonl)) "."))
                       host-response)
         (match-string 2 host-response)
       (display-warning 'matrix-client
@@ -491,8 +494,9 @@ set, will be called if the request fails."
   "Log in to SESSION with PASSWORD.
 Session should already have its USER slot set, and optionally its
 DEVICE-ID and INITIAL-DEVICE-DISPLAY-NAME."
-  (with-slots (user device-id initial-device-display-name initial-sync-p) session
+  (with-slots (user device-id initial-device-display-name initial-sync-p login-attempts) session
     (setq initial-sync-p t)
+    (cl-incf login-attempts)
     (matrix-post session 'login
       :data (a-list 'type "m.login.password"
                     'user user
@@ -500,7 +504,9 @@ DEVICE-ID and INITIAL-DEVICE-DISPLAY-NAME."
                     'device_id device-id
                     'initial_device_display_name initial-device-display-name)
       :success #'matrix-login-callback
-      :error #'matrix-login-error-callback)))
+      :error (apply-partially #'matrix-login-error-callback session
+                              ;; Pass password so we can use it again if necessary.
+                              :cbargs (a-list 'password password)))))
 
 (matrix-defcallback login matrix-session
   "Callback function for successful login.
@@ -514,16 +520,25 @@ Set access_token and device_id in session."
 
 (matrix-defcallback login-error matrix-session
   "Callback function for unsuccessful login."
+  :slots (server user login-attempts)
   :body (progn
           (matrix-log (a-list 'event 'matrix-login-error-callback
                               'error error
                               'url url
                               'query query
                               'data data))
-          (setq error (pcase error
-                        (`(error http 403) "403 Unauthorized (probably invalid username or password)")
-                        (_ error)))
-          (matrix-error (format$ "Login failed.  Error: $error"))))
+          (pcase error
+            (`(error http 403) "403 Unauthorized (probably invalid username or password)")
+            (_ (pcase login-attempts
+                 (1 (progn
+                      ;; One failed attempt, maybe because server hostname differs from user ID.
+                      ;; Try looking up the hostname and logging in again.  We make a new session to
+                      ;; reset the api-url-prefix to use the new server.
+                      (matrix-login (matrix-session :user user
+                                                    :server (matrix-lookup server)
+                                                    :login-attempts login-attempts)
+                                    (a-get cbargs 'password))))
+                 (_ (matrix-error (format$ "Login failed.  Error: $error"))))))))
 
 (cl-defmethod matrix-logout ((session matrix-session))
   "Log out of SESSION."
