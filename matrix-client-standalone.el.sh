@@ -41,7 +41,7 @@ EOF
 
 while [[ $1 ]]
 do
-[[ $1 == --debug ]] && debug="(setq debug-on-error t)"
+[[ $1 == --debug ]] && debug="(setq debug-on-error t) (setq matrix-log t)"
 [[ $1 == --help ]] && usage && exit
 [[ $1 == --local ]] && {
     shift
@@ -111,9 +111,7 @@ exit
 
 (use-package matrix-client
  :custom
- (matrix-client-save-token t)
  (matrix-client-show-images t)
- (matrix-log t)
  (matrix-client-show-room-avatars t)
  (matrix-client-mark-modified-rooms t))
 
