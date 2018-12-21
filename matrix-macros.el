@@ -306,7 +306,7 @@ SUCCESS and ERROR as `body'.  Or, if the body is not needed,
                                                     :status status
                                                     :error (plist-get status :error)))
                            ((or 'nil
-                                `(:peer (:certificate . ,_))
+                                `(:peer . ,_)
                                 `(:redirect . ,_))
                             (if (not url-http-end-of-headers)
                                 ;; HACK: It seems that the callback can be called with `nil' when
@@ -331,6 +331,7 @@ SUCCESS and ERROR as `body'.  Or, if the body is not needed,
                                          :status status
                                          :headers headers
                                          :data data))))
+                           ;; NOTE: This "please report" thing actually worked!  See issue #69.
                            (_ (error "Response status unrecognized; please report this error: %s" (pp-to-string status))))
                        (when matrix-url-with-retrieve-async-timeout-timer
                          (cancel-timer matrix-url-with-retrieve-async-timeout-timer))
