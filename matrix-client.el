@@ -147,7 +147,7 @@ connecting, non-nil."
       (setq user (or user (read-string "User ID: "))
             password (or password (read-passwd "Password: "))
             server (or server
-                       (--> (read-passwd "Server (leave blank to derive from user ID): ")
+                       (--> (read-passwd "Server (leave blank to fill automatically): ")
                             (if (string-empty-p it)
                                 nil
                               it)))))

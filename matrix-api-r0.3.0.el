@@ -135,10 +135,11 @@ automatically, and other keys are allowed."
          :documentation "The fully qualified user ID, e.g. @user:matrix.org.")
    (server :initarg :server
            :instance-initform (or server
-                                  (nth 2 (s-match (rx "@" (group (1+ (not (any ":"))))
-                                                      ":" (group (1+ anything)))
-                                                  user)))
-           :documentation "FQDN of server, e.g. \"matrix.org\" for the official homeserver.  Derived automatically from USER when not explicitly set.")
+                                  (let ((server (nth 2 (s-match (rx "@" (group (1+ (not (any ":"))))
+                                                                    ":" (group (1+ anything)))
+                                                                user))))
+                                    (matrix-lookup server)))
+           :documentation "FQDN of server, e.g. \"matrix.org\" for the official homeserver.  Derived automatically when not explicitly set.")
    (api-url-prefix :type string
                    :instance-initform (concat "https://" server "/_matrix/client/r0/")
                    :documentation "URL prefix for API requests.  Derived automatically from server-name and built-in API version.")
@@ -290,6 +291,26 @@ MESSAGE and ARGS should be a string and list of strings for
   (declare (indent defun))
   (nconc args (list :method 'put))
   (apply #'matrix-request args))
+
+(defun matrix-lookup (name)
+  "Return host for Matrix server for domain NAME.
+There is apparently no standard way to do this in Emacs.  This
+function tries to use lookup utilities, which may or may not
+exist on the local system.  If they fail, it returns NAME with
+the standard Matrix port."
+  (let* ((matrix-name (concat "_matrix._tcp." name))
+         (host-command (concat "host -t srv " matrix-name))
+         (host-response (shell-command-to-string host-command)))
+    (if (string-match (rx-to-string `(seq ,matrix-name " has SRV record "
+                                          (1+ digit) " "
+                                          (1+ digit) " "
+                                          (group (1+ digit)) " "
+                                          (group (1+ nonl))))
+                      host-response)
+        (match-string 2 host-response)
+      (display-warning 'matrix-client
+                       (concat "Unable to lookup server name automatically (maybe the \"host\" utility is not found).  Using: " name))
+      name)))
 
 ;;;; Methods
 
