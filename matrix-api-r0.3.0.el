@@ -501,7 +501,7 @@ Set access_token and device_id in session."
                               'data data))
           (setq error (pcase error
                         (`(error http 403) "403 Unauthorized (probably invalid username or password)")
-                        (_ _)))
+                        (_ error)))
           (matrix-error (format$ "Login failed.  Error: $error"))))
 
 (cl-defmethod matrix-logout ((session matrix-session))
