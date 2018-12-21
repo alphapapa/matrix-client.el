@@ -10,6 +10,7 @@
 # * Defaults
 
 recipe_part=":fetcher github :repo \"jgkamat/matrix-client-el\""
+custom_file_dir="~/.config/"
 
 # * Functions
 
@@ -57,10 +58,21 @@ done
 bash_end_line=$((2 + $(grep -n -m 1 -x "exit" "$0" \
                             | grep -o -E '[[:digit:]]+')))
 
+# NOTE: We set user-init-file to a temp file so Emacs will not balk at
+# saving our standalone custom-file.  If we didn't do this, we
+# wouldn't be able to save per-room settings.
+
+# MAYBE: Use a persistent file instead of a temp file.
+
 # Run Emacs
 emacs -q --insert <(tail -n +$bash_end_line "$0") --eval="(progn
 (defvar upgrade-matrix-client nil)
 (defvar quelpa-update-melpa-p nil)
+
+(setq user-init-file (make-temp-file \"matrix-client-standalone-fake-user-init-file-\"))
+(setq custom-file (expand-file-name \"matrix-client-standalone.el\" \"$custom_file_dir\"))
+(load custom-file)
+
 (setq recipe \`(matrix-client $recipe_part
 	                  :files (:defaults \"logo.png\" \"matrix-client-standalone.el.sh\")))
 $upgrade $debug
