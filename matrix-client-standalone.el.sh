@@ -69,9 +69,8 @@ emacs -q --insert <(tail -n +$bash_end_line "$0") --eval="(progn
 (defvar upgrade-matrix-client nil)
 (defvar quelpa-update-melpa-p nil)
 
-(setq user-init-file (make-temp-file \"matrix-client-standalone-fake-user-init-file-\"))
-(setq custom-file (expand-file-name \"matrix-client-standalone.el\" \"$custom_file_dir\"))
-(load custom-file)
+(setq user-init-file (expand-file-name \"matrix-client-standalone.el\" \"$custom_file_dir\"))
+(load user-init-file)
 
 (setq recipe \`(matrix-client $recipe_part
 	                  :files (:defaults \"logo.png\" \"matrix-client-standalone.el.sh\")))
