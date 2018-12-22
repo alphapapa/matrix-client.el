@@ -19,7 +19,7 @@ Used to add a button for pending messages.")
 
 (defvar matrix-client-mode-map
   (let ((map (make-sparse-keymap))
-        (mappings '(
+        (mappings `(
                     "r" matrix-client-reply-or-insert
                     "R" (lambda () (interactive) (matrix-client-reply-or-insert t))
                     "RET" matrix-client-ret
@@ -30,7 +30,8 @@ Used to add a button for pending messages.")
                     "<backtab>" (lambda ()
                                   (interactive)
                                   (matrix-client-tab :backward t))
-                    )))
+                    ;; This seems to work properly, to get the binding from `org-mode-map'.
+                    ,(key-description (where-is-internal 'org-edit-special org-mode-map 'first-only)) matrix-client-room-outorg)))
     (cl-loop for (key fn) on mappings by #'cddr
              do (define-key map (cl-typecase key
                                   (string (kbd key))
@@ -214,7 +215,7 @@ If DELETE is non-nil, also delete it from the input line."
   (let* ((fn (if delete
                  #'delete-and-extract-region
                #'buffer-substring))
-         (text (funcall fn (point) (point-max))))
+         (text (funcall fn (matrix-client--prompt-position) (point-max))))
     (remove-text-properties 0 (length text) '(read-only t) text)
     text))
 
@@ -806,21 +807,6 @@ INPUT should be, e.g. \"#room:matrix.org\".")
             (matrix-client-send-input :html t
                                       :input input)))
 
-(matrix-client-def-room-command org
-  :docstring "Send Org-formatted messages!"
-  :insert (let ((org-export-with-toc nil)
-                (org-export-with-broken-links t)
-                (org-export-with-section-numbers nil))
-            ;; There are probably other org-export settings that will be needed.
-            (save-window-excursion
-              (with-temp-buffer
-                (insert input)
-                (org-html-export-as-html nil nil nil 'body-only))
-              (matrix-client-send-input :html t
-                                        :input (with-current-buffer "*Org HTML Export*"
-                                                 (s-trim (buffer-string))))
-              nil)))
-
 (matrix-client-def-room-command upload
   :insert (when (matrix-client-upload room input)
             (concat "Uploading: " input))
@@ -1255,6 +1241,87 @@ as an async callback when the image is downloaded."
     (matrix-client-rename-buffer room)
     (when message
       (matrix-client-insert room message))))
+
+;;;;; Org syntax
+
+(matrix-client-def-room-command org
+  :docstring "Send Org-formatted messages!"
+  :insert (let ((org-export-with-toc nil)
+                (org-export-with-broken-links t)
+                (org-export-with-section-numbers nil))
+            ;; There are probably other org-export settings that will be needed.
+            (save-window-excursion
+              (with-temp-buffer
+                (insert input)
+                (cl-letf (((symbol-function 'org-html-src-block)
+                           (symbol-function 'matrix-client--org-html-src-block)))
+                  (org-html-export-as-html nil nil nil 'body-only)))
+              (matrix-client-send-input :html t
+                                        :input (with-current-buffer "*Org HTML Export*"
+                                                 (s-trim (buffer-string))))
+              nil)))
+
+(defun matrix-client-room-outorg ()
+  "Open a dedicated Org buffer to edit an outgoing message."
+  (interactive)
+  (let ((input (matrix-client--room-input :delete t))
+        (room matrix-client-room))
+    (with-current-buffer (generate-new-buffer "*matrix-client-outorg*")
+      ;; MAYBE: Bind-disable mode hooks.
+      (org-mode)
+      (setq-local matrix-client-room room)
+      (use-local-map (copy-keymap (current-local-map)))
+      (local-set-key [remap save-buffer]
+                     `(lambda ()
+                        (interactive)
+                        (let ((input (s-trim (buffer-string)))
+                              (room ,room))
+                          (with-room-buffer ,room
+                            (goto-char (matrix-client--prompt-position))
+                            (insert input))
+                          (kill-buffer))))
+      (insert input)
+      (pop-to-buffer (current-buffer))
+      (message (substitute-command-keys "Press \\[save-buffer] to save to room input"))
+      nil)))
+
+(defun matrix-client--org-html-src-block (src-block _contents info)
+  "Transcode a SRC-BLOCK element from Org to HTML.
+CONTENTS holds the contents of the item.  INFO is a plist holding
+contextual information.
+
+This is a copy of `org-html-src-block' that uses Riot
+Web-compatible HTML output, using HTML like:
+
+<pre><code class=\"language-python\">..."
+  (if (org-export-read-attribute :attr_html src-block :textarea)
+      (org-html--textarea-block src-block)
+    (let ((lang (pcase (org-element-property :language src-block)
+                  ;; Riot's syntax coloring doesn't support "elisp", but "lisp" works.
+                  ("elisp" "lisp")
+                  (else ,else)))
+	  (code (org-html-format-code src-block info))
+	  (label (let ((lbl (and (org-element-property :name src-block)
+				 (org-export-get-reference src-block info))))
+		   (if lbl (format " id=\"%s\"" lbl) ""))))
+      (if (not lang) (format "<pre class=\"example\"%s>\n%s</pre>" label code)
+	(format "<div class=\"org-src-container\">\n%s%s\n</div>"
+		;; Build caption.
+		(let ((caption (org-export-get-caption src-block)))
+		  (if (not caption) ""
+		    (let ((listing-number
+			   (format
+			    "<span class=\"listing-number\">%s </span>"
+			    (format
+			     (org-html--translate "Listing %d:" info)
+			     (org-export-get-ordinal
+			      src-block info nil #'org-html--has-caption-p)))))
+		      (format "<label class=\"org-src-name\">%s%s</label>"
+			      listing-number
+			      (org-trim (org-export-data caption info))))))
+		;; Contents.
+		(format "<pre><code class=\"src language-%s\"%s>%s</code></pre>"
+			lang label code))))))
 
 ;;;; Update-room-at-once approach
 
