@@ -2,6 +2,8 @@
 (require 'dnd)
 (require 'shr)
 
+(require 'ox-html)
+
 (require 'matrix-macros)
 (require 'matrix-client-rainbow)
 (require 'ordered-buffer)
@@ -200,7 +202,7 @@ With prefix, quote message or selected region of message."
   (unless (get-text-property (- (point) 2) 'read-only)
     (call-interactively #'delete-backward-char n kill-flag)))
 
-(cl-defun matrix-client-send-input (&key html)
+(cl-defun matrix-client-send-input (&key html input)
   "Send current input to current room.
 If HTML is non-nil, treat input as HTML."
   (interactive)
@@ -208,9 +210,10 @@ If HTML is non-nil, treat input as HTML."
   (pcase-let* ((room matrix-client-room)
                ((eieio session (id room-id)) room)
                ((eieio user txn-id) session)
-               (input (let ((text (delete-and-extract-region (point) (point-max))))
-                        (remove-text-properties 0 (length text) '(read-only t) text)
-                        text))
+               (input (or input
+                          (let ((text (delete-and-extract-region (point) (point-max))))
+                            (remove-text-properties 0 (length text) '(read-only t) text)
+                            text)))
                (first-word (when (string-match (rx bos "/" (group (1+ (not space)))) input)
                              (match-string 1 input)))
                (event-string (propertize input
@@ -774,12 +777,25 @@ INPUT should be, e.g. \"#room:matrix.org\".")
   :insert (when (matrix-set-name room input)
             (concat "Changing name to: " input)))
 
-(cl-defmethod matrix-client-room-command-html ((room matrix-room) input)
-  "Send HTML message to ROOM.
-INPUT should be, e.g. \"/html <b>...\"."
-  ;; HACK: Reinsert HTML without "/html" and call send-input again
-  (insert input)
-  (matrix-client-send-input :html t))
+(matrix-client-def-room-command html
+  :docstring "Send HTML messages."
+  :insert (prog1 nil
+            (matrix-client-send-input :html t
+                                      :input input)))
+
+(matrix-client-def-room-command org
+  :docstring "Send Org-formatted messages!"
+  :insert (let ((org-export-with-toc nil)
+                (org-export-with-broken-links t))
+            ;; There are probably other org-export settings that will be needed.
+            (save-window-excursion
+              (with-temp-buffer
+                (insert input)
+                (org-html-export-as-html nil nil nil 'body-only))
+              (matrix-client-send-input :html t
+                                        :input (with-current-buffer "*Org HTML Export*"
+                                                 (s-trim (buffer-string))))
+              nil)))
 
 (matrix-client-def-room-command upload
   :insert (when (matrix-client-upload room input)
