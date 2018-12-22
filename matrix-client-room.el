@@ -219,6 +219,13 @@ If DELETE is non-nil, also delete it from the input line."
     (remove-text-properties 0 (length text) '(read-only t) text)
     text))
 
+(defun matrix-client--room-command (name)
+  "If NAME is a room command, return its function, otherwise nil."
+  (let* ((fn-name (format "matrix-client-room-command-%s" name))
+         (fn (intern-soft fn-name)))
+    (when (functionp fn)
+      fn)))
+
 (cl-defun matrix-client-send-input (&key html input)
   "Send current input to current room.
 If HTML is non-nil, treat input as HTML."
@@ -229,13 +236,16 @@ If HTML is non-nil, treat input as HTML."
                ((eieio user txn-id) session)
                (input (or input
                           (matrix-client--room-input :delete t)))
-               (input (if (and (not html)
-                               matrix-client-send-as-org-by-default
-                               (not (string-prefix-p "/org " input)))
-                          (concat "/org " input)
-                        input))
+               ;; MAYBE: Rename `first-word' to `room-command' or something.
                (first-word (when (string-match (rx bos "/" (group (1+ (not space)))) input)
                              (match-string 1 input)))
+               (input (prog1 input
+                        (when (and matrix-client-send-as-org-by-default
+                                   (not html)
+                                   (not (matrix-client--room-command first-word))
+                                   (or (not first-word)
+                                       (not (string= first-word "org"))))
+                          (setq first-word "org"))))
                (event-string (propertize input
                                          'sender user
                                          'timestamp (time-to-seconds)))
@@ -288,6 +298,7 @@ If HTML is non-nil, treat input as HTML."
       (when matrix-client-save-outgoing-messages
         (push input kill-ring))
       (apply-if-fn (concat "matrix-client-room-command-" first-word)
+          ;; MAYBE: Use `--room-command' here.
           ;; Special command: apply command argument (i.e. without "/command ")
           (list room (s-trim (s-chop-prefix (concat "/" first-word) input)))
         (progn
