@@ -208,6 +208,16 @@ With prefix, quote message or selected region of message."
   (unless (get-text-property (- (point) 2) 'read-only)
     (call-interactively #'delete-backward-char n kill-flag)))
 
+(cl-defun matrix-client--room-input (&key delete)
+  "Return room input without read-only text properties.
+If DELETE is non-nil, also delete it from the input line."
+  (let* ((fn (if delete
+                 #'delete-and-extract-region
+               #'buffer-substring))
+         (text (funcall fn (point) (point-max))))
+    (remove-text-properties 0 (length text) '(read-only t) text)
+    text))
+
 (cl-defun matrix-client-send-input (&key html input)
   "Send current input to current room.
 If HTML is non-nil, treat input as HTML."
@@ -217,9 +227,7 @@ If HTML is non-nil, treat input as HTML."
                ((eieio session (id room-id)) room)
                ((eieio user txn-id) session)
                (input (or input
-                          (let ((text (delete-and-extract-region (point) (point-max))))
-                            (remove-text-properties 0 (length text) '(read-only t) text)
-                            text)))
+                          (matrix-client--room-input :delete t)))
                (input (if (and (not html)
                                matrix-client-send-as-org-by-default
                                (not (string-prefix-p "/org " input)))
