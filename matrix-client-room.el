@@ -786,7 +786,8 @@ INPUT should be, e.g. \"#room:matrix.org\".")
 (matrix-client-def-room-command org
   :docstring "Send Org-formatted messages!"
   :insert (let ((org-export-with-toc nil)
-                (org-export-with-broken-links t))
+                (org-export-with-broken-links t)
+                (org-export-with-section-numbers nil))
             ;; There are probably other org-export settings that will be needed.
             (save-window-excursion
               (with-temp-buffer
