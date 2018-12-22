@@ -82,6 +82,7 @@ exit
 ;;; # * matrix-client-standalone.el
 
 ;; Misc settings
+(setq load-prefer-newer t)
 (setq tool-bar-mode nil)
 
 ;; Improve default completion
