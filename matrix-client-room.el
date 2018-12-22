@@ -776,8 +776,10 @@ INPUT should be, e.g. \"#room:matrix.org\".")
 
 (matrix-client-def-room-command name
   :docstring "Set room name."
-  :insert (when (matrix-set-name room input)
-            (concat "Changing name to: " input)))
+  :insert (if (not (s-blank-str? input))
+              (when (matrix-set-name room input)
+                (concat "Changing name to: " input))
+            (concat "Room name: " (oref room name))))
 
 (matrix-client-def-room-command html
   :docstring "Send HTML messages."
