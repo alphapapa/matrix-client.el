@@ -57,6 +57,7 @@ Then run the command ~matrix-client-connect~ or ~matrix-client-frame~ to connect
 +  Send HTML messages: =/html=
 +  Send *Org-formatted* messages: =/org=
      -  You can send almost any Org syntax, including simple emphasis like *bold* and /italic/, one-line code blocks with =:= at the beginning of a line, code emphasis with =~=, even Org tables and complete =#+BEGIN_SRC lang ... #+END_SRC= blocks!  Emacs will even send the code blocks colorized according to your theme, and other =matrix-client.el= users will see the colors!
+     -  *Note: Sending Org-formatted messages is the default.*  You can disable it by changing the option ~matrix-client-send-as-org-by-default~, after which Org messages can be sent with the =/org= command.
 +  See the user list: =/who=
 +  Adjust notification settings: =/notify=
 +  Enable pretty colors: =/rainbow=

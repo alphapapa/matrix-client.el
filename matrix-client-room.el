@@ -39,6 +39,12 @@ Used to add a button for pending messages.")
     map)
   "Keymap for `matrix-client-mode'.")
 
+(defcustom matrix-client-send-as-org-by-default t
+  "Send messages as Org-formatted text by default.
+When disabled, use the \"/org\" command to send Org-formatted
+text."
+  :type 'boolean)
+
 (defcustom matrix-client-show-room-avatars t
   "Download and show room avatars."
   :type 'boolean)
@@ -214,6 +220,11 @@ If HTML is non-nil, treat input as HTML."
                           (let ((text (delete-and-extract-region (point) (point-max))))
                             (remove-text-properties 0 (length text) '(read-only t) text)
                             text)))
+               (input (if (and (not html)
+                               matrix-client-send-as-org-by-default
+                               (not (string-prefix-p "/org " input)))
+                          (concat "/org " input)
+                        input))
                (first-word (when (string-match (rx bos "/" (group (1+ (not space)))) input)
                              (match-string 1 input)))
                (event-string (propertize input
