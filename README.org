@@ -20,6 +20,8 @@ The script accepts these options (use =--help= for full list):
 
 The script doesn't load any standard Emacs user configuration files, so it's basically like a clean Emacs config.  However, it does initialize and use the existing Emacs packages directory (e.g. =~/.emacs.d/elpa=), so keep that in mind; any necessary packages will be installed there, and all autoload files will be read (which means that you can load any themes that you already have installed).  It also loads and saves its own =user-init-file= at =~/.config/matrix-client-standalone.el=, which preserves customized variables and faces; you can add your own code to it, just as you would to your regular Emacs =.emacs= or =init.el= file, which gives you a config mostly independent from your main Emacs config.
 
+The key @@html:<kbd>@@C-<tab>@@html:</kbd>@@ is bound to =switch-to-buffer=, and default completion settings are improved, to make switching room buffers easy.
+
 After using the "standalone" client, the packages will be installed to your Emacs packages directory, so then you can also use it in your main Emacs config.
 
 Of course, this is a rather unorthodox way to install and use an Emacs package, so if you are uncomfortable with this method, please do inspect the code yourself, or use another installation method.

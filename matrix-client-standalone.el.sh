@@ -81,7 +81,17 @@ exit
 
 ;;; # * matrix-client-standalone.el
 
+;; Misc settings
 (setq tool-bar-mode nil)
+
+;; Improve default completion
+(setq completion-ignore-case t)
+(setq read-buffer-completion-ignore-case t)
+(setq completion-cycle-threshold 1)
+(setq completions-format 'vertical)
+
+;; Switch buffer command
+(global-set-key (kbd "C-<tab>") #'switch-to-buffer)
 
 ;;;# package.el
 
