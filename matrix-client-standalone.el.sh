@@ -70,7 +70,8 @@ emacs -q --insert <(tail -n +$bash_end_line "$0") --eval="(progn
 (defvar quelpa-update-melpa-p nil)
 
 (setq user-init-file (expand-file-name \"matrix-client-standalone.el\" \"$custom_file_dir\"))
-(load user-init-file)
+(when (file-readable-p user-init-file)
+  (load user-init-file))
 
 (setq recipe \`(matrix-client $recipe_part
 	                  :files (:defaults \"logo.png\" \"matrix-client-standalone.el.sh\")))
