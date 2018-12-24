@@ -178,30 +178,50 @@ method without it."
   "If point is on a previous message, begin a reply addressed to its sender.  Otherwise, self-insert.
 With prefix, quote message or selected region of message."
   (interactive "P")
-  (if (get-text-property (point) 'sender)
+  (if-let* ((sender (get-text-property (point) 'sender)))
       ;; Start reply
-      (let* ((display-name (get-text-property (point) 'displayname))
-             (sender (get-text-property (point) 'sender))
-             (event-id (get-text-property (point) 'event_id))
-             (quote (if quote-p
-                        (--> (if (use-region-p)
-                                 (buffer-substring (region-beginning) (region-end))
-                               (matrix-client--this-message))
-                             (s-trim it)
-                             (prog1 it
-                               (remove-text-properties 0 (length it) '(read-only t) it)))
-                      ;; Not quoting
-                      ""))
-             ;; Sort of hacky but it will do for now.
-             (string (propertize (concat display-name ": " (propertize (replace-regexp-in-string (rx bol) "> " quote)
-                                                                       'quoted-body quote))
-                                 'event_id event-id
-                                 'sender sender))
-             (inhibit-read-only t))
+      (let* ((string (if quote-p
+                         (concat (matrix-client-quote-event-at-point :org matrix-client-send-as-org-by-default) "\n\n")
+                       (propertize (concat (matrix-user-displayname matrix-client-room sender) ": ")
+                                   'sender sender
+                                   'quoted-body (matrix-client--this-message)
+                                   'reply-p t
+                                   ;; local-label means to remove this part before sending a message.
+                                   ;; FIXME: This is all very ugly.  Needs better names too.
+                                   'local-label t
+                                   'rear-nonsticky t
+                                   'event_id (get-text-property (point) 'event_id)))))
         (goto-char (matrix-client--prompt-position))
-        (insert string "\n\n"))
+        (insert string))
     ;; Do self-insert
     (call-interactively 'self-insert-command)))
+
+(cl-defun matrix-client-quote-event-at-point (&key org)
+  "Return event at point quoted for replying.
+If ORG is non-nil, use Org syntax."
+  (let* ((display-name (get-text-property (point) 'displayname))
+         (sender (get-text-property (point) 'sender))
+         (event-id (get-text-property (point) 'event_id))
+         (quote (--> (if (use-region-p)
+                         (buffer-substring (region-beginning) (region-end))
+                       (matrix-client--this-message))
+                     (s-trim it)
+                     (prog1 it
+                       (remove-text-properties 0 (length it) '(read-only t) it))))
+         (string (if org
+                     (concat "#+BEGIN_QUOTE\n" quote "\n#+END_QUOTE")
+                   quote)))
+    ;; The `quoted-body' property is used to help display quotes sent by our own client properly.
+
+    ;; NOTE: There appears to be no Emacs function to get all text properties in a string, and doing
+    ;; so might be inefficient and not even make sense, because a single property can have multiple
+    ;; values in a string.  So it's important to put all the properties we want other functions to
+    ;; have access to at the beginning of the string.
+    (propertize (concat display-name ": \n\n" string)
+                'event_id event-id
+                'sender sender
+                'quoted-body quote
+                'rear-nonsticky '(quoted-body))))
 
 (defun matrix-client-delete-backward-char (n &optional kill-flag)
   "Delete backward unless the point is at the prompt or other read-only text."
@@ -231,98 +251,115 @@ If DELETE is non-nil, also delete it from the input line."
 If HTML is non-nil, treat input as HTML."
   (interactive)
   (goto-char (matrix-client--prompt-position))
-  (pcase-let* ((room matrix-client-room)
-               ((eieio session (id room-id)) room)
-               ((eieio user txn-id) session)
-               (input (or input
-                          (matrix-client--room-input :delete t)))
-               ;; MAYBE: Rename `first-word' to `room-command' or something.
-               (first-word (when (string-match (rx bos "/" (group (1+ (not space)))) input)
-                             (match-string 1 input)))
-               (input (prog1 input
-                        (when (and matrix-client-send-as-org-by-default
-                                   (not html)
-                                   (not (matrix-client--room-command first-word))
-                                   (or (not first-word)
-                                       (not (string= first-word "org"))))
-                          (setq first-word "org"))))
-               (event-string (propertize input
-                                         'sender user
-                                         'timestamp (time-to-seconds)))
-               (matrix-client-insert-prefix-fn (lambda ()
-                                                 (insert-button "[pending] "
-                                                                'face 'matrix-client-pending-messages
-                                                                'action (lambda (&rest ignore)
-                                                                          (when (yes-or-no-p "Resend message?")
-                                                                            ;; FIXME: Include txn-id.  FIXME: This will include
-                                                                            ;; the metadata, which we probably don't want to
-                                                                            ;; resend.
-                                                                            (matrix-send-message room string
-                                                                                                 :override-txn-id (1+ txn-id))))
-                                                                'help-echo "Resend message"
-                                                                'transaction_id (1+ txn-id))))
-               (format) (formatted-body) (extra-content))
-    (when (get-text-property 0 'event_id input)
-      ;; Quoting
-      ;; FIXME: This is getting ugly.  Needs refactoring.
-      (let* ((event-id (get-text-property 0 'event_id input))
-             (sender (get-text-property 0 'sender input))
-             (sender-displayname (matrix-user-displayname room sender))
-             (quoted-body-start-pos (text-property-not-all 0 (length input) 'quoted-body nil input))
-             (quoted-body (if quoted-body-start-pos
-                              (get-text-property quoted-body-start-pos 'quoted-body input)
-                            ""))
-             (input (let ((text (substring input (next-single-property-change 0 'event_id input))))
-                      ;; Not sure if removing read-only is necessary.
-                      (remove-text-properties 0 (length text) '(read-only t) text)
-                      text))
-             (byline (if (string-empty-p quoted-body)
-                         (format$ "<a href=\"https://matrix.to/#/$sender\">$sender-displayname</a>:")
-                       (format$ "<a href=\"https://matrix.to/#/$room-id/$event-id\">In reply to</a> <a href=\"https://matrix.to/#/$sender\">$sender-displayname</a><br>")))
-             (html (if (string-empty-p quoted-body)
-                       (concat byline input)
-                     (concat "<mx-reply><blockquote>" byline quoted-body "</blockquote></mx-reply>" input))))
-        (setq format "org.matrix.custom.html"
-              formatted-body html
-              input (concat "> <" sender "> " quoted-body "\n\n" input)
-              extra-content (a-list 'format format
-                                    'formatted_body formatted-body
-                                    'm.relates_to (a-list 'm.in_reply_to (a-list 'event_id event-id))))))
-    (when html
-      (setq format "org.matrix.custom.html"
-            formatted-body input
-            input (matrix-client--html-to-plain input)
-            extra-content (a-list 'format format
-                                  'formatted_body formatted-body)))
+  (let* ((input (or input
+                    (matrix-client--room-input :delete t)))
+         (room-command (if-let* ((match-found-p (string-match (rx bos "/" (group (1+ (not blank)))
+                                                                  (1+ blank)
+                                                                  (group (1+ anything)))
+                                                              input)))
+                           ;; Room command used: remove it from `input' and return it.
+                           (prog1
+                               (matrix-client--room-command (match-string 1 input))
+                             (setq input (match-string 2 input)))
+                         ;; No room command: set to /org if necessary.
+                         (when (and matrix-client-send-as-org-by-default
+                                    (not html))
+                           (matrix-client--room-command "org")))))
     (unless (s-blank-str? input)
       (when matrix-client-save-outgoing-messages
-        (push input kill-ring))
-      (apply-if-fn (concat "matrix-client-room-command-" first-word)
-          ;; MAYBE: Use `--room-command' here.
-          ;; Special command: apply command argument (i.e. without "/command ")
-          (list room (s-trim (s-chop-prefix (concat "/" first-word) input)))
+        (push input kill-ring)))
+    (if room-command
+        (funcall room-command matrix-client-room input)
+      (matrix-client-send-input-1 :input input :html html))))
+
+(cl-defun matrix-client-send-input-1 (&key input html)
+  "Send input to current room as a message.
+If HTML is non-nil, treat INPUT as HTML."
+  (pcase-let* (;; (matrix-client-insert-prefix-fn
+               ;;  ;; FIXME: I don't think this works anymore.
+               ;;  (lambda ()
+               ;;    (insert-button "[pending] "
+               ;;                   'face 'matrix-client-pending-messages
+               ;;                   'action (lambda (&rest ignore)
+               ;;                             (when (yes-or-no-p "Resend message?")
+               ;;
+               ;;                               (matrix-send-message room string
+               ;;                                                    :override-txn-id (1+ txn-id))))
+               ;;                   'help-echo "Resend message"
+               ;;                   'transaction_id (1+ txn-id))))
+               (room matrix-client-room)
+               ((eieio session (id room-id)) room)
+               ((eieio user txn-id) session)
+               (plain-text-body input)
+               (format) (formatted-body) (extra-content))
+    (when (or (get-text-property 0 'event_id input)
+              (text-property-not-all 0 (length input) 'quoted-body nil input))
+      ;; Replying or quoting.
+      ;; FIXME: This is better than the old code, but still feels messy.
+      (let* ((reply-p (get-text-property 0 'reply-p input))
+             ;; In case a user copies and pastes a message from one room buffer into another, it
+             ;; will appear as a reply, but we won't have a quoted-body, so use an empty string to
+             ;; prevent "nil".
+             (quotation (or (get-text-property 0 'quoted-body input) ""))
+             (event-id (or (get-text-property 0 'event_id input)
+                           (display-warning 'matrix-client-send-input-1 "Event ID not found in quotation: %s" quotation)))
+             (sender (get-text-property 0 'sender input))
+             (sender-displayname (matrix-user-displayname room sender))
+             (byline (format$ "<a href=\"https://matrix.to/#/$room-id/$event-id\">In reply to</a> <a href=\"https://matrix.to/#/$sender\">$sender-displayname</a><br>"))
+             ;; Remove quoted body from input to avoid double-quoting.
+             (input (or (get-text-property 0 'non-quoted-part input)
+                        (when (get-text-property 0 'local-label input)
+                          (substring input (next-single-property-change 0 'local-label input)))
+                        input)))
+        (setq html t
+              ;; NOTE: Trying to imitate Riot here, except that we send "m.relates_to/m.in_reply_to"
+              ;; even when "quoting", because it seems to make sense to do so.  Riot doesn't do it,
+              ;; probably because it would have to adjust the UI code to not print the entire
+              ;; message being replied to.  But without sending the event ID it relates to, there's
+              ;; no definitive link to the message being replied to, so I think we should send it
+              ;; anyway.  This means that when quoting part of a message, Riot will also display the
+              ;; entire message body above the quoted portion...but so what.
+              formatted-body (if reply-p
+                                 ;; A "reply"
+                                 (concat "<mx-reply><blockquote>" byline quotation "</blockquote></mx-reply>" input)
+                               ;; Not a reply but a "quote"
+                               (format$ "<blockquote>$quotation</blockquote>$input"))
+              plain-text-body (if reply-p
+                                  (format$ "> <$sender> $quotation\n$input")
+                                ;; NOTE: Riot omits the leading ">" in this case, but that seems like a bug, so we'll include it.
+                                (format$ "> $quotation $input"))
+              extra-content (a-list 'm.relates_to (a-list 'm.in_reply_to (a-list 'event_id event-id))))))
+    (when html
+      (setq format "org.matrix.custom.html"
+            formatted-body (or formatted-body input)
+            plain-text-body (or plain-text-body
+                                (matrix-client--html-to-plain input))
+            extra-content (append extra-content
+                                  (a-list 'format format
+                                          'formatted_body formatted-body))))
+    (if (matrix-send-message room plain-text-body
+                             :extra-content extra-content
+                             :success (apply-partially #'matrix-client-send-message-callback room
+                                                       ;; HACK: We have to get the txn-id
+                                                       ;; ourselves here so we can apply it to the
+                                                       ;; callback, before send-message returns
+                                                       ;; the txn-id.
+                                                       (1+ txn-id))
+                             :error (apply-partially #'matrix-client-send-message-error-callback room
+                                                     (1+ txn-id)))
         (progn
-          ;; Normal message
+          ;; Message sent: insert fake message while waiting for server response.
           (matrix-client-event-m.room.message
            room (a-list 'origin_server_ts (* 1000 (string-to-number (format-time-string "%s")))
                         'sender user
                         'unsigned (a-list 'transaction_id (1+ txn-id))
-                        'content (a-list 'body input
+                        'content (a-list 'body plain-text-body
                                          'msgtype "m.text"
                                          'format format
                                          'formatted_body formatted-body)
                         'type "m.room.message"))
-          (matrix-send-message room input
-                               :extra-content extra-content
-                               :success (apply-partially #'matrix-client-send-message-callback room
-                                                         ;; HACK: We have to get the txn-id
-                                                         ;; ourselves here so we can apply it to the
-                                                         ;; callback, before send-message returns
-                                                         ;; the txn-id.
-                                                         (1+ txn-id))
-                               :error (apply-partially #'matrix-client-send-message-error-callback room
-                                                       (1+ txn-id)))
-          (matrix-client-update-last-seen room))))))
+          (matrix-client-update-last-seen room))
+      (display-warning 'matrix-client-send-input-1 "`matrix-send-message' failed."))))
 
 (defun matrix-client--event-body (id)
   "Return event message body for ID."
@@ -773,6 +810,36 @@ is sent, if any."
 When `matrix-client-send-as-org-by-default' is non-nil, this
 cancels Org formatting."
   :message input)
+
+(matrix-client-def-room-command org
+  :docstring "Send Org-formatted messages!"
+  ;; There are probably other org-export settings that will be needed.
+  :insert (let* ((org-export-with-toc nil)
+                 (org-export-with-broken-links t)
+                 (org-export-with-section-numbers nil)
+                 (text-properties (text-properties-at 0 input))
+                 (quoted-body (get-text-property 0 'quoted-body input))
+                 (non-quoted-part (when (and quoted-body
+                                             (text-property-not-all 0 (length input) 'quoted-body quoted-body input))
+                                    ;; This is getting really messy, but the problem is that, after
+                                    ;; running the text through org-export, we lose the text
+                                    ;; properties.
+                                    (substring input (next-single-property-change 0 'quoted-body input))))
+                 (exported (save-window-excursion
+                             (with-temp-buffer
+                               (insert input)
+                               (cl-letf (((symbol-function 'org-html-src-block)
+                                          (symbol-function 'matrix-client--org-html-src-block)))
+                                 (org-html-export-as-html nil nil nil 'body-only))
+                               (with-current-buffer "*Org HTML Export*"
+                                 (prog1 (s-trim (buffer-string))
+                                   (kill-buffer)))))))
+            (matrix-client-send-input-1 :html t
+                                        :input (apply #'propertize exported
+                                                      'non-quoted-part non-quoted-part
+                                                      text-properties))
+            ;; Return nil so nothing actually gets inserted directly from this command.
+            nil))
 
 (matrix-client-def-room-command me
   :message input
@@ -1260,23 +1327,6 @@ as an async callback when the image is downloaded."
       (matrix-client-insert room message))))
 
 ;;;;; Org syntax
-
-(matrix-client-def-room-command org
-  :docstring "Send Org-formatted messages!"
-  :insert (let ((org-export-with-toc nil)
-                (org-export-with-broken-links t)
-                (org-export-with-section-numbers nil))
-            ;; There are probably other org-export settings that will be needed.
-            (save-window-excursion
-              (with-temp-buffer
-                (insert input)
-                (cl-letf (((symbol-function 'org-html-src-block)
-                           (symbol-function 'matrix-client--org-html-src-block)))
-                  (org-html-export-as-html nil nil nil 'body-only)))
-              (matrix-client-send-input :html t
-                                        :input (with-current-buffer "*Org HTML Export*"
-                                                 (s-trim (buffer-string))))
-              nil)))
 
 (defun matrix-client-room-outorg ()
   "Open a dedicated Org buffer to edit an outgoing message."
