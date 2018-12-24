@@ -768,6 +768,12 @@ is sent, if any."
                        "Boring mode engaged."))
             nil))
 
+(matrix-client-def-room-command raw
+  :docstring "Send message without formatting.
+When `matrix-client-send-as-org-by-default' is non-nil, this
+cancels Org formatting."
+  :message input)
+
 (matrix-client-def-room-command me
   :message input
   :msgtype "m.emote"
