@@ -36,7 +36,7 @@ to match until the next whitespace character."
   "Return list of supported image URLs in TEXT."
   (cl-loop for regexp in matrix-client-image-url-prefixes
            for re = (rx-to-string `(seq (regexp ,regexp) (1+ (not space))))
-           append (-map #'first (s-match-strings-all re text))))
+           append (-map #'car (s-match-strings-all re text))))
 
 (cl-defmethod matrix-client-insert-image ((room matrix-room) message-id url)
   "Download image from URL and insert it at message MESSAGE-ID in ROOM."
