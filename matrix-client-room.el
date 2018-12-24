@@ -817,6 +817,7 @@ cancels Org formatting."
   :insert (let* ((org-export-with-toc nil)
                  (org-export-with-broken-links t)
                  (org-export-with-section-numbers nil)
+                 (org-html-inline-images nil)
                  (text-properties (text-properties-at 0 input))
                  (quoted-body (get-text-property 0 'quoted-body input))
                  (non-quoted-part (when (and quoted-body
