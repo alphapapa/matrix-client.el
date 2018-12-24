@@ -440,8 +440,10 @@ If MESSAGE is nil, clear existing message."
                                  'face 'font-lock-comment-face))))
       (ov-set ov 'before-string message))))
 
-(cl-defmethod matrix-client--delete-event ((room matrix-room) plist)
+(defun matrix-client--delete-event (room plist)
   "Delete event with text properties in PLIST from ROOM's buffer."
+  ;; MAYBE: Run the m.room.message handler in `with-current-buffer' so we don't have to do it here.
+  ;; Could reduce the number of times `with-current-buffer' is used, which may be slow.
   (with-room-buffer room
     (-when-let* (((beg end) (matrix-client--find-propertized-string plist))
                  (inhibit-read-only t))
