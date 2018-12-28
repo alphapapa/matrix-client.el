@@ -745,6 +745,7 @@ Called from inside the room's buffer.")
       (when-let* ((rules (a-get matrix-client-room-notification-rules id)))
         (oset client-data notification-rules rules)))
     ;; Drag-and-drop support
+    (setq-local x-dnd-test-function #'matrix-client--x-dnd-test-function)
     (setq-local dnd-protocol-alist
                 ;; Support dropping URLs, e.g. from Dolphin or Firefox.  Copied from `dnd-protocol-alist'.
 
@@ -975,6 +976,13 @@ INPUT should be, e.g. \"#room:matrix.org\".")
     ;; Return `private' to the sending app (this appears to be redundant, because, as
     ;; implemented, Emacs only returns the private event type).
     'private))
+
+(defun matrix-client--x-dnd-test-function (_window _action types)
+  "Like `x-dnd-default-test-function', but always returns the suggested action.
+Works around bug in Chrome/Chromium.  Hopefully doesn't break
+other apps' ability to drag-and-drop into Emacs."
+  (when-let* ((type (x-dnd-choose-type types)))
+    (cons 'copy type)))
 
 ;;;;; Support
 
