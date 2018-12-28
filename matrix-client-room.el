@@ -251,28 +251,46 @@ If DELETE is non-nil, also delete it from the input line."
 (cl-defun matrix-client-send-input (&key html input)
   "Send current input to current room.
 If HTML is non-nil, treat input as HTML."
+  ;; FIXME: Do we still need the html arg?
   (interactive)
-  (goto-char (matrix-client--prompt-position))
-  (let* ((input (or input
-                    (matrix-client--room-input :delete t)))
-         (room-command (if-let* ((match-found-p (string-match (rx bos "/" (group (1+ (not blank)))
-                                                                  (optional (1+ blank)
-                                                                            (group (1+ anything))))
-                                                              input)))
-                           ;; Room command used: remove it from `input' and return it.
-                           (prog1
-                               (matrix-client--room-command (match-string 1 input))
-                             (setq input (match-string 2 input)))
-                         ;; No room command: set to /org if necessary.
-                         (when (and matrix-client-send-as-org-by-default
-                                    (not html))
-                           (matrix-client--room-command "org")))))
-    (unless (s-blank-str? input)
+  ;; This is surprisingly tedious to get correct.  It has to handle these cases:
+  ;;
+  ;; +  Empty input
+  ;; +  Invalid command without args
+  ;; +  Invalid command with args
+  ;; +  Valid command without args
+  ;; +  Valid command with args
+  ;; +  Message without command
+  ;;
+  ;; This is something like version 3.5 of this function.  Seems to work properly now.
+  (-let* ((input (or input
+                     (matrix-client--room-input :delete t)))
+          ((command args) (progn
+                            ;; This should always match, even an empty string, so no errors.
+                            (string-match (rx bos
+                                              (seq (optional "/" (group (1+ (not blank))))
+                                                   (optional (1+ blank))
+                                                   (optional (group (1+ anything)))))
+                                          input)
+                            (list (match-string 1 input)
+                                  (match-string 2 input))))
+          (command-fn (if command
+                          (matrix-client--room-command command)
+                        (when (and matrix-client-send-as-org-by-default args)
+                          ;; Only call /org when input is non-empty.
+                          (matrix-client--room-command "org")))))
+    (when (and command (not command-fn))
+      ;; Invalid command
+      (goto-char (matrix-client--prompt-position))
+      (insert input)
+      (user-error "Invalid room command: /%s (to send messages starting with \"/\", insert a space first)" command))
+    (when (or command-fn (not (s-blank-str? args)))
+      ;; Valid command or normal message
       (when matrix-client-save-outgoing-messages
         (push input kill-ring))
-      (if room-command
-          (funcall room-command matrix-client-room input)
-        (matrix-client-send-input-1 :input input :html html)))))
+      (if command-fn
+          (funcall command-fn matrix-client-room args)
+        (matrix-client-send-input-1 :input args :html html)))))
 
 (cl-defun matrix-client-send-input-1 (&key input html)
   "Send input to current room as a message.
@@ -930,8 +948,7 @@ INPUT should be, e.g. \"#room:matrix.org\".")
 (matrix-client-def-room-command html
   :docstring "Send HTML messages."
   :insert (prog1 nil
-            (matrix-client-send-input :html t
-                                      :input input)))
+            (matrix-client-send-input-1 :html t :input input)))
 
 (matrix-client-def-room-command upload
   :insert (when (matrix-client-upload room input)
