@@ -1,5 +1,6 @@
 (require 'cl-lib)
 (require 'dnd)
+(require 'pcomplete)
 (require 'shr)
 
 (require 'ox-html)
@@ -161,10 +162,11 @@ method without it."
     (call-interactively #'kill-visual-line)))
 
 (cl-defun matrix-client-tab (&key backward)
-  "If point is before prompt, move point to next event; otherwise call `indent-for-tab-command'."
+  "If point is before prompt, move point to next event; otherwise complete room member names/IDs."
   (interactive)
-  (when-let ((pos (matrix-client--next-event-pos :backward backward)))
-    (goto-char pos)))
+  (if-let* ((pos (matrix-client--next-event-pos :backward backward)))
+      (goto-char pos)
+    (pcomplete)))
 
 (defun matrix-client-ret ()
   "If point is before prompt, move point to prompt; otherwise call `matrix-client-send-active-line'."
@@ -763,6 +765,39 @@ Called from inside the room's buffer.")
                                              'face '(:height 0.1))
                                  matrix-client-input-prompt)
           'matrix-client-prompt t))))
+
+;;;;;; Pcomplete
+
+(defun matrix-client-room-pcomplete-setup ()
+  "Set buffer-local variables for `pcomplete'.
+To be called in `matrix-client-setup-room-buffer-hook'."
+  (setq-local pcomplete-parse-arguments-function #'matrix-client-pcomplete-parse-arguments)
+  (setq-local pcomplete-default-completion-function #'matrix-client-pcomplete-room-members)
+  (setq-local pcomplete-use-paring nil)
+  (setq-local pcomplete-termination-string ": "))
+
+(add-hook 'matrix-client-setup-room-buffer-hook #'matrix-client-room-pcomplete-setup)
+
+(defun matrix-client-pcomplete-room-members ()
+  "Throw `pcomplete-completions' with a list of room members.
+List contains displaynames where available and MXIDs where not."
+  (throw 'pcomplete-completions
+         (-flatten
+          (--map (list (alist-get 'displayname it)
+                       (car it))
+                 (oref matrix-client-room members)))))
+
+(defun matrix-client-pcomplete-parse-arguments ()
+  "Parse current input line and return argument list suitable for `pcomplete'."
+  ;; This is all very confusing.  Only with the help of
+  ;; <https://www.emacswiki.org/emacs/PcompleteExamples> was I able to
+  ;; figure it out.  Thanks to whoever put together the simple example there.
+  (save-excursion
+    (list (list "dummy"
+                (s-trim (buffer-substring (point) (save-excursion
+                                                    (backward-to-indentation)
+                                                    (point)))))
+          (line-beginning-position) (point))))
 
 ;;;;; Room commands
 
