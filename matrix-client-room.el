@@ -256,8 +256,8 @@ If HTML is non-nil, treat input as HTML."
   (let* ((input (or input
                     (matrix-client--room-input :delete t)))
          (room-command (if-let* ((match-found-p (string-match (rx bos "/" (group (1+ (not blank)))
-                                                                  (1+ blank)
-                                                                  (group (1+ anything)))
+                                                                  (optional (1+ blank)
+                                                                            (group (1+ anything))))
                                                               input)))
                            ;; Room command used: remove it from `input' and return it.
                            (prog1
