@@ -774,7 +774,8 @@ To be called in `matrix-client-setup-room-buffer-hook'."
   (setq-local pcomplete-parse-arguments-function #'matrix-client-pcomplete-parse-arguments)
   (setq-local pcomplete-default-completion-function #'matrix-client-pcomplete-room-members)
   (setq-local pcomplete-use-paring nil)
-  (setq-local pcomplete-termination-string ": "))
+  (setq-local pcomplete-termination-string ": ")
+  (setq-local pcomplete-ignore-case t))
 
 (add-hook 'matrix-client-setup-room-buffer-hook #'matrix-client-room-pcomplete-setup)
 
