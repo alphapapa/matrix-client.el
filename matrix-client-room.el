@@ -269,10 +269,10 @@ If HTML is non-nil, treat input as HTML."
                            (matrix-client--room-command "org")))))
     (unless (s-blank-str? input)
       (when matrix-client-save-outgoing-messages
-        (push input kill-ring)))
-    (if room-command
-        (funcall room-command matrix-client-room input)
-      (matrix-client-send-input-1 :input input :html html))))
+        (push input kill-ring))
+      (if room-command
+          (funcall room-command matrix-client-room input)
+        (matrix-client-send-input-1 :input input :html html)))))
 
 (cl-defun matrix-client-send-input-1 (&key input html)
   "Send input to current room as a message.
