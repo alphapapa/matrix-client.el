@@ -292,12 +292,12 @@ If HTML is non-nil, treat INPUT as HTML."
                (room matrix-client-room)
                ((eieio session (id room-id)) room)
                ((eieio user txn-id) session)
-               (plain-text-body input)
-               (format) (formatted-body) (extra-content))
+               (plain-text-body) (format) (formatted-body) (extra-content))
     (when (or (get-text-property 0 'event_id input)
               (text-property-not-all 0 (length input) 'quoted-body nil input))
       ;; Replying or quoting.
-      ;; FIXME: This is better than the old code, but still feels messy.
+      ;; FIXME: This is better than the old code, but still feels messy.  The
+      ;; quoting code should probably be moved to another function.
       (let* ((reply-p (get-text-property 0 'reply-p input))
              ;; In case a user copies and pastes a message from one room buffer into another, it
              ;; will appear as a reply, but we won't have a quoted-body, so use an empty string to
@@ -326,19 +326,22 @@ If HTML is non-nil, treat INPUT as HTML."
                                  (concat "<mx-reply><blockquote>" byline quotation "</blockquote></mx-reply>" input)
                                ;; Not a reply but a "quote"
                                (format$ "<blockquote>$quotation</blockquote>$input"))
-              plain-text-body (if reply-p
-                                  (format$ "> <$sender> $quotation\n$input")
-                                ;; NOTE: Riot omits the leading ">" in this case, but that seems like a bug, so we'll include it.
-                                (format$ "> $quotation $input"))
+              plain-text-body (let ((quotation (matrix-client--html-to-plain quotation))
+                                    (input (matrix-client--html-to-plain input)))
+                                (if reply-p
+                                    (format$ "> <$sender> $quotation\n$input")
+                                  ;; NOTE: Riot omits the leading ">" in this case, but that seems like a bug, so we'll include it.
+                                  (format$ "> $quotation $input")))
               extra-content (a-list 'm.relates_to (a-list 'm.in_reply_to (a-list 'event_id event-id))))))
-    (when html
-      (setq format "org.matrix.custom.html"
-            formatted-body (or formatted-body input)
-            plain-text-body (or plain-text-body
-                                (matrix-client--html-to-plain input))
-            extra-content (append extra-content
-                                  (a-list 'format format
-                                          'formatted_body formatted-body))))
+    (if html
+        (setq format "org.matrix.custom.html"
+              formatted-body (or formatted-body input)
+              plain-text-body (or plain-text-body
+                                  (matrix-client--html-to-plain input))
+              extra-content (append extra-content
+                                    (a-list 'format format
+                                            'formatted_body formatted-body)))
+      (setq plain-text-body input))
     (if (matrix-send-message room plain-text-body
                              :extra-content extra-content
                              :success (apply-partially #'matrix-client-send-message-callback room
