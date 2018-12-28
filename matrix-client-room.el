@@ -1352,7 +1352,7 @@ as an async callback when the image is downloaded."
                           (kill-buffer))))
       (insert input)
       (pop-to-buffer (current-buffer))
-      (message (substitute-command-keys "Press \\[save-buffer] to save to room input"))
+      (setq header-line-format (substitute-command-keys "Press \\[save-buffer] to save to room input"))
       nil)))
 
 (defun matrix-client--org-html-src-block (src-block _contents info)
