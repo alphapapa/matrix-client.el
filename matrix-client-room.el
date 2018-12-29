@@ -930,11 +930,11 @@ cancels Org formatting."
 (matrix-client-def-room-command who
   :insert (with-slots (members) room
             (concat "Room members: "
-                    (--> members
-                         (--map (a-get (cdr it) 'displayname) it)
-                         (--sort (string-collate-lessp it other nil 'ignore-case)
-                                 it)
-                         (s-join ", " it))))
+                    (->> members
+                         (--map (or (a-get (cdr it) 'displayname)
+                                    (car it)))  ; MXID
+                         (--sort (string-collate-lessp it other nil 'ignore-case))
+                         (s-join ", "))))
   :docstring "Print list of room members.")
 
 (matrix-client-def-room-command join
