@@ -85,6 +85,7 @@ exit
 ;; Misc settings
 (setq load-prefer-newer t)
 (setq tool-bar-mode nil)
+(setq scroll-conservatively 100)
 
 ;; Improve default completion
 (setq completion-ignore-case t)
