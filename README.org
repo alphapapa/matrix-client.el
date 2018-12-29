@@ -67,6 +67,7 @@ Then run the command ~matrix-client-connect~ or ~matrix-client-frame~ to connect
      -  When ~matrix-client-send-as-org-by-default~ is enabled, this sends messages without Org formatting.
 +  See the user list: =/who=
 +  Adjust notification settings: =/notify=
++  Set room priority: ~/priority~
 +  Enable pretty colors: =/rainbow=
 
 Also:
