@@ -538,7 +538,7 @@ Set access_token and device_id in session."
                               'query query
                               'data data))
           (pcase error
-            (`(error http 403) "403 Unauthorized (probably invalid username or password)")
+            (`(error http 403) (matrix-error "403 Unauthorized (probably invalid username or password)"))
             (_ (pcase login-attempts
                  (1 (progn
                       ;; One failed attempt, maybe because server hostname differs from user ID.
