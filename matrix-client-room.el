@@ -1513,7 +1513,7 @@ Web-compatible HTML output, using HTML like:
       ;; Process new ephemeral events
       (seq-doseq (event ephemeral)
         (pcase-let* (((map type) event))
-          (apply-if-fn (concat "matrix-client-event-" type)
+          (if-fn-apply (concat "matrix-client-event-" type)
               (list room event)
             (matrix-unimplemented (format$ "Unimplemented client method: $fn-name")))))
       (setq ephemeral nil)                ; I think we can skip making a method for this.

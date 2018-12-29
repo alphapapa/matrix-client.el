@@ -657,7 +657,7 @@ requests, and we make a new request."
           (cl-loop for param in '(rooms presence account_data to_device device_lists)
                    ;; Assume that methods called will signal errors if anything goes wrong, so
                    ;; ignore return values.
-                   do (apply-if-fn (concat "matrix-sync-" (symbol-name param))
+                   do (if-fn-apply (concat "matrix-sync-" (symbol-name param))
                           (list session (a-get data param))
                         (matrix-unimplemented (format$ "Unimplemented API method: $fn-name"))))
           (when initial-sync-p
@@ -726,7 +726,7 @@ requests, and we make a new request."
                   (cl-loop for param in params
                            ;; If the event array is empty, the function will be
                            ;; called anyway, so ignore its return value.
-                           do (apply-if-fn (concat "matrix-sync-" (symbol-name param))
+                           do (if-fn-apply (concat "matrix-sync-" (symbol-name param))
                                   (list room (a-get joined-room param))
                                 (matrix-unimplemented (format$ "Unimplemented API method: $fn-name")))
                            ;; Always return t for now, so that we think the sync succeeded
@@ -791,7 +791,7 @@ requests, and we make a new request."
 (defun matrix-event (room event)
   "Process EVENT in ROOM."
   (pcase-let* (((map type) event))
-    (apply-if-fn (concat "matrix-event-" type)
+    (if-fn-apply (concat "matrix-event-" type)
         (list room event)
       (matrix-unimplemented (format$ "Unimplemented API handler for event $type in room %s." (oref room id))))))
 

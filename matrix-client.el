@@ -262,7 +262,7 @@ Intended to be called from a timer that runs at midnight."
 (defun matrix-client-timeline (room event)
   "Process EVENT in ROOM."
   (pcase-let* (((map type) event))
-    (apply-if-fn (concat "matrix-client-event-" type)
+    (if-fn-apply (concat "matrix-client-event-" type)
         (list room event)
       (matrix-unimplemented (format$ "Unimplemented client method: $fn-name")))))
 
