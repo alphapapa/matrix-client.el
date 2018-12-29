@@ -2,10 +2,9 @@
 
 [[https://img.shields.io/matrix/matrix-client.el:matrix.org.svg?label=%23matrix-client.el:matrix.org]]
 
-This is a fork of the [[http://doc.rix.si/projects/matrix.el.html][original matrix.el client]] with the intent of maintaining
-it further, fixing bugs, and providing long-term goals for the project.
+This is a fork of the [[http://doc.rix.si/projects/matrix.el.html][original matrix.el client]] with the intent of maintaining it further, fixing bugs, and providing long-term goals for the project.
 
-[[https://i.imgur.com/VlzRtEz.png][https://i.imgur.com/VlzRtEz.png]]
+[[images/frame-purpose-example.png]]
 
 * Installation
 
@@ -73,10 +72,6 @@ Then run the command ~matrix-client-connect~ or ~matrix-client-frame~ to connect
 Also:
 
 +  Press @@html:<kbd>@@TAB@@html:</kbd>@@ to complete on usernames and user IDs at the prompt, or @@html:<kbd>@@TAB@@html:</kbd>@@/@@html:<kbd>@@S-TAB@@html:</kbd>@@ to move between messages when point is before the input prompt.
-
-The command ~matrix-client-frame~ opens a dedicated frame, like this (also seen here is the optional ~matrix-client-rainbow-mode~ that colorizes events according to sender):
-
-[[images/frame-purpose-example.png]]
 
 * Configuration
 
