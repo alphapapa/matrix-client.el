@@ -43,8 +43,8 @@ return non-nil if the first should be sorted before the second."
 
 (defun matrix-client-room-buffer-name< (buffer-a buffer-b)
   "Return non-nil if BUFFER-A's room name is `string<' than BUFFER-B's."
-  (string< (buffer-name buffer-a)
-           (buffer-name buffer-b)))
+  (string-collate-lessp (buffer-name buffer-a)
+                        (buffer-name buffer-b)))
 
 (defun matrix-client-room-buffer-latest-event< (buffer-a buffer-b)
   "Return non-nil if BUFFER-A's room's latest event is more recent than BUFFER-B's."
@@ -92,6 +92,7 @@ automatically."
                                (cl-loop for session in matrix-client-sessions
                                         append (cl-loop for room in (oref* session rooms)
                                                         collect (oref* room client-data buffer))))
+         :sidebar-update-fn #'matrix-client-frame-update-sidebar
          :sidebar-auto-update nil
          :sidebar-update-on-buffer-switch t
          :sidebar-header " Rooms"
@@ -103,6 +104,45 @@ Should be called manually, e.g. in `matrix-after-sync-hook', by
 `frame-purpose--sidebar-switch-to-buffer', etc."
   (when (frame-live-p matrix-client-frame)
     (with-selected-frame matrix-client-frame
-      (frame-purpose--update-sidebar))))
+      ;; Copied from `frame-purpose--update-sidebar' to add grouping.
+      (with-current-buffer (frame-purpose--get-sidebar 'create)
+        (let* ((saved-point (point))
+               (inhibit-read-only t)
+               (buffer-sort-fns (frame-parameter nil 'buffer-sort-fns))
+               (buffers (funcall (frame-parameter nil 'sidebar-buffers-fn)))
+               (buffers (dolist (fn buffer-sort-fns buffers)
+                          (setq buffers (-sort fn buffers))))
+               (buffer-groups (-group-by matrix-client-frame-buffer-group-fn buffers))
+               (buffer-groups (a-list "Favorites" (a-get buffer-groups "Favorites")
+                                      "Rooms" (a-get buffer-groups "Rooms")
+                                      "Low Priority" (a-get buffer-groups "Low priority")                                      ))
+               (separator (pcase (frame-parameter nil 'sidebar)
+                            ((or 'left 'right) "\n")
+                            ((or 'top 'bottom) "  "))))
+          (erase-buffer)
+          (cl-loop for (group . buffers) in buffer-groups
+                   do (insert (propertize (concat " " group "\n")
+                                          'face 'matrix-client-date-header))
+                   do (cl-loop for buffer in buffers
+                               for string = (frame-purpose--format-buffer buffer)
+                               do (insert (propertize string 'buffer buffer)
+                                          separator))
+                   do (insert "\n"))
+          (goto-char saved-point))))))
+
+(defcustom matrix-client-frame-buffer-group-fn #'matrix-client-frame-default-buffer-group
+  "Function to group room buffers.
+It should return a string for each buffer, which will become that
+buffer group's header."
+  :type 'function)
+
+(defun matrix-client-frame-default-buffer-group (buffer)
+  "Return BUFFER's group header."
+  (let* ((room (buffer-local-value 'matrix-client-room buffer)))
+    (with-slots (tags) room
+      (cond ((assq 'm.favourite tags) "Favorites")
+            ((assq 'm.lowpriority tags) "Low priority")
+            ;; TODO: Direct chats.
+            (t "Rooms")))))
 
 (provide 'matrix-client-frame)
