@@ -109,12 +109,19 @@ Should be called manually, e.g. in `matrix-after-sync-hook', by
         (let* ((saved-point (point))
                (inhibit-read-only t)
                (buffer-sort-fns (frame-parameter nil 'buffer-sort-fns))
+               ;; FIXME: This works fine but is a little messy.
                (buffers (funcall (frame-parameter nil 'sidebar-buffers-fn)))
                (buffers (dolist (fn buffer-sort-fns buffers)
                           (setq buffers (-sort fn buffers))))
                (buffer-groups (-group-by matrix-client-frame-buffer-group-fn buffers))
+               (headers (-map #'car buffer-groups))
+               (other-headers (seq-difference headers '("Favorites" "People" "Rooms" "Low priority")))
+               ;; FIXME: Make group order configurable.
                (buffer-groups (a-list "Favorites" (a-get buffer-groups "Favorites")
-                                      "Rooms" (a-get buffer-groups "Rooms")
+                                      "People" (a-get buffer-groups "People")
+                                      "Rooms" (apply #'-flatten (a-get buffer-groups "Rooms")
+                                                     (--map (a-get buffer-groups it)
+                                                            other-headers))
                                       "Low Priority" (a-get buffer-groups "Low priority")                                      ))
                (separator (pcase (frame-parameter nil 'sidebar)
                             ((or 'left 'right) "\n")
@@ -139,10 +146,10 @@ buffer group's header."
 (defun matrix-client-frame-default-buffer-group (buffer)
   "Return BUFFER's group header."
   (let* ((room (buffer-local-value 'matrix-client-room buffer)))
-    (with-slots (tags) room
+    (with-slots (id tags session) room
       (cond ((assq 'm.favourite tags) "Favorites")
             ((assq 'm.lowpriority tags) "Low priority")
-            ;; TODO: Direct chats.
+            ((matrix-room-direct-p id session) "People")
             (t "Rooms")))))
 
 (provide 'matrix-client-frame)

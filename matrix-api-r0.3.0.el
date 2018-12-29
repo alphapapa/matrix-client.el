@@ -222,6 +222,8 @@ The sync error handler should increase this for consecutive errors, up to a maxi
    (canonical-alias :initarg :canonical-alias)
    (members :documentation "List of room members, as user objects."
             :type list)
+   (direct-p :documentation "Non-nil if the room is an \"m.direct\" room."
+             :type boolean)
    (state :documentation "Updates to the state, between the time indicated by the since parameter, and the start of the timeline (or all state up to the start of the timeline, if since is not given, or full_state is true).")
    (state-new :documentation "List of new state events.  Clients should clear this list by calling `matrix-clear-state'.")
    (tags :documentation "Room tags, as a list of symbols."
@@ -1184,7 +1186,22 @@ TYPING should be t or nil."
     (matrix-put session endpoint
       :data data)))
 
+(defun matrix-room-direct-p (room-id session)
+  "Return non-nil if ROOM-ID in SESSION is \"m.direct\"."
+  ;; Yes, this nesting is ugly, but this is how the API presents it.
+  (pcase-let* ((`(((type . "m.direct")
+                   (content . ,users)))
+                (matrix-account-data "m.direct" session)))
+    (cl-loop for (user-id . room-ids) in users
+             thereis (seq-contains room-ids room-id #'string=))))
+
 ;;;;; Misc
+
+(defun matrix-account-data (type session)
+  "Return account data of TYPE for SESSION."
+  (with-slots (account-data) session
+    (--select (equal (alist-get 'type it) type)
+              account-data)))
 
 (defun matrix-transform-mxc-uri (session uri)
   "Return HTTPS URL for MXI URI to be accessed through SESSION."
