@@ -1,16 +1,12 @@
 ;;;;; Faces
 
 (defface matrix-client-metadata
-  '((((class color) (background light)) (:foreground "#000088" :weight bold))
-    (((class color) (background dark)) (:foreground "#4444FF" :weight bold))
-    (t (:weight bold)))
+  '((t (:weight bold :inherit font-lock-function-name-face)))
   "Face for chat metadata properties."
   :group 'matrix-client)
 
 (defface matrix-client-own-metadata
-  '((((class color) (background light)) (:foreground "#268bd2" :weight bold))
-    (((class color) (background dark)) (:foreground "#268bd2" :weight bold))
-    (t (:weight bold)))
+  '((t (:weight bold :inherit font-lock-variable-name-face)))
   "Face for user's own chat metadata properties."
   :group 'matrix-client)
 
