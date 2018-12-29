@@ -373,14 +373,14 @@ If HTML is non-nil, treat INPUT as HTML."
         (progn
           ;; Message sent: insert fake message while waiting for server response.
           (matrix-client-event-m.room.message
-           room (a-list 'origin_server_ts (* 1000 (string-to-number (format-time-string "%s")))
-                        'sender user
-                        'unsigned (a-list 'transaction_id (1+ txn-id))
-                        'content (a-list 'body plain-text-body
-                                         'msgtype "m.text"
-                                         'format format
-                                         'formatted_body formatted-body)
-                        'type "m.room.message"))
+            room (a-list 'origin_server_ts (* 1000 (string-to-number (format-time-string "%s")))
+                         'sender user
+                         'unsigned (a-list 'transaction_id (1+ txn-id))
+                         'content (a-list 'body plain-text-body
+                                          'msgtype "m.text"
+                                          'format format
+                                          'formatted_body formatted-body)
+                         'type "m.room.message"))
           (matrix-client-update-last-seen room))
       (display-warning 'matrix-client-send-input-1 "`matrix-send-message' failed."))))
 

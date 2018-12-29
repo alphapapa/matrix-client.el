@@ -1224,14 +1224,14 @@ TYPING should be t or nil."
                (file-size (f-size path))
                (endpoint (url-encode-url (format$ "https://$server/_matrix/media/r0/upload?filename=$filename"))))
     (matrix-request-request session endpoint
-                            :method "POST"
-                            :success (apply-partially #'matrix-upload-callback room
-                                                      :cbargs (list :path path
-                                                                    :filename filename
-                                                                    :mime-type mime-type
-                                                                    :size file-size))
-                            :content-type mime-type
-                            :raw-data file-contents)))
+      :method "POST"
+      :success (apply-partially #'matrix-upload-callback room
+                                :cbargs (list :path path
+                                              :filename filename
+                                              :mime-type mime-type
+                                              :size file-size))
+      :content-type mime-type
+      :raw-data file-contents)))
 
 (matrix-defcallback upload matrix-room
   "Callback for `matrix-upload'.
