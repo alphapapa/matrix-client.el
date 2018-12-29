@@ -15,30 +15,40 @@
 ;; TODO: It'd be nice to byte-compile these comparators, because it doesn't seem to happen just by
 ;; byte-compiling the file.
 (defcustom matrix-client-frame-sort-fns
-  (list (lambda (a b)
-          (string< (buffer-name a)
-                   (buffer-name b)))
-        (lambda (a b)
-          ;; Sort modified rooms first (i.e. rooms with unseen events).
-          (and (buffer-modified-p a)
-               (not (buffer-modified-p b)))))
+  '(matrix-client-room-buffer-favorite<
+    matrix-client-room-buffer-name<)
   "How to sort room buffers in the frame sidebar.
 A list of functions that take two room buffers as arguments and
 return non-nil if the first should be sorted before the second."
   :group 'matrix-client
-  :type `(repeat (choice (const :tag "Room name"
-                                (lambda (a b)
-                                  (string< (buffer-name a)
-                                           (buffer-name b))))
-                         (const :tag "Most recent event in room"
-                                (lambda (a b)
-                                  (> (matrix-client-buffer-latest-event-ts a)
-                                     (matrix-client-buffer-latest-event-ts b))))
-                         (const :tag "Unseen events"
-                                (lambda (a b)
-                                  ;; Sort modified rooms first (i.e. rooms with unseen events).
-                                  (and (buffer-modified-p a)
-                                       (not (buffer-modified-p b))))))))
+  :type `(repeat (choice (const :tag "Favourite rooms" matrix-client-room-buffer-favorite<)
+                         (const :tag "Room name" matrix-client-room-buffer-name<)
+                         (const :tag "Most recent event in room" matrix-client-room-buffer-latest-event<)
+                         (const :tag "Unseen events" matrix-client-room-buffer-unseen-events<))))
+
+(defun matrix-client-room-buffer-favorite< (buffer-a buffer-b)
+  "Return non-nil if BUFFER-A's room is a favorite and BUFFER-B's is not."
+  (cl-macrolet ((room-favorite-p
+                 (buffer)
+                 `(with-slots (tags) (buffer-local-value 'matrix-client-room ,buffer)
+                    (assq 'm.favourite tags))))
+    (and (room-favorite-p buffer-a)
+         (not (room-favorite-p buffer-b)))))
+
+(defun matrix-client-room-buffer-name< (buffer-a buffer-b)
+  "Return non-nil if BUFFER-A's room name is `string<' than BUFFER-B's."
+  (string< (buffer-name buffer-a)
+           (buffer-name buffer-b)))
+
+(defun matrix-client-room-buffer-latest-event< (buffer-a buffer-b)
+  "Return non-nil if BUFFER-A's room's latest event is more recent than BUFFER-B's."
+  (> (matrix-client-buffer-latest-event-ts buffer-a)
+     (matrix-client-buffer-latest-event-ts buffer-b)))
+
+(defun matrix-client-room-buffer-unseen-events< (buffer-a buffer-b)
+  "Return non-nil if BUFFER-A's room is modified but not BUFFER-B's."
+  (and (buffer-modified-p buffer-a)
+       (not (buffer-modified-p buffer-b))))
 
 ;; This function can stay here for now since it's only used here.
 (defun matrix-client-buffer-latest-event-ts (buffer)
