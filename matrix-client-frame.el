@@ -24,7 +24,11 @@ return non-nil if the first should be sorted before the second."
   :type `(repeat (choice (const :tag "Favourite rooms" matrix-client-room-buffer-favorite<)
                          (const :tag "Room name" matrix-client-room-buffer-name<)
                          (const :tag "Most recent event in room" matrix-client-room-buffer-latest-event<)
-                         (const :tag "Unseen events" matrix-client-room-buffer-unseen-events<))))
+                         (const :tag "Unseen events" matrix-client-room-buffer-unseen-events<)))
+  :set (lambda (option value)
+         (set-default option value)
+         (when (frame-live-p matrix-client-frame)
+           (set-frame-parameter matrix-client-frame 'buffer-sort-fns (reverse value)))))
 
 (defun matrix-client-room-buffer-favorite< (buffer-a buffer-b)
   "Return non-nil if BUFFER-A's room is a favorite and BUFFER-B's is not."
@@ -76,7 +80,12 @@ automatically."
          :title "Matrix"
          :icon-type (expand-file-name "logo.png" (file-name-directory (locate-library "matrix-client-frame")))
          :sidebar side
-         :buffer-sort-fns matrix-client-frame-sort-fns
+         ;; NOTE: We reverse the buffer sort functions because that's
+         ;; how it needs to work.  We could do this in
+         ;; `frame-purpose-make-frame', but then it would have to
+         ;; special-case this parameter, which I don't want to do
+         ;; right now.
+         :buffer-sort-fns (reverse matrix-client-frame-sort-fns)
          :sidebar-buffers-fn (lambda ()
                                (cl-loop for session in matrix-client-sessions
                                         append (cl-loop for room in (oref* session rooms)
