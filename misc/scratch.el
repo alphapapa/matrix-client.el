@@ -39,7 +39,7 @@
 
 ;;; derp
 
-(cl-defmethod matrix-client-room-command-cowsay ((room matrix-room) input)
+(defun matrix-client-room-command-cowsay (room input)
   "Cowsay!"
   (let* ((s (replace-regexp-in-string (rx bos "/" (1+ (not space)) (1+ space)) "" input))
          (cow-type (seq-random-elt '("-b" "-d" "-g" "-p" "-s" "-t" "-w" "-y")))
@@ -56,7 +56,7 @@
 
 ;;; Replay room
 
-(cl-defmethod matrix-client-replay ((room matrix-room))
+(defun matrix-client-replay (room)
   "Erase and replay events into ROOM's buffer."
   (with-room-buffer room
     (let ((inhibit-read-only t)

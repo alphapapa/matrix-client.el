@@ -38,7 +38,7 @@ to match until the next whitespace character."
            for re = (rx-to-string `(seq (regexp ,regexp) (1+ (not space))))
            append (-map #'car (s-match-strings-all re text))))
 
-(cl-defmethod matrix-client-insert-image ((room matrix-room) message-id url)
+(defun matrix-client-insert-image (room message-id url)
   "Download image from URL and insert it at message MESSAGE-ID in ROOM."
   (matrix-url-with-retrieve-async url
     :silent t
@@ -50,7 +50,7 @@ to match until the next whitespace character."
                               :message-id message-id
                               :url url)))
 
-(cl-defmethod matrix-client-parse-image ((room matrix-room) &rest rescale-args)
+(defun matrix-client-parse-image (room &rest rescale-args)
   "Parse image from current HTTP response buffer and return image object.
 RESCALE-ARGS are passed to `matrix-client-rescale-image'."
   (pcase-let* ((data (progn
@@ -90,9 +90,7 @@ determined by the size of the buffer's window."
                   :max-width max-width
                   :max-height max-height)))
 
-(cl-defmethod matrix-client-insert-image-callback (&key (room matrix-room)
-                                                        message-id url data
-                                                        &allow-other-keys)
+(cl-defun matrix-client-insert-image-callback (&key room message-id url data &allow-other-keys)
   "Insert image into proper place at URL in message MESSAGE-ID in ROOM.
 Image is passed from parser as DATA, which should be an image
 object made with `create-image'.  This function should be called

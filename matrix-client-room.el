@@ -119,7 +119,7 @@ method without it."
   (let ((method-name (intern (concat "matrix-client-event-" (symbol-name type))))
         (slots (cl-loop for (object . slots) in object-slots
                         collect (list slots object))))
-    `(cl-defmethod ,method-name ((room matrix-room) event)
+    `(defun ,method-name (room event)
        ,docstring
        (declare (indent defun))
        (with-slots* ,slots
@@ -435,12 +435,12 @@ local file path; with prefix, reads path/URL without completion."
 
 ;;;; Methods
 
-(cl-defmethod matrix-client-fetch-history ((room matrix-room))
+(defun matrix-client-fetch-history (room)
   "Load earlier messages for ROOM."
   (matrix-client-room-banner room "Loading history...")
   (matrix-messages room ))
 
-(cl-defmethod matrix-client-fetch-history-callback ((room matrix-room) &key data &allow-other-keys)
+(cl-defun matrix-client-fetch-history-callback (room &key data &allow-other-keys)
   (pcase-let* (((map start end chunk) data)
                (matrix-client-enable-notifications nil)) ; Silence notifications for old messages
     ;; NOTE: We don't add the events to the timeline of the room object.
@@ -451,7 +451,7 @@ local file path; with prefix, reads path/URL without completion."
     ;; all... (maybe API 0.3.0 is better)
     (matrix-client-room-banner room nil)))
 
-(cl-defmethod matrix-client-room-banner ((room matrix-room) message)
+(defun matrix-client-room-banner (room message)
   "Display MESSAGE in a banner overlay at top of ROOM's buffer.
 If MESSAGE is nil, clear existing message."
   (with-room-buffer room
@@ -472,7 +472,7 @@ If MESSAGE is nil, clear existing message."
                  (inhibit-read-only t))
       (delete-region beg end))))
 
-(cl-defmethod matrix-client-send-message-callback ((room matrix-room) txn-id &key data &allow-other-keys)
+(cl-defun matrix-client-send-message-callback (room txn-id &key data &allow-other-keys)
   "Client callback for send-message.
 Replacing pending button with normal message event."
   ;; NOTE: ewoc.el might make this easier...
@@ -491,7 +491,7 @@ Replacing pending button with normal message event."
           (delete-region (ov-beg it) (ov-end it))
           (delete-overlay it))))))
 
-(cl-defmethod matrix-client-send-message-error-callback ((room matrix-room) txn-id &key data &allow-other-keys)
+(cl-defun matrix-client-send-message-error-callback (room txn-id &key data &allow-other-keys)
   "Client error callback for send-message.
 Update [pending] overlay."
   ;; NOTE: ewoc.el might make this easier...
@@ -526,7 +526,7 @@ Update [pending] overlay."
              :comparator #'<=))
   "Used to override point function when fetching old messages.")
 
-(cl-defmethod matrix-client-insert ((room matrix-room) string &key update timestamp-prefix)
+(cl-defun matrix-client-insert (room string &key update timestamp-prefix)
   "Insert STRING into ROOM's buffer.
 STRING should have a `timestamp' text-property, or the current
 timestamp will be added.
@@ -606,7 +606,7 @@ point positioned before the inserted message."
                                                     date-to-time
                                                     time-to-seconds)))))
 
-(cl-defmethod matrix-client-update-last-seen ((room matrix-room) &rest _)
+(defun matrix-client-update-last-seen (room &rest _)
   "Move the last-seen overlay to after the last message in ROOM."
   (with-room-buffer room
     ;; FIXME: Does this need to be when-let?  Shouldn't these always be found?
@@ -614,7 +614,7 @@ point positioned before the inserted message."
                (target-pos (1- (matrix-client--prompt-position))))
       (ov-move seen-ov target-pos target-pos))))
 
-(cl-defmethod matrix-client-replay ((room matrix-room))
+(defun matrix-client-replay (room)
   "Erase and replay events into ROOM's buffer."
   (with-room-buffer room
     (let ((inhibit-read-only t)
@@ -628,12 +628,12 @@ point positioned before the inserted message."
 
 ;;;;; Room metadata
 
-(cl-defmethod matrix-client-rename-buffer ((room matrix-room))
+(defun matrix-client-rename-buffer (room)
   "Rename ROOM's buffer."
   (with-room-buffer room
     (rename-buffer (matrix-client-display-name room))))
 
-(cl-defmethod matrix-client-display-name ((room matrix-room))
+(defun matrix-client-display-name (room)
   "Return display name for ROOM.
 If a buffer already exists with the name that would be returned,
 a different name is returned."
@@ -696,7 +696,7 @@ a different name is returned."
                               ;; coding that right now, so we'll just use the room ID.
                               id)))))))
 
-(cl-defmethod matrix-client-update-header ((room matrix-room))
+(defun matrix-client-update-header (room)
   "Update the header line of the current buffer for ROOM.
 Also update prompt with typers."
   (unless (and (boundp 'tabbar-mode) tabbar-mode)
@@ -726,7 +726,7 @@ Also update prompt with typers."
   "Hook run after a room buffer is set up.
 Called from inside the room's buffer.")
 
-(cl-defmethod matrix-client-setup-room-buffer ((room matrix-room))
+(defun matrix-client-setup-room-buffer (room)
   "Prepare and switch to buffer for ROOM-ID, and return room object."
   (with-room-buffer room
     (matrix-client-mode)
@@ -765,7 +765,7 @@ Called from inside the room's buffer.")
     (matrix-client-insert-last-seen room)
     (run-hooks 'matrix-client-setup-room-buffer-hook)))
 
-(cl-defmethod matrix-client-insert-last-seen ((room matrix-room))
+(defun matrix-client-insert-last-seen (room)
   "Insert last-seen overlay into ROOM's buffer."
   (with-room-buffer room
     (when-let ((prompt-ov (car (ov-in 'matrix-client-prompt)))
@@ -774,7 +774,7 @@ Called from inside the room's buffer.")
           'before-string (concat "\n" (propertize "\n\n" 'face 'matrix-client-last-seen))
           'matrix-client-last-seen t))))
 
-(cl-defmethod matrix-client-insert-prompt ((room matrix-room))
+(defun matrix-client-insert-prompt (room)
   "Insert prompt into ROOM's buffer."
   (with-room-buffer room
     (let ((inhibit-read-only t)
@@ -844,7 +844,7 @@ is sent, if any."
   (let* ((command (symbol-name name))
          (method-name (intern (concat "matrix-client-room-command-" command))))
     `(progn
-       (cl-defmethod ,method-name ((room matrix-room) input)
+       (defun ,method-name (room input)
          ,docstring
          (--when-let ,message
            (matrix-send-message room it :msgtype ,msgtype))
@@ -1381,7 +1381,7 @@ includes the \"In reply to\" link to the quoted message ID)."
           (when (equal own-username username)
             (matrix-client-update-last-seen room))))
 
-(cl-defmethod matrix-client-room-avatar-callback (&key (room matrix-room) message data &allow-other-keys)
+(cl-defun matrix-client-room-avatar-callback (&key room message data &allow-other-keys)
   "Set avatar for ROOM.
 Image is passed from parser as DATA, which should be an image
 object made with `create-image'.  This function should be called
@@ -1462,7 +1462,7 @@ Web-compatible HTML output, using HTML like:
 
 ;;;; Update-room-at-once approach
 
-(cl-defmethod matrix-client-update ((room matrix-room) &key old-messages)
+(cl-defun matrix-client-update (room &key old-messages)
   "Update ROOM."
   (with-slots* (((client-data state-new timeline-new ephemeral id) room))
     (let ((matrix-client-ordered-buffer-point-fn (if old-messages

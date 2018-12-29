@@ -81,7 +81,7 @@ Without argument, displays help and current setting."
 
 ;;;; Functions
 
-(cl-defmethod matrix-client-set-notification-rule ((room matrix-room) rule)
+(defun matrix-client-set-notification-rule (room rule)
   "Set notification RULE for ROOM.
 See `matrix-client-notification-rules' for rules."
   (with-slots* (((client-data id) room)
@@ -158,7 +158,7 @@ activates a notification."
 
 ;;;;; Predicates
 
-(cl-defmethod matrix-client-notify-p ((room matrix-room) event)
+(defun matrix-client-notify-p (room event)
   "Return non-nil if notification should be displayed for EVENT in ROOM."
   ;; FIXME: Initialize to a user-defined default.
   (pcase (oref* room client-data notification-rules)
@@ -166,7 +166,7 @@ activates a notification."
     ('nil nil)
     ('t t)))
 
-(cl-defmethod matrix-client-event-mentions-user-p ((room matrix-room) event)
+(defun matrix-client-event-mentions-user-p (room event)
   "Return non-nil if EVENT mentions logged-in user in ROOM.
 Uses user's displayname in ROOM."
   (pcase-let* (((map content) event)

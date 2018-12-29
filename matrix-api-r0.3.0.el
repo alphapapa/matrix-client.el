@@ -103,9 +103,9 @@ automatically, and other keys are allowed."
   (let ((name (intern (concat "matrix-" (symbol-name name) "-callback")))
         (instance (intern (nth 1 (s-match (rx "matrix-" (group (1+ anything)))
                                           (symbol-name type))))))
-    `(cl-defmethod ,name ((,instance ,type) &key cbargs status headers data
-                          error url query ; Used primarily for error handling
-                          &allow-other-keys)
+    `(cl-defun ,name (,instance &key cbargs status headers data
+                                error url query ; Used primarily for error handling
+                                &allow-other-keys)
        ,docstring
        (with-slots ,slots ,instance
          ,body))))
@@ -245,7 +245,7 @@ The sync error handler should increase this for consecutive errors, up to a maxi
                 :documentation "Reserved for users of the library, who may store whatever they want here."))
   :allow-nil-initform t)
 
-(cl-defmethod matrix-user-displayname ((room matrix-room) user-id)
+(defun matrix-user-displayname (room user-id)
   "Return display name for USER-ID in ROOM."
   (pcase-let* (((eieio members) room)
                (displayname (a-get* members user-id 'displayname)))
@@ -319,10 +319,10 @@ the standard Matrix port."
 
 ;;;;; Request
 
-(cl-defmethod matrix-request ((session matrix-session) endpoint &key data success
-                              raw-data (content-type "application/json")
-                              (method "GET") (error #'matrix-request-error-callback) timeout
-                              (query-on-exit t))
+(cl-defun matrix-request (session endpoint &key data success
+                                  raw-data (content-type "application/json")
+                                  (method "GET") (error #'matrix-request-error-callback) timeout
+                                  (query-on-exit t))
   "Make request to ENDPOINT on SESSION with DATA and call CALLBACK on success.
 Request is made asynchronously.  METHOD should be a symbol or
 string, `get' (the default) or `post' (it will be upcased).  ENDPOINT may be a string
@@ -400,10 +400,10 @@ set, will be called if the request fails."
                              :error error
                              :timeout timeout))))))
 
-(cl-defmethod matrix-request-request ((session matrix-session) endpoint &key data success
-                                      raw-data (content-type "application/json")
-                                      (method "GET") (error #'matrix-request-error-callback) timeout
-                                      (query-on-exit t))
+(cl-defun matrix-request-request (session endpoint &key data success
+                                          raw-data (content-type "application/json")
+                                          (method "GET") (error #'matrix-request-error-callback) timeout
+                                          (query-on-exit t))
   "Using `request', make request to ENDPOINT on SESSION with DATA and call CALLBACK on success.
 Request is made asynchronously.  METHOD should be a symbol or
 string, `get' (the default) or `post' (it will be upcased).  ENDPOINT may be a string
@@ -490,7 +490,7 @@ set, will be called if the request fails."
 
 ;;;;; Login/logout
 
-(cl-defmethod matrix-login ((session matrix-session) password)
+(defun matrix-login (session password)
   "Log in to SESSION with PASSWORD.
 Session should already have its USER slot set, and optionally its
 DEVICE-ID and INITIAL-DEVICE-DISPLAY-NAME."
@@ -540,7 +540,7 @@ Set access_token and device_id in session."
                                     (a-get cbargs 'password))))
                  (_ (matrix-error (format$ "Login failed.  Error: $error"))))))))
 
-(cl-defmethod matrix-logout ((session matrix-session))
+(defun matrix-logout (session)
   "Log out of SESSION."
   (with-slots (user device-id initial-device-display-name) session
     (matrix-post session 'logout
@@ -559,7 +559,7 @@ Unset access_token and device_id in session."
 
 ;;;;; Sync
 
-(cl-defmethod matrix-sync ((session matrix-session) &key full-state set-presence (timeout 30))
+(cl-defun matrix-sync (session &key full-state set-presence (timeout 30))
   "Start making /sync API requests.
 Every TIMEOUT seconds, the server should return any outstanding
 requests, and we make a new request."
@@ -674,7 +674,7 @@ requests, and we make a new request."
                                              (t (* sync-retry-delay 2))))
                 (matrix-sync session))))
 
-(cl-defmethod matrix-sync-presence ((session matrix-session) state-changes)
+(defun matrix-sync-presence (session state-changes)
   "Process presence STATE-CHANGES."
   ;; TODO: Test this.
   ;; https://matrix.org/docs/spec/client_server/r0.3.0.html#id294
@@ -687,7 +687,7 @@ requests, and we make a new request."
                                                'last_active_ago last_active_ago
                                                'presence presence))))))
 
-(cl-defmethod matrix-sync-rooms ((session matrix-session) rooms)
+(defun matrix-sync-rooms (session rooms)
   "Process ROOMS from sync response on SESSION."
   ;; https://matrix.org/docs/spec/client_server/r0.3.0.html#id167
   (cl-loop for room in rooms
@@ -697,7 +697,7 @@ requests, and we make a new request."
                   (`(invite .  ,_) (matrix-unimplemented (format$ "Would process room invites: $room")))
                   (`(leave . ,_) (matrix-unimplemented (format$ "Would process room leaves: %s" room)))))))
 
-(cl-defmethod matrix-sync-join ((session matrix-session) join)
+(defun matrix-sync-join (session join)
   "Sync JOIN, a list of joined rooms, on SESSION."
   ;; https://matrix.org/docs/spec/client_server/r0.3.0.html#id167
   (with-slots (rooms) session
@@ -727,7 +727,7 @@ requests, and we make a new request."
                   ;; FIXME: Shouldn't matter if we return t anymore.
                   t))))
 
-(cl-defmethod matrix-sync-state ((room matrix-room) data)
+(defun matrix-sync-state (room data)
   "Process state DATA in ROOM."
   (with-slots (state state-new) room
     (pcase-let (((map events) data))
@@ -741,7 +741,7 @@ requests, and we make a new request."
 ;;   "List of functions called for new timeline events.
 ;; Each function is called with ROOM and EVENT.")
 
-(cl-defmethod matrix-sync-timeline ((room matrix-room) data)
+(defun matrix-sync-timeline (room data)
   "Sync timeline DATA in ROOM."
   (with-slots* (((id session timeline timeline-new timeline-event-ids prev-batch last-full-sync) room)
                 ((next-batch) session))
@@ -778,14 +778,14 @@ requests, and we make a new request."
         (matrix-log "Room fully synced.")
         (setq last-full-sync next-batch)))))
 
-(cl-defmethod matrix-event ((room matrix-room) event)
+(defun matrix-event (room event)
   "Process EVENT in ROOM."
   (pcase-let* (((map type) event))
     (apply-if-fn (concat "matrix-event-" type)
         (list room event)
       (matrix-unimplemented (format$ "Unimplemented API handler for event $type in room %s." (oref room id))))))
 
-(cl-defmethod matrix-event-m.room.member ((room matrix-room) event)
+(defun matrix-event-m.room.member (room event)
   "Process m.room.member EVENT in ROOM."
   (with-slots (members id) room
     (pcase-let* (((map ('state_key user-id) content) event)
@@ -798,13 +798,13 @@ requests, and we make a new request."
     ;; FIXME: Don't think we need this hook, the client can just process the event from timeline-new.
     (run-hook-with-args 'matrix-event-m.room.member-hook room event)))
 
-(cl-defmethod matrix-event-m.room.name ((room matrix-room) event)
+(defun matrix-event-m.room.name (room event)
   "Process m.room.name EVENT in ROOM."
   (with-slots (name) room
     (setq name (a-get* event 'content 'name))
     (run-hook-with-args 'matrix-room-metadata-hook room)))
 
-(cl-defmethod matrix-event-m.room.canonical_alias ((room matrix-room) event)
+(defun matrix-event-m.room.canonical_alias (room event)
   "Process m.room.canonical_alias EVENT in ROOM."
   (with-slots (canonical-alias) room
     (setq canonical-alias (a-get* event 'content 'alias))
@@ -821,17 +821,17 @@ was updated.")
 Each function is called with one argument, the room object that
 was updated.")
 
-(cl-defmethod matrix-clear-timeline ((room matrix-room))
+(defun matrix-clear-timeline (room)
   "Clear ROOM's `timeline-new' list."
   (with-slots (timeline-new) room
     (setq timeline-new nil)))
 
-(cl-defmethod matrix-clear-state ((room matrix-room))
+(defun matrix-clear-state (room)
   "Clear ROOM's `state-new' list."
   (with-slots (state-new) room
     (setq state-new nil)))
 
-(cl-defmethod matrix-messages ((room matrix-room) &key (direction "b") (limit 10))
+(cl-defun matrix-messages (room &key (direction "b") (limit 10))
   "Request messages for ROOM-ID in SESSION.
 DIRECTION must be \"b\" (the default) or \"f\".  LIMIT is the
 maximum number of events to return (default 10)."
@@ -891,13 +891,15 @@ maximum number of events to return (default 10)."
           ;;   (matrix-messages room))
           ))
 
-(cl-defmethod matrix-sync-ephemeral ((room matrix-room) data)
+(defun matrix-sync-ephemeral (room data)
   "Sync EPHEMERAL in ROOM."
   (with-slots (ephemeral) room
     (pcase-let (((map events) data))
       (seq-doseq (event events)
         (push event ephemeral)
         (matrix-event room event)))))
+
+;; NOTE: Leaving these as methods for now.
 
 (cl-defmethod matrix-sync-account_data ((session matrix-session) data)
   "Sync ACCOUNT-DATA in SESSION."
@@ -913,19 +915,19 @@ maximum number of events to return (default 10)."
       (seq-doseq (event events)
         (push event account-data)))))
 
-(cl-defmethod matrix-sync-to_device ((session matrix-session) data)
+(defun matrix-sync-to_device (session data)
   "Sync to_device data in SESSION."
   ;; FIXME: Implement.
   ;; (matrix-log "Received to_device data: %s" data)
   )
 
-(cl-defmethod matrix-sync-device_lists ((session matrix-session) data)
+(defun matrix-sync-device_lists (session data)
   "Sync device_lists data in SESSION."
   ;; FIXME: Implement.
   ;; (matrix-log "Received device_lists data: %s" data)
   )
 
-(cl-defmethod matrix-sync-unread_notifications ((room matrix-room) unread-notifications)
+(defun matrix-sync-unread_notifications (room unread-notifications)
   "Sync UNREAD-NOTIFICATIONS in ROOM."
   ;; (pcase-let (((eieio id) room)
   ;;             ((map highlight_count notification_count) unread-notifications))
@@ -936,8 +938,7 @@ maximum number of events to return (default 10)."
 
 ;;;;; Rooms
 
-(cl-defmethod matrix-create-room ((session matrix-session)
-                                  &key (visibility "private") alias name topic invite preset (is-direct t))
+(cl-defun matrix-create-room (session &key (visibility "private") alias name topic invite preset (is-direct t))
   "Create new room on SESSION.
 When IS-DIRECT is non-nil, set that flag on the new room."
   ;; https://matrix.org/docs/spec/client_server/r0.3.0.html#id190
@@ -964,7 +965,7 @@ Add new room to SESSION."
                                         :id room_id)))
           (push room rooms)))
 
-(cl-defmethod matrix-join-room ((session matrix-session) room-id)
+(defun matrix-join-room (session room-id)
   "Join ROOM-ID on SESSION.
 If ROOM-ID does not have a server part, SESSION's server will be
 added."
@@ -997,8 +998,8 @@ added."
               (`(error http 404) (matrix-error (format$ "Room not found: $room-id")))
               (_ (matrix-error (format$ "Error joining room $room-id: $error")))))))
 
-(cl-defmethod matrix-send-message ((room matrix-room) message &key (msgtype "m.text") override-txn-id
-                                   extra-content success error)
+(cl-defun matrix-send-message (room message &key (msgtype "m.text")
+                                    override-txn-id extra-content success error)
   "Send MESSAGE of MSGTYPE to ROOM.
 SUCCESS should be a function which will be called when the server
 acknowledges the message; if nil, `matrix-send-message-callback'
@@ -1042,8 +1043,7 @@ standard event content object."
                             'room-id id
                             'data data)))
 
-(cl-defmethod matrix-send-state ((room matrix-room)
-                                 &key data type success error)
+(cl-defun matrix-send-state (room &key data type success error)
   "Send state event of TYPE to ROOM with DATA.
 
 TYPE should be, e.g. \"m.room.topic\"."
@@ -1064,15 +1064,15 @@ TYPE should be, e.g. \"m.room.topic\"."
                             'room-id id
                             'data data)))
 
-(cl-defmethod matrix-set-name ((room matrix-room) name)
+(defun matrix-set-name (room name)
   "Set ROOM name to NAME."
   (matrix-send-state room :type "m.room.name" :data (a-list 'name name)))
 
-(cl-defmethod matrix-set-topic ((room matrix-room) topic)
+(defun matrix-set-topic (room topic)
   "Set ROOM topic to TOPIC."
   (matrix-send-state room :type "m.room.topic" :data (a-list 'topic topic)))
 
-(cl-defmethod matrix-leave ((room matrix-room))
+(defun matrix-leave (room)
   "Leave room."
   ;; https://matrix.org/docs/spec/client_server/r0.3.0.html#id203
   (with-slots (id session) room
@@ -1088,7 +1088,7 @@ TYPE should be, e.g. \"m.room.topic\"."
   ;; TODO: Optionally kill room buffer.
   :body (object-remove-from-list session :rooms room))
 
-(cl-defmethod matrix-forget ((room matrix-room))
+(defun matrix-forget (room)
   "Forget ROOM."
   ;; TODO: Maybe use room ID instead of object, since if we've left a
   ;; room, the object should be gone.  Alternatively, instead of
@@ -1108,7 +1108,7 @@ TYPE should be, e.g. \"m.room.topic\"."
   :slots (id)
   :body (matrix-log "FORGOT ROOM: %s" id))
 
-(cl-defmethod matrix-typing ((room matrix-room) (typing t))
+(cl-defun matrix-typing (room (typing t))
   "Send TYPING notification to ROOM.
 TYPING should be t or nil."
   (pcase-let* (((eieio id session) room)
@@ -1121,13 +1121,13 @@ TYPING should be t or nil."
 
 ;;;;; Misc
 
-(cl-defmethod matrix-transform-mxc-uri ((session matrix-session) uri)
+(defun matrix-transform-mxc-uri (session uri)
   "Return HTTPS URL for MXI URI to be accessed through SESSION."
   (pcase-let* (((eieio server) session)
                (`(,protocol _ ,mxc-server ,file) (split-string uri "/")))
     (format$ "https://$server/_matrix/media/v1/download/$mxc-server/$file")))
 
-(cl-defmethod matrix-upload ((room matrix-room) path)
+(defun matrix-upload (room path)
   "Upload file at PATH to SESSION's server."
   (pcase-let* (((eieio session) room)
                ((eieio server) session)

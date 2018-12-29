@@ -164,7 +164,7 @@ connecting, non-nil."
                                     :initial-sync-p t)
                     password))))
 
-(cl-defmethod matrix-client-login-hook ((session matrix-session))
+(defun matrix-client-login-hook (session)
   "Callback for successful login.
 Add session to sessions list and run initial sync."
   (push session matrix-client-sessions)
@@ -177,7 +177,7 @@ Add session to sessions list and run initial sync."
 
 (add-hook 'matrix-login-hook #'matrix-client-login-hook)
 
-(cl-defmethod matrix-client-rename-room-buffers ((session matrix-session))
+(defun matrix-client-rename-room-buffers (session)
   "Rename all room buffers in SESSION.
 Should be called after initial sync."
   ;; After initial sync timelines are processed, we run the room metadata hook to set the
@@ -188,7 +188,7 @@ Should be called after initial sync."
 
 (add-hook 'matrix-after-initial-sync-hook #'matrix-client-rename-room-buffers)
 
-(cl-defmethod matrix-client-save-token ((session matrix-session))
+(defun matrix-client-save-token (session)
   "Save username and access token for session SESSION to file."
   ;; FIXME: This does not work with multiple sessions.
   ;; MAYBE: Could we use `savehist-additional-variables' instead of our own code for this?
@@ -259,7 +259,7 @@ Intended to be called from a timer that runs at midnight."
 
 ;;;;; Timeline
 
-(cl-defmethod matrix-client-timeline ((room matrix-room) event)
+(defun matrix-client-timeline (room event)
   "Process EVENT in ROOM."
   (pcase-let* (((map type) event))
     (apply-if-fn (concat "matrix-client-event-" type)
