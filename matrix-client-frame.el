@@ -15,13 +15,13 @@
 ;; TODO: It'd be nice to byte-compile these comparators, because it doesn't seem to happen just by
 ;; byte-compiling the file.
 (defcustom matrix-client-frame-sort-fns
-  '(matrix-client-room-buffer-favorite<
+  '(matrix-client-room-buffer-priority<
     matrix-client-room-buffer-name<)
   "How to sort room buffers in the frame sidebar.
 A list of functions that take two room buffers as arguments and
 return non-nil if the first should be sorted before the second."
   :group 'matrix-client
-  :type `(repeat (choice (const :tag "Favourite rooms" matrix-client-room-buffer-favorite<)
+  :type `(repeat (choice (const :tag "Room priority" matrix-client-room-buffer-priority<)
                          (const :tag "Room name" matrix-client-room-buffer-name<)
                          (const :tag "Most recent event in room" matrix-client-room-buffer-latest-event<)
                          (const :tag "Unseen events" matrix-client-room-buffer-unseen-events<)))
@@ -30,14 +30,16 @@ return non-nil if the first should be sorted before the second."
          (when (frame-live-p matrix-client-frame)
            (set-frame-parameter matrix-client-frame 'buffer-sort-fns (reverse value)))))
 
-(defun matrix-client-room-buffer-favorite< (buffer-a buffer-b)
-  "Return non-nil if BUFFER-A's room is a favorite and BUFFER-B's is not."
-  (cl-macrolet ((room-favorite-p
-                 (buffer)
+(defun matrix-client-room-buffer-priority< (buffer-a buffer-b)
+  "Return non-nil if BUFFER-A's room is a higher priority than BUFFER-B's."
+  (cl-macrolet ((room-buffer-tag-p
+                 (tag buffer)
                  `(with-slots (tags) (buffer-local-value 'matrix-client-room ,buffer)
-                    (assq 'm.favourite tags))))
-    (and (room-favorite-p buffer-a)
-         (not (room-favorite-p buffer-b)))))
+                    (assq ,tag tags))))
+    (or (and (room-buffer-tag-p 'm.favourite buffer-a)
+             (not (room-buffer-tag-p 'm.favourite buffer-b)))
+        (and (not (room-buffer-tag-p 'm.lowpriority buffer-a))
+             (room-buffer-tag-p 'm.lowpriority buffer-b)))))
 
 (defun matrix-client-room-buffer-name< (buffer-a buffer-b)
   "Return non-nil if BUFFER-A's room name is `string<' than BUFFER-B's."
