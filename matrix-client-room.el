@@ -865,6 +865,23 @@ is sent, if any."
                        "Boring mode engaged."))
             nil))
 
+(matrix-client-def-room-command priority
+  :docstring "Set room priority."
+  :insert (pcase input
+            ((or "" 'nil)
+             "Priority may be: (high|favorite|favourite), (normal|none), or low.")
+            ((or "high" "favorite" "favourite")
+             (when (and (matrix-room-tags room '(m.favourite))
+                        (matrix-room-tags room '(m.lowpriority) :action 'delete))
+               "Room set as favourite."))
+            ((or "normal" "none")
+             (when (matrix-room-tags room '(m.favourite m.lowpriority) :action 'delete)
+               "Room set to normal priority."))
+            ("low"
+             (when (and (matrix-room-tags room '(m.lowpriority))
+                        (matrix-room-tags room '(m.favourite) :action 'delete))
+               "Room set to low priority."))))
+
 (matrix-client-def-room-command raw
   :docstring "Send message without formatting.
 When `matrix-client-send-as-org-by-default' is non-nil, this

@@ -297,6 +297,12 @@ MESSAGE and ARGS should be a string and list of strings for
   (nconc args (list :method 'put))
   (apply #'matrix-request args))
 
+(defun matrix-delete (&rest args)
+  "Call `matrix-request' with ARGS for a \"DELETE\" request."
+  (declare (indent defun))
+  (nconc args (list :method 'delete))
+  (apply #'matrix-request args))
+
 (defun matrix-lookup (name)
   "Return host for Matrix server for domain NAME.
 There is apparently no standard way to do this in Emacs.  This
@@ -389,18 +395,18 @@ set, will be called if the request fails."
                  :success success
                  :error error
                  :timeout timeout))
-        ((or "POST" "PUT") (matrix-url-with-retrieve-async url
-                             :query-on-exit query-on-exit
-                             :silent t
-                             :inhibit-cookies t
-                             :method method
-                             :extra-headers (a-list "Content-Type" content-type
-                                                    "Authorization" (concat "Bearer " access-token))
-                             :data (or raw-data (json-encode data))
-                             :parser #'json-read
-                             :success success
-                             :error error
-                             :timeout timeout))))))
+        ((or "POST" "PUT" "DELETE") (matrix-url-with-retrieve-async url
+                                      :query-on-exit query-on-exit
+                                      :silent t
+                                      :inhibit-cookies t
+                                      :method method
+                                      :extra-headers (a-list "Content-Type" content-type
+                                                             "Authorization" (concat "Bearer " access-token))
+                                      :data (or raw-data (json-encode data))
+                                      :parser #'json-read
+                                      :success success
+                                      :error error
+                                      :timeout timeout))))))
 
 (cl-defun matrix-request-request (session endpoint &key data success
                                           raw-data (content-type "application/json")
@@ -1073,6 +1079,53 @@ TYPE should be, e.g. \"m.room.topic\"."
   ;; For now, just log it, because we'll get it back when we sync anyway.
   :slots (id)
   :body (matrix-log (a-list 'event 'matrix-send-state-callback
+                            'room-id id
+                            'data data)))
+
+(cl-defun matrix-room-tags (room tags &key (action 'put) success error)
+  "Change TAGS on ROOM.
+Each tag in TAGS may be a tag or a (TAG . ORDER) cons.
+
+ACTION may be `put' or `delete', as appropriate."
+  ;; e.g. /_matrix/client/r0/user/%40alice%3Aexample.com/rooms/%21726s6s6q%3Aexample.com/tags/u.work
+  (let* ((session (oref room session))
+         (room-id (url-hexify-string (oref room id)))
+         (user-id (url-hexify-string (oref session user)))
+         (success (or success (apply-partially #'matrix-set-tags-callback room)))
+         (fn (intern (format "matrix-%s" action)))
+         name data)
+    ;; FIXME: When setting a tag, the server returns 400 Bad Request
+    ;; "content must be a JSON object" unless I send the "order".  Not
+    ;; sure if caused by JSON-encoding nil or if bug in server.  So
+    ;; for now we always set the order to 1 unless specified, and
+    ;; never send content when deleting.
+    (dolist (tag tags)
+      (pcase tag
+        (`(,n . ,o) (setf name n
+                          data (a-list 'order o)))
+        (n (setf name n
+                 data (a-list 'order 1))))
+      (pcase action
+        ('delete (setf data nil)))
+      (funcall fn session (format$ "user/$user-id/rooms/$room-id/tags/$name")
+               :data data
+               :success success
+               :error (apply-partially #'matrix-set-tags-error-callback room)
+               :timeout 30))))
+
+(matrix-defcallback set-tags matrix-room
+  "Callback for set-tags."
+  ;; For now, just log it, because we'll get it back when we sync anyway.
+  :slots (id)
+  :body (matrix-log (a-list 'event 'matrix-set-tags-callback
+                            'room-id id
+                            'data data)))
+
+(matrix-defcallback set-tags-error matrix-room
+  "Error Callback for set-tags."
+  ;; For now, just log it, because we'll get it back when we sync anyway.
+  :slots (id)
+  :body (matrix-log (a-list 'event 'matrix-set-tags-error-callback
                             'room-id id
                             'data data)))
 
