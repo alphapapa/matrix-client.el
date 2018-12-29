@@ -871,15 +871,18 @@ is sent, if any."
             ((or "" 'nil)
              "Priority may be: (high|favorite|favourite), (normal|none), or low.")
             ((or "high" "favorite" "favourite")
-             (when (and (matrix-room-tags room '(m.favourite))
-                        (matrix-room-tags room '(m.lowpriority) :action 'delete))
+             (progn
+               (matrix-room-tags room '(m.favourite))
+               (matrix-room-tags room '(m.lowpriority) :action 'delete)
                "Room set as favourite."))
             ((or "normal" "none")
-             (when (matrix-room-tags room '(m.favourite m.lowpriority) :action 'delete)
+             (progn
+               (matrix-room-tags room '(m.favourite m.lowpriority) :action 'delete)
                "Room set to normal priority."))
             ("low"
-             (when (and (matrix-room-tags room '(m.lowpriority))
-                        (matrix-room-tags room '(m.favourite) :action 'delete))
+             (progn
+               (matrix-room-tags room '(m.lowpriority))
+               (matrix-room-tags room '(m.favourite) :action 'delete)
                "Room set to low priority."))))
 
 (matrix-client-def-room-command raw
