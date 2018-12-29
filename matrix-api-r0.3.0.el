@@ -224,6 +224,8 @@ The sync error handler should increase this for consecutive errors, up to a maxi
             :type list)
    (state :documentation "Updates to the state, between the time indicated by the since parameter, and the start of the timeline (or all state up to the start of the timeline, if since is not given, or full_state is true).")
    (state-new :documentation "List of new state events.  Clients should clear this list by calling `matrix-clear-state'.")
+   (tags :documentation "Room tags, as a list of symbols."
+         :type list)
    (timeline :documentation "List of timeline events."
              :type list)
    (timeline-new :documentation "List of new timeline events.  Clients may clear this list by calling `matrix-clear-timeline'."
@@ -785,6 +787,14 @@ requests, and we make a new request."
         (list room event)
       (matrix-unimplemented (format$ "Unimplemented API handler for event $type in room %s." (oref room id))))))
 
+(defun matrix-event-m.tag (room event)
+  "Process m.tag EVENT in ROOM."
+  ;; NOTE: Assuming that the event is a comprehensive list of tags
+  ;; that currently apply to the room, not a diff.
+  (with-slots (tags) room
+    (let-alist event
+      (setf tags .content.tags))))
+
 (defun matrix-event-m.room.member (room event)
   "Process m.room.member EVENT in ROOM."
   (with-slots (members id) room
@@ -913,7 +923,9 @@ maximum number of events to return (default 10)."
   (with-slots (account-data) room
     (pcase-let (((map events) data))
       (seq-doseq (event events)
-        (push event account-data)))))
+        (push event account-data)
+        ;; Run API handler for event.
+        (matrix-event room event)))))
 
 (defun matrix-sync-to_device (session data)
   "Sync to_device data in SESSION."
