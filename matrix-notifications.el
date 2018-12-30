@@ -67,12 +67,12 @@ Automatically trimmed to last 20 notifications.")
   :docstring "Set room notification setting.
 Without argument, displays help and current setting."
   :insert (pcase input
-            ("" (pcase-let* (((eieio client-data id) room)
-                             ((eieio notification-rules) client-data)
-                             (current-rule notification-rules)
-                             (current-rule-name (car (cl-rassoc current-rule matrix-client-notification-rules :test #'equal)))
-                             (available-rules (s-join ", " (-map #'car matrix-client-notification-rules))))
-                  (format "Current notification rule: %s.  Available rules: %s." current-rule-name available-rules)))
+            ((or 'nil "") (pcase-let* (((eieio client-data id) room)
+                                       ((eieio notification-rules) client-data)
+                                       (current-rule notification-rules)
+                                       (current-rule-name (car (cl-rassoc current-rule matrix-client-notification-rules :test #'equal)))
+                                       (available-rules (s-join ", " (-map #'car matrix-client-notification-rules))))
+                            (format "Current notification rule: %s.  Available rules: %s." current-rule-name available-rules)))
             (_ (let* ((rule (map-elt matrix-client-notification-rules input nil #'equal))
                       (rule-name (car (cl-rassoc rule matrix-client-notification-rules :test #'equal))))
                  ;; NOTE: If the user enters an invalid rule, it will default to "never".
