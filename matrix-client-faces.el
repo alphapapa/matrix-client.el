@@ -50,7 +50,7 @@
   :group 'matrix-client)
 
 (defface matrix-client-last-seen
-  '((t (:inherit 'highlight :height 0.1)))
+  '((t (:inherit highlight :height 0.1)))
   "Face for last-seen overlay."
   :group 'matrix-client)
 
