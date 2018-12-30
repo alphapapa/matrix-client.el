@@ -266,6 +266,7 @@ MESSAGE and ARGS should be a string and list of strings for
       (setq args (a-list 'message args)))
     (map-put args 'timestamp (format-time-string "%Y-%m-%d %H:%M:%S"))
     (with-current-buffer (get-buffer-create matrix-log-buffer)
+      (setq buffer-undo-list t)
       (save-excursion
         (goto-char (point-max))
         (insert (pp-to-string args) "\n"))))
