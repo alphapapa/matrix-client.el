@@ -1,4 +1,30 @@
-;; -*- lexical-binding: t; -*-
+;;; matrix-client-frame.el --- Matrix Client dedicated frame  -*- lexical-binding: t; -*-
+
+;; Copyright (C) 2018  Adam Porter
+
+;; Author: Adam Porter <adam@alphapapa.net>
+;; Keywords:
+
+;; This program is free software; you can redistribute it and/or modify
+;; it under the terms of the GNU General Public License as published by
+;; the Free Software Foundation, either version 3 of the License, or
+;; (at your option) any later version.
+
+;; This program is distributed in the hope that it will be useful,
+;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;; GNU General Public License for more details.
+
+;; You should have received a copy of the GNU General Public License
+;; along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+;;; Commentary:
+
+;;
+
+;;; Code:
+
+;;;; Requirements
 
 (require 'cl-lib)
 (require 'eieio)
@@ -9,11 +35,12 @@
 (require 'dash-functional)
 (require 'frame-purpose)
 
-(defvar matrix-client-frame nil
-  "The current Matrix Client frame.")
+;;;; Customization
 
-;; TODO: It'd be nice to byte-compile these comparators, because it doesn't seem to happen just by
-;; byte-compiling the file.
+(defgroup matrix-client-frame nil
+  "Matrix Client dedicated frame."
+  :group 'matrix-client)
+
 (defcustom matrix-client-frame-sort-fns
   '(matrix-client-room-buffer-priority<
     matrix-client-room-buffer-name<)
@@ -34,40 +61,21 @@ return non-nil if the first should be sorted before the second."
   "String prefixing buffer names in room list sidebar."
   :type 'string)
 
-(defun matrix-client-room-buffer-priority< (buffer-a buffer-b)
-  "Return non-nil if BUFFER-A's room is a higher priority than BUFFER-B's."
-  (cl-macrolet ((room-buffer-tag-p
-                 (tag buffer)
-                 `(with-slots (tags) (buffer-local-value 'matrix-client-room ,buffer)
-                    (assq ,tag tags))))
-    (or (and (room-buffer-tag-p 'm.favourite buffer-a)
-             (not (room-buffer-tag-p 'm.favourite buffer-b)))
-        (and (not (room-buffer-tag-p 'm.lowpriority buffer-a))
-             (room-buffer-tag-p 'm.lowpriority buffer-b)))))
+(defcustom matrix-client-frame-buffer-group-fn #'matrix-client-frame-default-buffer-group
+  "Function to group room buffers.
+It should return a string for each buffer, which will become that
+buffer group's header."
+  :type 'function)
 
-(defun matrix-client-room-buffer-name< (buffer-a buffer-b)
-  "Return non-nil if BUFFER-A's room name is `string<' than BUFFER-B's."
-  (string-collate-lessp (buffer-name buffer-a)
-                        (buffer-name buffer-b)))
+;;;; Variables
 
-(defun matrix-client-room-buffer-latest-event< (buffer-a buffer-b)
-  "Return non-nil if BUFFER-A's room's latest event is more recent than BUFFER-B's."
-  (> (matrix-client-buffer-latest-event-ts buffer-a)
-     (matrix-client-buffer-latest-event-ts buffer-b)))
+(defvar matrix-client-frame nil
+  "The current Matrix Client frame.
+There can be only one.")
 
-(defun matrix-client-room-buffer-unseen-events< (buffer-a buffer-b)
-  "Return non-nil if BUFFER-A's room is modified but not BUFFER-B's."
-  (and (buffer-modified-p buffer-a)
-       (not (buffer-modified-p buffer-b))))
-
-;; This function can stay here for now since it's only used here.
-(defun matrix-client-buffer-latest-event-ts (buffer)
-  "Return timestamp of latest event in BUFFER's room."
-  (when-let* ((room (buffer-local-value 'matrix-client-room buffer))
-              (last-event (car (oref* room timeline))))
-    (a-get* last-event 'origin_server_ts)))
-
+;;;; Commands
 ;;;###autoload
+
 (defun matrix-client-frame (&optional side)
   "Open and return the Matrix Client frame on SIDE.
 SIDE may be `left', `right', `top', or `bottom'.
@@ -112,6 +120,29 @@ automatically."
   ;; Be sure to return the frame.
   matrix-client-frame)
 
+(defun matrix-client-frame-sidebar-open-room-frame ()
+  "Open a new frame showing room at point.
+Should be called in the frame sidebar buffer."
+  (interactive)
+  (when-let* ((buffer (get-text-property (1+ (line-beginning-position)) 'buffer))
+              (frame (make-frame
+                      (a-list 'name (buffer-name buffer)
+                              ;; MAYBE: Save room avatar to a temp file, pass to `icon-type'.
+                              'icon-type (expand-file-name "logo.png"
+                                                           (file-name-directory (locate-library "matrix-client-frame")))))))
+    (with-selected-frame frame
+      (switch-to-buffer buffer))))
+
+(defun matrix-client-frame-sidebar-open-room-frame-mouse (click)
+  "Move point to CLICK's position and call `matrix-client-frame-sidebar-open-room-frame'."
+  (interactive "e")
+  (mouse-set-point click)
+  (matrix-client-frame-sidebar-open-room-frame))
+
+;;;; Functions
+
+;;;;; Sidebar
+
 (defun matrix-client-frame-update-sidebar (&rest _ignore)
   "Update the buffer list sidebar when the `matrix-client-frame' is active.
 Should be called manually, e.g. in `matrix-after-sync-hook', by
@@ -145,18 +176,19 @@ Should be called manually, e.g. in `matrix-after-sync-hook', by
                    do (insert (propertize (concat " " group "\n")
                                           'face 'matrix-client-date-header))
                    do (cl-loop for buffer in buffers
-                               for string = (frame-purpose--format-buffer buffer)
-                               do (insert matrix-client-frame-sidebar-buffer-prefix
-                                          (propertize string 'buffer buffer)
-                                          separator))
+                               for buffer-string = (frame-purpose--format-buffer buffer)
+                               for properties = (matrix-client--plist-delete (matrix-client--string-properties buffer-string)
+                                                                             'display)
+                               for string = (concat matrix-client-frame-sidebar-buffer-prefix
+                                                    buffer-string
+                                                    separator)
+                               ;; Apply all the properties to the entire string, including the separator,
+                               ;; so the face will apply all the way to the newline, and getting the
+                               ;; `buffer' property will be less error-prone.
+                               do (insert (apply #'propertize string 'buffer buffer properties)))
                    do (insert "\n"))
+          ;; FIXME: Is there a reason I didn't use `save-excursion' here?
           (goto-char saved-point))))))
-
-(defcustom matrix-client-frame-buffer-group-fn #'matrix-client-frame-default-buffer-group
-  "Function to group room buffers.
-It should return a string for each buffer, which will become that
-buffer group's header."
-  :type 'function)
 
 (defun matrix-client-frame-default-buffer-group (buffer)
   "Return BUFFER's group header."
@@ -167,23 +199,57 @@ buffer group's header."
             ((matrix-room-direct-p id session) "People")
             (t "Rooms")))))
 
-(defun matrix-client-frame-sidebar-open-room-frame ()
-  "Open a new frame showing room at point.
-Should be called in the frame sidebar buffer."
-  (interactive)
-  (when-let* ((buffer (get-text-property (1+ (line-beginning-position)) 'buffer))
-              (frame (make-frame
-                      (a-list 'name (buffer-name buffer)
-                              ;; MAYBE: Save room avatar to a temp file, pass to `icon-type'.
-                              'icon-type (expand-file-name "logo.png"
-                                                           (file-name-directory (locate-library "matrix-client-frame")))))))
-    (with-selected-frame frame
-      (switch-to-buffer buffer))))
+;;;;; Comparators
 
-(defun matrix-client-frame-sidebar-open-room-frame-mouse (click)
-  "Move point to CLICK's position and call `matrix-client-frame-sidebar-open-room-frame'."
-  (interactive "e")
-  (mouse-set-point click)
-  (matrix-client-frame-sidebar-open-room-frame))
+(defun matrix-client-room-buffer-priority< (buffer-a buffer-b)
+  "Return non-nil if BUFFER-A's room is a higher priority than BUFFER-B's."
+  (cl-macrolet ((room-buffer-tag-p
+                 (tag buffer)
+                 `(with-slots (tags) (buffer-local-value 'matrix-client-room ,buffer)
+                    (assq ,tag tags))))
+    (or (and (room-buffer-tag-p 'm.favourite buffer-a)
+             (not (room-buffer-tag-p 'm.favourite buffer-b)))
+        (and (not (room-buffer-tag-p 'm.lowpriority buffer-a))
+             (room-buffer-tag-p 'm.lowpriority buffer-b)))))
+
+(defun matrix-client-room-buffer-name< (buffer-a buffer-b)
+  "Return non-nil if BUFFER-A's room name is `string<' than BUFFER-B's."
+  (string-collate-lessp (buffer-name buffer-a)
+                        (buffer-name buffer-b)))
+
+(defun matrix-client-room-buffer-latest-event< (buffer-a buffer-b)
+  "Return non-nil if BUFFER-A's room's latest event is more recent than BUFFER-B's."
+  (> (matrix-client-buffer-latest-event-ts buffer-a)
+     (matrix-client-buffer-latest-event-ts buffer-b)))
+
+(defun matrix-client-room-buffer-unseen-events< (buffer-a buffer-b)
+  "Return non-nil if BUFFER-A's room is modified but not BUFFER-B's."
+  (and (buffer-modified-p buffer-a)
+       (not (buffer-modified-p buffer-b))))
+
+;;;;; Utility
+
+;; NOTE: Leaving these functions here for now since they're only used here.
+
+(defun matrix-client-buffer-latest-event-ts (buffer)
+  "Return timestamp of latest event in BUFFER's room."
+  (when-let* ((room (buffer-local-value 'matrix-client-room buffer))
+              (last-event (car (oref* room timeline))))
+    (a-get* last-event 'origin_server_ts)))
+
+(defun matrix-client--string-properties (s)
+  "Return plist of all properties and values in string S."
+  (cl-loop with pos = 0
+           append (text-properties-at pos s)
+           do (setf pos (next-property-change pos s))
+           while pos))
+
+(defun matrix-client--plist-delete (plist property)
+  "Return PLIST without PROPERTY."
+  (cl-loop for (p v) on plist by #'cddr
+           unless (equal property p)
+           append (list p v)))
 
 (provide 'matrix-client-frame)
+
+;;; matrix-client-frame.el ends here
