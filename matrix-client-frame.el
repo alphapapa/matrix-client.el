@@ -100,7 +100,17 @@ automatically."
          :sidebar-auto-update nil
          :sidebar-update-on-buffer-switch t
          :sidebar-header " Rooms"
-         :require-mode nil)))
+         :require-mode nil))
+  (with-selected-frame matrix-client-frame
+    ;; Set sidebar keymap.
+    (with-current-buffer (frame-purpose--get-sidebar)
+      ;; HACK: Either elegant or a hack, to just copy the local map like this.  Should probably define one.
+      (let ((map (copy-keymap (current-local-map))))
+        (define-key map [mouse-2] #'matrix-client-frame-sidebar-open-room-frame-mouse)
+        (define-key map (kbd "<C-return>") #'matrix-client-frame-sidebar-open-room-frame)
+        (use-local-map map))))
+  ;; Be sure to return the frame.
+  matrix-client-frame)
 
 (defun matrix-client-frame-update-sidebar (&rest _ignore)
   "Update the buffer list sidebar when the `matrix-client-frame' is active.
@@ -156,5 +166,24 @@ buffer group's header."
             ((assq 'm.lowpriority tags) "Low priority")
             ((matrix-room-direct-p id session) "People")
             (t "Rooms")))))
+
+(defun matrix-client-frame-sidebar-open-room-frame ()
+  "Open a new frame showing room at point.
+Should be called in the frame sidebar buffer."
+  (interactive)
+  (when-let* ((buffer (get-text-property (1+ (line-beginning-position)) 'buffer))
+              (frame (make-frame
+                      (a-list 'name (buffer-name buffer)
+                              ;; MAYBE: Save room avatar to a temp file, pass to `icon-type'.
+                              'icon-type (expand-file-name "logo.png"
+                                                           (file-name-directory (locate-library "matrix-client-frame")))))))
+    (with-selected-frame frame
+      (switch-to-buffer buffer))))
+
+(defun matrix-client-frame-sidebar-open-room-frame-mouse (click)
+  "Move point to CLICK's position and call `matrix-client-frame-sidebar-open-room-frame'."
+  (interactive "e")
+  (mouse-set-point click)
+  (matrix-client-frame-sidebar-open-room-frame))
 
 (provide 'matrix-client-frame)
