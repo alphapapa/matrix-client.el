@@ -1,12 +1,12 @@
 ;;;;; Faces
 
 (defface matrix-client-metadata
-  '((t (:weight bold :inherit font-lock-constant-face)))
+  '((t (:weight bold :inherit font-lock-function-name-face)))
   "Face for chat metadata properties."
   :group 'matrix-client)
 
 (defface matrix-client-own-metadata
-  '((t (:weight bold :inherit font-lock-variable-name-face)))
+  '((t (:weight bold :inherit font-lock-keyword-face)))
   "Face for user's own chat metadata properties."
   :group 'matrix-client)
 
