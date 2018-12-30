@@ -30,6 +30,10 @@ return non-nil if the first should be sorted before the second."
          (when (frame-live-p matrix-client-frame)
            (set-frame-parameter matrix-client-frame 'buffer-sort-fns (reverse value)))))
 
+(defcustom matrix-client-frame-sidebar-buffer-prefix " "
+  "String prefixing buffer names in room list sidebar."
+  :type 'string)
+
 (defun matrix-client-room-buffer-priority< (buffer-a buffer-b)
   "Return non-nil if BUFFER-A's room is a higher priority than BUFFER-B's."
   (cl-macrolet ((room-buffer-tag-p
@@ -132,7 +136,8 @@ Should be called manually, e.g. in `matrix-after-sync-hook', by
                                           'face 'matrix-client-date-header))
                    do (cl-loop for buffer in buffers
                                for string = (frame-purpose--format-buffer buffer)
-                               do (insert (propertize string 'buffer buffer)
+                               do (insert matrix-client-frame-sidebar-buffer-prefix
+                                          (propertize string 'buffer buffer)
                                           separator))
                    do (insert "\n"))
           (goto-char saved-point))))))
