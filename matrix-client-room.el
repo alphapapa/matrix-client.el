@@ -634,13 +634,15 @@ point positioned before the inserted message."
   "Erase and replay events into ROOM's buffer."
   (with-room-buffer room
     (let ((inhibit-read-only t)
-          (matrix-client-notifications nil))
+          (matrix-client-notifications nil)
+          (buffer-was-modified-p (buffer-modified-p (current-buffer))))
       (ov-clear)
       (erase-buffer)
       (matrix-client-insert-prompt room)
       (matrix-client-insert-last-seen room)
       (cl-loop for event in (reverse (oref room timeline))
-               do (matrix-client-timeline room event)))))
+               do (matrix-client-timeline room event))
+      (set-buffer-modified-p buffer-was-modified-p))))
 
 ;;;;; Room metadata
 
