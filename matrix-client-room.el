@@ -1485,7 +1485,10 @@ Web-compatible HTML output, using HTML like:
 (cl-defun matrix-client-update (room &key old-messages)
   "Update ROOM."
   (with-slots* (((client-data state-new timeline-new ephemeral id) room))
-    (let ((matrix-client-ordered-buffer-point-fn (if old-messages
+    (let ((matrix-client-notifications (if old-messages
+                                           nil
+                                         matrix-client-notifications))
+          (matrix-client-ordered-buffer-point-fn (if old-messages
                                                      (lambda (timestamp)
                                                        (ordered-buffer-point-fn
                                                          :forward-from #'point-min
