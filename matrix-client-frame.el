@@ -35,6 +35,12 @@
 (require 'dash-functional)
 (require 'frame-purpose)
 
+;;;; Variables
+
+(defvar matrix-client-frame nil
+  "The current Matrix Client frame.
+There can be only one.")
+
 ;;;; Customization
 
 (defgroup matrix-client-frame nil
@@ -66,12 +72,6 @@ return non-nil if the first should be sorted before the second."
 It should return a string for each buffer, which will become that
 buffer group's header."
   :type 'function)
-
-;;;; Variables
-
-(defvar matrix-client-frame nil
-  "The current Matrix Client frame.
-There can be only one.")
 
 ;;;; Commands
 ;;;###autoload
