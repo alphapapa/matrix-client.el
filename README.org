@@ -6,6 +6,10 @@ This is a fork of the [[http://doc.rix.si/projects/matrix.el.html][original matr
 
 [[images/frame-purpose-example.png]]
 
+Of course, since it's Emacs, you can use any Emacs theme you like.  Here's [[https://emacsthemes.com/themes/django-theme.html][django]] without scroll bars or fringes. Note the syntax highlighting in the pasted code, which respects the HTML sent by the client, rather than overriding it like Riot--for better or worse, you decide.  =;)=
+
+[[images/django.png]]
+
 * Installation
 
 *Note:* This package currently requires Emacs 26 or greater.
