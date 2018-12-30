@@ -71,7 +71,8 @@ header has the text-property `ordered-buffer-header' set."
                               properties)))
     (insert whole-header)))
 
-(cl-defun ordered-buffer-point-fn (&key backward-from forward-from property comparator value)
+(cl-defun ordered-buffer-point-fn (&key backward-from forward-from property comparator value
+                                        final-fn)
   "Return position at which a new string should be inserted, depending on criteria.
 
 One of BACKWARD-FROM or FORWARD-FROM may be set and should be an
@@ -86,7 +87,11 @@ When the comparison is non-nil, the point at that position is
 returned.  If the search reaches a point after which PROPERTY
 does not change again in the buffer, the point returned depends
 on the search direction: if BACKWARD-FROM, `point-min'; if
-FORWARD-FROM, `point-max'."
+FORWARD-FROM, `point-max'.
+
+FINAL-FN may be a function which is run after finding the
+position but before returning point.  It may move point to make a
+final adjustment."
   (declare (indent defun))
   (when (and backward-from forward-from)
     (user-error "Only one of `:backward-from' or `:forward-from' may be set"))
@@ -113,6 +118,8 @@ FORWARD-FROM, `point-max'."
              return (if backward-from
                         (point-min)
                       (point-max))
+             finally do (when final-fn
+                          (funcall final-fn))
              finally return (point))))
 
 

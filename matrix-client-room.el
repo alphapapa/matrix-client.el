@@ -174,7 +174,8 @@ method without it."
   (let ((prompt (matrix-client--prompt-position)))
     (if (< (point) prompt)
         (goto-char prompt)
-      (call-interactively #'matrix-client-send-input))))
+      (call-interactively #'matrix-client-send-input))
+    (matrix-client-update-last-seen matrix-client-room)))
 
 (defun matrix-client-reply-or-insert (&optional quote-p)
   "If point is on a previous message, begin a reply addressed to its sender.  Otherwise, self-insert.
@@ -523,7 +524,16 @@ Update [pending] overlay."
              :backward-from #'matrix-client--prompt-position
              :property 'timestamp
              :value timestamp
-             :comparator #'<=))
+             :comparator #'<=
+             :final-fn (lambda ()
+                         (unless (matrix--next-property-change (point) 'timestamp)
+                           ;; `timestamp' property doesn't change after this point, so
+                           ;; we're at the bottom of the buffer, so if the last seen
+                           ;; line is past this position, move point it.
+                           (let* ((last-seen-ov (car (ov-in 'matrix-client-last-seen)))
+                                  (ov-pos (ov-beg last-seen-ov)))
+                             (when (> ov-pos (point))
+                               (goto-char (ov-end (car (ov-in 'matrix-client-last-seen))))))))))
   "Used to override point function when fetching old messages.")
 
 (cl-defun matrix-client-insert (room string &key update timestamp-prefix)
@@ -579,7 +589,13 @@ point positioned before the inserted message."
   ;; May want to use a defvar, maybe something like `ordered-buffer-insertion-direction'.
   (let* ((ordered-buffer-header-face 'matrix-client-date-header)
          (previous-timestamp (unless (bobp)
-                               (get-text-property (1- (point)) 'timestamp)))
+                               (save-excursion
+                                 (--when-let (cl-loop for ov in (overlays-at (point))
+                                                      when (ov-val ov 'matrix-client-last-seen)
+                                                      return ov)
+                                   ;; Point is after the last-seen line: look behind it for the timestamp.
+                                   (goto-char (ov-beg it)))
+                                 (get-text-property (1- (point)) 'timestamp))))
          (day-number (time-to-days timestamp))
          (previous-day-number (when previous-timestamp
                                 (time-to-days previous-timestamp))))

@@ -100,15 +100,15 @@ PAIRS should be of the form (SLOT VALUE SLOT VALUE...)."
       ;; tracking state ourselves, which seems messy.  This is good
       ;; enough for now.
       (set-buffer-modified-p nil)
-      (matrix-client-update-last-seen room))))
-
-(defun matrix-client-insert-last-seen-overlay ()
-  "Insert last-seen overlay into current buffer."
-  (when-let ((prompt-ov (car (ov-in 'matrix-client-prompt)))
-             (target-pos (1- (ov-beg prompt-ov))))
-    (ov target-pos target-pos
-        'before-string (concat "\n" (propertize "\n\n" 'face 'matrix-client-last-seen))
-        'matrix-client-last-seen t)))
+      ;; NOTE: Commenting out the last-seen-line-moving for now.
+      ;; Maybe it should be an option, but I guess we shouldn't update
+      ;; it just because the Emacs window happens to have focus and
+      ;; the room's buffer happens to be in the selected window,
+      ;; because the user might not be at the screen.  The user can
+      ;; move the line by simply pressing RET, even without typing a
+      ;; message.
+      ;; (matrix-client-update-last-seen room)
+      )))
 
 ;; (defun matrix-client-buffer-visible-p (&optional buffer)
 ;; FIXME: Remove this if we don't need it anymore.
