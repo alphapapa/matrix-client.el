@@ -61,30 +61,30 @@ Then run the command ~matrix-client-connect~ or ~matrix-client-frame~ to connect
 ** Commands
 
 +  Membership
-     -  Join a room :: =/join #room:server=
-     -  Leave the current room :: =/leave=
-     -  List room users :: =/who=
+     -  Join a room: =/join #room:server=
+     -  Leave the current room: =/leave=
+     -  List room users: =/who=
 +  Room settings
-     -  Set room priority :: ~/priority~
-     -  List or set user-tags. :: =/tags=
-     -  Add user-tags. :: =/addtags=
-     -  Delete user-tags. :: =/deltags=
-     -  Set notification settings :: =/notify=
+     -  Set room priority: ~/priority~
+     -  List or set user-tags: =/tags=
+     -  Add user-tags: =/addtags=
+     -  Delete user-tags: =/deltags=
+     -  Set notification settings: =/notify=
           +  Note: These settings are currently local to Emacs and do not integrate with the API spec.
 +  Sending messages:
-     -  Send *Org-formatted* messages :: =/org=
+     -  Send *Org-formatted* messages: =/org=
           +  *Note: Sending Org-formatted messages is the default.*  You can disable it by changing the option ~matrix-client-send-as-org-by-default~, after which Org messages can be sent with the =/org= command.
           +  You can send almost any Org syntax, including simple emphasis like *bold* and /italic/, one-line code blocks with =:= at the beginning of a line, code emphasis with =~=, even Org tables and complete =#+BEGIN_SRC lang ... #+END_SRC= blocks!  Emacs will even send the code blocks colorized according to your theme, and other =matrix-client.el= users will see the colors!
           +  Press @@html:<kbd>@@C-c '@@html:</kbd>@@ (or whatever you may have bound =org-edit-special= to) to edit the current message in a dedicated Org buffer, then save it back to the room input line with @@html:<kbd>@@C-x C-s@@html:</kbd>@@ (or whatever you may have bound =save-buffer= to).
-     -  Send unformatted messages :: =/raw=
+     -  Send unformatted messages: =/raw=
           +  When ~matrix-client-send-as-org-by-default~ is enabled, this sends messages without Org formatting.
-     -  Send HTML messages :: =/html=
-+  Upload a file :: =/upload PATH-OR-URL=, or drag-and-drop files or URLs onto the room buffer
-+  Enable pretty colors :: =/rainbow=
+     -  Send HTML messages: =/html=
++  Upload a file: =/upload PATH-OR-URL=, or drag-and-drop files or URLs onto the room buffer
++  Enable pretty colors: =/rainbow=
 +  Other:
-     -  Complete usernames and IDs :: @@html:<kbd>@@TAB@@html:</kbd>@@ (with point at prompt)
-     -  Move point between messages ::  @@html:<kbd>@@TAB@@html:</kbd>@@/@@html:<kbd>@@S-TAB@@html:</kbd>@@
-     -  Open room in a new frame ::  Middle-click or press @@html:<kbd>@@<C-return>@@html:</kbd>@@ in the room list.
+     -  Complete usernames and IDs: @@html:<kbd>@@TAB@@html:</kbd>@@ (with point at prompt)
+     -  Move point between messages:  @@html:<kbd>@@TAB@@html:</kbd>@@/@@html:<kbd>@@S-TAB@@html:</kbd>@@
+     -  Open room in a new frame:  Middle-click or press @@html:<kbd>@@<C-return>@@html:</kbd>@@ in the room list.
 
 * Configuration
 
