@@ -332,6 +332,9 @@ If HTML is non-nil, treat INPUT as HTML."
                         (when (get-text-property 0 'local-label input)
                           (substring input (next-single-property-change 0 'local-label input)))
                         input)))
+        ;; BUG: If replying to a message, the propertized quotation
+        ;; part with event ID prevents the rest of the reply from
+        ;; being handled as Org syntax.
         (setq html t
               ;; NOTE: Trying to imitate Riot here, except that we send "m.relates_to/m.in_reply_to"
               ;; even when "quoting", because it seems to make sense to do so.  Riot doesn't do it,
