@@ -973,6 +973,50 @@ INPUT should be, e.g. \"#room:matrix.org\".")
             "Leaving room...")
   :docstring "Leave current room.")
 
+(matrix-client-def-room-command tags
+  :docstring "List or set room user-tags."
+  :insert (with-slots (tags) room
+            (cond (input
+                   ;; Delete existing user tags
+                   (matrix-room-tags room (-map #'make-symbol (matrix-client-room-user-tags room))
+                                     :action 'delete)
+                   (let ((new-tags (split-string input)))
+                     ;; Set new tags
+                     (matrix-room-tags room (--map (make-symbol (concat "u." it))
+                                                   new-tags))
+                     (concat "Set room user-tags to: "
+                             (s-join ", " new-tags))))
+                  (t (concat "Current room user-tags: "
+                             (let ((tags (matrix-client-room-user-tags room)))
+                               (if tags
+                                   (s-join ", " (--map (substring it 2)
+                                                       tags))
+                                 "none")))))))
+
+(matrix-client-def-room-command addtags
+  :docstring "Add room user-tags."
+  :insert (with-slots (tags) room
+            (cond (input
+                   (let ((new-tags (split-string input)))
+                     ;; Set new tags
+                     (matrix-room-tags room (--map (make-symbol (concat "u." it))
+                                                   new-tags))
+                     (concat "Added room user-tags: "
+                             (s-join ", " new-tags))))
+                  (t "You may be in the Matrix, but it can't read your mind."))))
+
+(matrix-client-def-room-command deltags
+  :docstring "Delete room user-tags."
+  :insert (with-slots (tags) room
+            (cond (input
+                   (let ((deleting-tags (split-string input)))
+                     (matrix-room-tags room (--map (make-symbol (concat "u." it))
+                                                   deleting-tags)
+                                       :action 'delete)
+                     (concat "Deleted room user-tags: "
+                             (s-join ", " deleting-tags))))
+                  (t "You may be in the Matrix, but it can't read your mind."))))
+
 (matrix-client-def-room-command topic
   :docstring "Set room topic."
   :insert (if (not (s-blank-str? input))

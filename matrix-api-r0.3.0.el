@@ -1132,6 +1132,14 @@ ACTION may be `put' or `delete', as appropriate."
                             'room-id id
                             'data data)))
 
+(defun matrix-client-room-user-tags (room)
+  "Return list of user tags set in ROOM."
+  (with-slots (tags) room
+    (->> tags
+         (-map #'car)
+         (-map #'symbol-name)
+         (--select (s-prefix? "u." it)))))
+
 (defun matrix-set-name (room name)
   "Set ROOM name to NAME."
   (matrix-send-state room :type "m.room.name" :data (a-list 'name name)))

@@ -67,10 +67,10 @@ return non-nil if the first should be sorted before the second."
   "String prefixing buffer names in room list sidebar."
   :type 'string)
 
-(defcustom matrix-client-frame-buffer-group-fn #'matrix-client-frame-default-buffer-group
+(defcustom matrix-client-frame-buffer-group-fn #'matrix-client-frame-default-buffer-groups
   "Function to group room buffers.
-It should return a string for each buffer, which will become that
-buffer group's header."
+It should return a list of strings for each buffer, for each of
+which a group will be created."
   :type 'function)
 
 ;;;; Commands
@@ -156,48 +156,68 @@ Should be called manually, e.g. in `matrix-after-sync-hook', by
                (buffer-sort-fns (frame-parameter nil 'buffer-sort-fns))
                ;; FIXME: This works fine but is a little messy.
                (buffers (funcall (frame-parameter nil 'sidebar-buffers-fn)))
-               (buffers (dolist (fn buffer-sort-fns buffers)
-                          (setq buffers (-sort fn buffers))))
-               (buffer-groups (-group-by matrix-client-frame-buffer-group-fn buffers))
-               (headers (-map #'car buffer-groups))
-               (other-headers (seq-difference headers '("Favorites" "People" "Rooms" "Low priority")))
+               (sorted-buffers (dolist (fn buffer-sort-fns buffers)
+                                 (setq buffers (-sort fn buffers))))
+               (buffer-groups (matrix-client-frame-group-buffers sorted-buffers))
+               (standard-groups (cl-loop for header in '("Favorites" "People")
+                                         collect (cons header (alist-get header buffer-groups nil nil #'string=))))
+               (low-priority-group (cons "Low priority" (alist-get "Low priority" buffer-groups nil nil #'string=)))
+               (other-groups (seq-difference buffer-groups (-flatten-n 1 (list standard-groups (list low-priority-group)))
+                                             (lambda (a b)
+                                               (string= (car a) (car b)))))
                ;; FIXME: Make group order configurable.
-               (buffer-groups (a-list "Favorites" (a-get buffer-groups "Favorites")
-                                      "People" (a-get buffer-groups "People")
-                                      "Rooms" (apply #'-flatten (a-get buffer-groups "Rooms")
-                                                     (--map (a-get buffer-groups it)
-                                                            other-headers))
-                                      "Low Priority" (a-get buffer-groups "Low priority")                                      ))
                (separator (pcase (frame-parameter nil 'sidebar)
                             ((or 'left 'right) "\n")
                             ((or 'top 'bottom) "  "))))
+          (setf buffer-groups (-flatten-n 1 (list standard-groups
+                                                  other-groups
+                                                  (list low-priority-group))))
           (erase-buffer)
-          (cl-loop for (group . buffers) in buffer-groups
-                   do (insert (propertize (concat " " group "\n")
-                                          'face 'matrix-client-date-header))
-                   do (cl-loop for buffer in buffers
-                               for buffer-string = (frame-purpose--format-buffer buffer)
-                               for properties = (matrix-client--plist-delete (matrix-client--string-properties buffer-string)
-                                                                             'display)
-                               for string = (concat matrix-client-frame-sidebar-buffer-prefix
-                                                    buffer-string
-                                                    separator)
-                               ;; Apply all the properties to the entire string, including the separator,
-                               ;; so the face will apply all the way to the newline, and getting the
-                               ;; `buffer' property will be less error-prone.
-                               do (insert (apply #'propertize string 'buffer buffer properties)))
-                   do (insert "\n"))
+          (--each buffer-groups
+            (-let* (((header . buffers) it))
+              (insert (propertize (concat " " header "\n")
+                                  'face 'matrix-client-date-header))
+              (cl-loop for buffer in buffers
+                       for buffer-string = (frame-purpose--format-buffer buffer)
+                       for properties = (matrix-client--plist-delete (matrix-client--string-properties buffer-string)
+                                                                     'display)
+                       for string = (concat matrix-client-frame-sidebar-buffer-prefix
+                                            buffer-string
+                                            separator)
+                       ;; Apply all the properties to the entire string, including the separator,
+                       ;; so the face will apply all the way to the newline, and getting the
+                       ;; `buffer' property will be less error-prone.
+                       do (insert (apply #'propertize string 'buffer buffer properties)))
+              (insert "\n")))
           ;; FIXME: Is there a reason I didn't use `save-excursion' here?
           (goto-char saved-point))))))
 
-(defun matrix-client-frame-default-buffer-group (buffer)
-  "Return BUFFER's group header."
+(defun matrix-client-frame-group-buffers (buffers)
+  "Return BUFFERS grouped."
+  (let* ((grouped (-group-by #'matrix-client-frame-default-buffer-groups buffers))
+         (actual-group-headers (-uniq (-flatten (-map #'car grouped)))))
+    (cl-loop for header in actual-group-headers
+             collect (cons header (-flatten
+                                   (-map #'cdr
+                                         (--select (member header (car it))
+                                                   grouped)))))))
+
+(defun matrix-client-frame-default-buffer-groups (buffer)
+  "Return BUFFER's group headers."
   (let* ((room (buffer-local-value 'matrix-client-room buffer)))
     (with-slots (id tags session) room
-      (cond ((assq 'm.favourite tags) "Favorites")
-            ((assq 'm.lowpriority tags) "Low priority")
-            ((matrix-room-direct-p id session) "People")
-            (t "Rooms")))))
+      (let ((default-groups (cond ((assq 'm.favourite tags) "Favorites")
+                                  ((assq 'm.lowpriority tags) "Low priority")
+                                  ;; We'll imitate Riot by not allowing a room to be both
+                                  ;; favorite/low-priority AND "people".
+                                  ((matrix-room-direct-p id session) "People")))
+            (user-tags (cl-loop for (tag . attrs) in tags
+                                for tag-name = (symbol-name tag)
+                                when (string-prefix-p "u." tag-name)
+                                collect (substring tag-name 2))))
+        (if (or default-groups user-tags)
+            (-non-nil (-flatten (list default-groups user-tags)))
+          '("Rooms"))))))
 
 ;;;;; Comparators
 
