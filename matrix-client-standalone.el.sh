@@ -87,6 +87,8 @@ exit
 (setq tool-bar-mode nil)
 (setq scroll-conservatively 100)
 (setq scroll-step 100)
+(set-fringe-mode 0)
+(scroll-bar-mode -1)
 
 ;; Improve default completion
 (setq completion-ignore-case t)
