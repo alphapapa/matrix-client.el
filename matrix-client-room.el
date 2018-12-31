@@ -876,6 +876,12 @@ is sent, if any."
          (matrix-client-update-last-seen room))
        (add-to-list 'matrix-client-room-commands ,command))))
 
+(matrix-client-def-room-command help
+  :docstring "Display list of room commands."
+  :insert (concat "Room commands: "
+                  (s-join ", " (--map (concat "/" it)
+                                      (-sort #'string< matrix-client-room-commands)))))
+
 ;; HACK: This /rainbow command cannot be defined in matrix-client-rainbow.el because the
 ;; byte-compiler fails for some weird reason.
 (matrix-client-def-room-command rainbow

@@ -60,6 +60,7 @@ Then run the command ~matrix-client-connect~ or ~matrix-client-frame~ to connect
 
 ** Commands
 
++  List room commands: =/help=
 +  Membership
      -  Join a room: =/join #room:server=
      -  Leave the current room: =/leave=
