@@ -16,7 +16,7 @@ Of course, since it's Emacs, you can use any Emacs theme you like.  Here's [[htt
 
 ** Standalone client
 
-The easiest way to start using this package is to download the script =matrix-client-standalone.el.sh= ([[https://github.com/jgkamat/matrix-client-el/blob/master/misc/matrix-client-standalone.el][GitHub link]]), make it executable, and run it from a shell (not from within Emacs).  If any packages are missing, it uses Emacs's built-in =package.el= to install =quelpa= from MELPA, and =quelpa= then installs this client and its dependencies.  Then it runs the "standalone" client.
+The easiest way to start using this package is to download the script =matrix-client-standalone.el.sh= ([[https://github.com/jgkamat/matrix-client-el/blob/master/matrix-client-standalone.el.sh][GitHub link]]), make it executable, and run it from a shell (not from within Emacs).  If any packages are missing, it uses Emacs's built-in =package.el= to install =quelpa= from MELPA, and =quelpa= then installs this client and its dependencies.  Then it runs the "standalone" client.
 
 The script accepts these options (use =--help= for full list):
 
