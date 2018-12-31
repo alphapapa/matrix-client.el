@@ -58,12 +58,6 @@ done
 bash_end_line=$((2 + $(grep -n -m 1 -x "exit" "$0" \
                             | grep -o -E '[[:digit:]]+')))
 
-# NOTE: We set user-init-file to a temp file so Emacs will not balk at
-# saving our standalone custom-file.  If we didn't do this, we
-# wouldn't be able to save per-room settings.
-
-# MAYBE: Use a persistent file instead of a temp file.
-
 # Run Emacs
 emacs -q --insert <(tail -n +$bash_end_line "$0") --eval="(progn
 (defvar upgrade-matrix-client nil)
