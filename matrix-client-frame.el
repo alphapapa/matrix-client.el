@@ -206,15 +206,18 @@ Should be called manually, e.g. in `matrix-after-sync-hook', by
   "Return BUFFER's group headers."
   (let* ((room (buffer-local-value 'matrix-client-room buffer)))
     (with-slots (id tags session) room
-      (let ((default-groups (cond ((assq 'm.favourite tags) "Favorites")
-                                  ((assq 'm.lowpriority tags) "Low priority")
-                                  ;; We'll imitate Riot by not allowing a room to be both
-                                  ;; favorite/low-priority AND "people".
-                                  ((matrix-room-direct-p id session) "People")))
-            (user-tags (cl-loop for (tag . attrs) in tags
-                                for tag-name = (symbol-name tag)
-                                when (string-prefix-p "u." tag-name)
-                                collect (substring tag-name 2))))
+      (let* ((user-tags (cl-loop for (tag . attrs) in tags
+                                 for tag-name = (symbol-name tag)
+                                 when (string-prefix-p "u." tag-name)
+                                 collect (substring tag-name 2)))
+             ;; User-tagged rooms can also appear in "Favorites", but not in "Low priority" or "People".
+             (default-groups (if (assq 'm.favourite tags)
+                                 "Favorites"
+                               (unless user-tags
+                                 (cond ((assq 'm.lowpriority tags) "Low priority")
+                                       ;; We'll imitate Riot by not allowing a room to be both
+                                       ;; favorite/low-priority AND "people".
+                                       ((matrix-room-direct-p id session) "People"))))))
         (if (or default-groups user-tags)
             (-non-nil (-flatten (list default-groups user-tags)))
           '("Rooms"))))))
