@@ -85,6 +85,7 @@ Then run the command ~matrix-client-connect~ or ~matrix-client-frame~ to connect
 +  Other:
      -  Complete usernames and IDs: @@html:<kbd>@@TAB@@html:</kbd>@@ (with point at prompt)
      -  Move point between messages:  @@html:<kbd>@@TAB@@html:</kbd>@@/@@html:<kbd>@@S-TAB@@html:</kbd>@@
+     -  Return point to input prompt: @@html:<kbd>@@RET@@html:</kbd>@@ (with point before prompt)
      -  Open room in a new frame:  Middle-click or press @@html:<kbd>@@<C-return>@@html:</kbd>@@ in the room list.
 
 * Configuration
