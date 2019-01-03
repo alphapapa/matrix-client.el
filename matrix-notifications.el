@@ -87,6 +87,19 @@ Without argument, displays help and current setting."
   ;; FIXME: This is messy.
   (switch-to-buffer (oref* (matrix-client--notifications-buffer) client-data buffer)))
 
+(defun matrix-client-notifications-buffer-pop ()
+  "Pop to room buffer for event at point."
+  (interactive)
+  (let* ((properties (text-properties-at (point)))
+         (buffer (lax-plist-get properties 'buffer))
+         (event-id (lax-plist-get properties 'event_id)))
+    (matrix-client-update-last-seen (matrix-client--notifications-buffer))
+    (when buffer
+      (pop-to-buffer buffer)
+      (when event-id
+        (awhen (matrix-client--find-propertized-string (list 'event_id event-id))
+          (goto-char (car it)))))))
+
 ;;;; Functions
 
 (defun matrix-client-set-notification-rule (room rule)
@@ -154,18 +167,6 @@ This function exists to allow the use of `with-room-buffer'."
                         (matrix-client-insert-prompt)
                         (matrix-client-insert-last-seen))))))
     (matrix-room :client-data (matrix-room-client-data :buffer buffer))))
-
-(defun matrix-client-notifications-buffer-pop ()
-  "Pop to room buffer for event at point."
-  (interactive)
-  (let* ((properties (text-properties-at (point)))
-         (buffer (lax-plist-get properties 'buffer))
-         (event-id (lax-plist-get properties 'event_id)))
-    (when buffer
-      (pop-to-buffer buffer)
-      (when event-id
-        (awhen (matrix-client--find-propertized-string (list 'event_id event-id))
-          (goto-char (car it)))))))
 
 ;; MAYBE: Use a macro to define the handlers, because they have to
 ;; define their arg lists in a certain way, and the macro would take
