@@ -172,10 +172,10 @@ Optional REST of args are also applied to hooks and function."
             ;; FIXME: Should probably rework a lot of code in this file to pass event arguments in a better way.
             (let* ((room (plist-get rest :room))
                    (room-name (propertize (matrix-client-display-name room)
-                                          'face 'font-lock-function-name-face))
+                                          'face 'font-lock-keyword-face))
                    (room-buffer (oref* room client-data buffer))
                    (sender (propertize (concat (matrix-user-displayname room .sender) ">")
-                                       'face 'font-lock-keyword-face))
+                                       'face 'font-lock-function-name-face))
                    (body .content.body)
                    (event-id .event_id)
                    (message (propertize (format$ "$room-name: $sender $body")
