@@ -568,7 +568,8 @@ point positioned before the inserted message."
              (timestamp-prefix (when timestamp-prefix
                                  ;; Apply face property from beginning of `string'.
                                  (propertize (concat (format-time-string "[%T]" timestamp) " ")
-                                             'face (get-text-property 0 'face string))))
+                                             'face (or (get-text-property 0 'face string)
+                                                       'matrix-client-metadata))))
              (string (apply #'propertize (concat timestamp-prefix string "\n") 'read-only t non-face-properties)))
         (unless (and update
                      ;; Inserting our own message, received back in /sync
