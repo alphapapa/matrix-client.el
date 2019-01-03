@@ -208,7 +208,8 @@ NOTE: This only works for replies!"
   (interactive)
   (cond ((< (point) (matrix-client--prompt-position))
          (matrix-client-notifications-buffer-pop))
-        (t (matrix-client-notifications-buffer-send-input))))
+        (t (matrix-client-notifications-buffer-send-input)))
+  (matrix-client-update-last-seen (matrix-client--notifications-buffer)))
 
 (defun matrix-client--notifications-buffer ()
   "Return `matrix-room' object whose buffer is the special notifications buffer.
