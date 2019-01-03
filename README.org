@@ -1,6 +1,6 @@
 #+TITLE: [[images/logo64.png]] matrix-client.el
 
-[[https://img.shields.io/matrix/matrix-client.el:matrix.org.svg?label=%23matrix-client.el:matrix.org]]
+[[https://matrix.to/#/#matrix-client.el:matrix.org][https://img.shields.io/matrix/matrix-client.el:matrix.org.svg?label=%23matrix-client.el:matrix.org]]
 
 This is a fork of the [[http://doc.rix.si/projects/matrix.el.html][original matrix.el client]] with the intent of maintaining it further, fixing bugs, and providing long-term goals for the project.
 
