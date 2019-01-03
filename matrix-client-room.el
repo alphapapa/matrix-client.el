@@ -131,14 +131,17 @@ method without it."
 
 (defmacro with-room-buffer (room &rest body)
   (declare (debug (sexp body)) (indent defun))
-  `(with-slots* (((client-data id) room)
+  `(with-slots* (((client-data id display-name) room)
                  ((buffer) client-data))
      (unless (and buffer (buffer-live-p buffer))
        ;; Make buffer if necessary.  This seems like the easiest way
        ;; to guarantee that the room has a buffer, since it seems
        ;; unclear what the first received event type for a joined room
        ;; will be.
-       (setq buffer (get-buffer-create (matrix-client-display-name room)))
+       (setq buffer (generate-new-buffer (or display-name
+                                             (oset room display-name (matrix--room-display-name room))
+                                             ;; "*matrix-room temporary buffer name*"
+                                             )))
        (matrix-client-setup-room-buffer room))
      (with-current-buffer buffer
        ,@body)))
@@ -655,73 +658,29 @@ point positioned before the inserted message."
 
 ;;;;; Room metadata
 
+(defun matrix-client-rename-room-buffers (session)
+  "Rename all room buffers in SESSION.
+Should be called after initial sync."
+  ;; After initial sync timelines are processed, we run the room metadata hook to set the
+  ;; room buffer names (which we do not do during processing of timelines during initial
+  ;; sync, because doing so for every user "join" event is very slow.
+  (dolist (room (oref session rooms))
+    (matrix-client-rename-buffer room)
+    (with-room-buffer room
+      ;; HACK: Set buffer to not modified.  I don't feel like making another hook function now.
+      ;; TODO: If we ever do caching, this should set the modification flag based on whether it has unseen messages.
+      (set-buffer-modified-p nil))))
+
+(add-hook 'matrix-after-initial-sync-hook #'matrix-client-rename-room-buffers)
+
 (defun matrix-client-rename-buffer (room)
   "Rename ROOM's buffer."
   (with-room-buffer room
-    (rename-buffer (matrix-client-display-name room))))
-
-(defun matrix-client-display-name (room)
-  "Return display name for ROOM.
-If a buffer already exists with the name that would be returned,
-a different name is returned."
-  ;; https://matrix.org/docs/spec/client_server/r0.3.0.html#id267
-
-  ;; FIXME: Make it easier to name the room separately from the room's buffer.  e.g. I want the
-  ;; header line to have the official room name, but I want the buffer name in 1-on-1 chats to be
-  ;; the other person's name.
-
-  (cl-macrolet ((displaynames-sorted-by-id (members)
-                                           `(--> ,members
-                                                 (-sort (-on #'string< #'car) it)
-                                                 (--map (matrix-user-displayname room (car it))
-                                                        it)))
-                (members-without-self () `(cl-remove self members :test #'string= :key #'car))
-                (pick-name (&rest choices)
-                           ;; This macro allows short-circuiting the choice forms, only evaluating them when needed.
-                           `(or ,@(cl-loop for choice in choices
-                                           collect `(--when-let ,choice
-                                                      ;; NOTE: We check to see if strings are empty,
-                                                      ;; because apparently it can happen that an
-                                                      ;; mxid is something like "@:hostname", with
-                                                      ;; an empty displayname.  Sigh.
-                                                      (if (listp it)
-                                                          (cl-loop for this-choice in (-non-nil (-flatten it))
-                                                                   unless (or (string-empty-p this-choice)
-                                                                              (--when-let (get-buffer this-choice)
-                                                                                ;; Allow reusing current name of current buffer
-                                                                                (not (equal it (oref* room client-data buffer)))))
-                                                                   return this-choice)
-                                                        (unless (or (string-empty-p it)
-                                                                    (--when-let (get-buffer it)
-                                                                      ;; Allow reusing current name of current buffer
-                                                                      (not (equal it (oref* room client-data buffer)))))
-                                                          it)))))))
-    (pcase-let* (((eieio id name avatar aliases canonical-alias members session) room)
-                 ((eieio (user self)) session)
-                 (avatar (when (and avatar matrix-client-show-room-avatars-in-buffer-names)
-                           ;; Make a new image to avoid modifying the avatar in the header.
-                           (setq avatar (cl-copy-list (get-text-property 0 'display avatar)))
-                           (setf (image-property avatar :max-width) matrix-client-room-avatar-in-buffer-name-size)
-                           (setf (image-property avatar :max-height) matrix-client-room-avatar-in-buffer-name-size)
-                           (setq avatar (concat (propertize " " 'display avatar) " ")))))
-      (concat avatar
-              (pcase (1- (length members))
-                (1 (pick-name (matrix-user-displayname room (caar (members-without-self)))
-                              name canonical-alias aliases id))
-                (2 (pick-name name canonical-alias aliases
-                              (s-join ", " (displaynames-sorted-by-id (members-without-self)))
-                              id))
-                ((or `nil (pred (< 0))) ;; More than 2
-                 (pick-name name canonical-alias aliases
-                            (format "%s and %s others"
-                                    (car (displaynames-sorted-by-id (members-without-self)))
-                                    (- (length members) 2))
-                            id))
-                (_ (pick-name name canonical-alias aliases
-                              ;; FIXME: The API says to use names of previous room
-                              ;; members if nothing else works, but I don't feel like
-                              ;; coding that right now, so we'll just use the room ID.
-                              id)))))))
+    (rename-buffer (or (oref room display-name)
+                       ;; HACK: The room name ought to have been set already, but if e.g. the
+                       ;; hook functions were run in the wrong order, it might not be.
+                       (oset room display-name (matrix--room-display-name room)))
+                   'unique)))
 
 (defun matrix-client-update-header (room)
   "Update the header line of the current buffer for ROOM.
@@ -1168,7 +1127,10 @@ If such text is not found, return nil."
 
 (defun matrix-client--prompt-position ()
   "Return position of prompt in current buffer."
-  (ov-beg (car (ov-in 'matrix-client-prompt))))
+  (aif (car (ov-in 'matrix-client-prompt))
+      (ov-beg it)
+    (matrix-client-insert-prompt)
+    (matrix-client--prompt-position)))
 
 (defun matrix--prev-property-change (pos property &optional value limit)
   "Return the previous position in buffer, starting from POS, where PROPERTY changes and is set.
@@ -1391,7 +1353,7 @@ includes the \"In reply to\" link to the quoted message ID)."
 
 (matrix-client-defevent m.room.member
   "Say that member in EVENT joined/left ROOM."
-  :object-slots ((room session)
+  :object-slots ((room session display-name)
                  (session initial-sync-p))
   :event-keys (state_key sender)
   :content-keys (displayname membership)
@@ -1413,7 +1375,7 @@ includes the \"In reply to\" link to the quoted message ID)."
           ;; show up from when the user initially joined the room.
           (matrix-client-insert room message)
           (with-room-buffer room
-            (rename-buffer (matrix-client-display-name room) 'unique))))
+            (rename-buffer display-name 'unique))))
 
 (matrix-client-defevent m.typing
   "Handle m.typing events."
@@ -1481,8 +1443,9 @@ includes the \"In reply to\" link to the quoted message ID)."
 Image is passed from parser as DATA, which should be an image
 object made with `create-image'.  This function should be called
 as an async callback when the image is downloaded."
-  (with-slots (avatar) room
-    (setq avatar (propertize " " 'display data))
+  (with-slots (avatar display-name) room
+    (setq avatar (propertize " " 'display data)
+          display-name (matrix--room-display-name room))
     (matrix-client-update-header room)
     (matrix-client-rename-buffer room)
     (when message

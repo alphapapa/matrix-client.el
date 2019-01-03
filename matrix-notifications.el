@@ -174,7 +174,7 @@ Optional REST of args are also applied to hooks and function."
           (let-alist data
             ;; FIXME: Should probably rework a lot of code in this file to pass event arguments in a better way.
             (let* ((room (plist-get rest :room))
-                   (room-name (propertize (matrix-client-display-name room)
+                   (room-name (propertize (oref room display-name)
                                           'face 'font-lock-keyword-face))
                    (room-buffer (oref* room client-data buffer))
                    (sender (propertize (concat (matrix-user-displayname room .sender) ">")

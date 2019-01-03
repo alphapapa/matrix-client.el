@@ -177,21 +177,6 @@ Add session to sessions list and run initial sync."
 
 (add-hook 'matrix-login-hook #'matrix-client-login-hook)
 
-(defun matrix-client-rename-room-buffers (session)
-  "Rename all room buffers in SESSION.
-Should be called after initial sync."
-  ;; After initial sync timelines are processed, we run the room metadata hook to set the
-  ;; room buffer names (which we do not do during processing of timelines during initial
-  ;; sync, because doing so for every user "join" event is very slow.
-  (dolist (room (oref session rooms))
-    (matrix-client-rename-buffer room)
-    (with-room-buffer room
-      ;; HACK: Set buffer to not modified.  I don't feel like making another hook function now.
-      ;; TODO: If we ever do caching, this should set the modification flag based on whether it has unseen messages.
-      (set-buffer-modified-p nil))))
-
-(add-hook 'matrix-after-initial-sync-hook #'matrix-client-rename-room-buffers)
-
 (defun matrix-client-save-token (session)
   "Save username and access token for session SESSION to file."
   ;; FIXME: This does not work with multiple sessions.
