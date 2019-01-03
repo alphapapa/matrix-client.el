@@ -178,12 +178,7 @@ Optional REST of args are also applied to hooks and function."
                                        'face 'font-lock-keyword-face))
                    (body .content.body)
                    (event-id .event_id)
-                   ;; (blank (propertize " " 'face 'matrix-client-metadata))
-                   ;; The space is required because of an idiosyncrasy with
-                   ;; how Emacs handles images in display properties.
-                   ;; Without it, only the room avatar is visible, and it's
-                   ;; doubled, and there is no other text visible.
-                   (message (propertize (format$ " $room-name: $sender $body")
+                   (message (propertize (format$ "$room-name: $sender $body")
                                         'buffer room-buffer
                                         'event_id event-id
                                         'sender sender

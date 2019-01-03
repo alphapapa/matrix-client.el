@@ -568,7 +568,7 @@ point positioned before the inserted message."
              (timestamp (get-text-property 0 'timestamp string))
              (event-id (get-text-property 0 'event_id string))
              (non-face-properties (cl-loop for (key val) on (text-properties-at 0 string) by #'cddr
-                                           unless (eq key 'face)
+                                           unless (member key '(face display))
                                            append (list key val)))
              (timestamp-prefix (when timestamp-prefix
                                  ;; Apply face property from beginning of `string'.
