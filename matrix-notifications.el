@@ -154,7 +154,9 @@ Optional REST of args are also applied to hooks and function."
   ;; on session.
   (when matrix-client-notifications
     (unless (oref (car matrix-client-sessions) initial-sync-p)
-      (run-hook-with-args 'matrix-client-notify-hook event-type data rest)
+      (ignore-errors
+        ;; Ignore errors so notification problems don't interrupt the processing of events, which would also prevent the next sync.
+        (run-hook-with-args 'matrix-client-notify-hook event-type data rest))
       ;; Run built-in notification for this event type
       ;; TODO: Use `if-fn-apply' here.
       (let ((fn (intern-soft (concat "matrix-client-notify-" event-type))))
