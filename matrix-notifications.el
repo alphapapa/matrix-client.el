@@ -81,6 +81,12 @@ Without argument, displays help and current setting."
                  (matrix-client-set-notification-rule room rule)
                  (format "Notification rule set: %s." rule-name)))))
 
+(defun matrix-client-show-notifications-buffer ()
+  "Show notifications buffer, if it exists."
+  (interactive)
+  ;; FIXME: This is messy.
+  (switch-to-buffer (oref* (matrix-client--notifications-buffer) client-data buffer)))
+
 ;;;; Functions
 
 (defun matrix-client-set-notification-rule (room rule)
