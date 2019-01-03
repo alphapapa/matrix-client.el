@@ -128,13 +128,15 @@ Optional REST of args are also applied to hooks and function."
               (sender (propertize (concat (matrix-user-displayname room .sender) ">")
                                   'face 'font-lock-keyword-face))
               (body .content.body)
+              (event-id .event_id)
               ;; (blank (propertize " " 'face 'matrix-client-metadata))
               ;; The space is required because of an idiosyncrasy with
               ;; how Emacs handles images in display properties.
               ;; Without it, only the room avatar is visible, and it's
               ;; doubled, and there is no other text visible.
               (message (propertize (format$ " $room-name: $sender $body")
-                                   'buffer room-buffer)))
+                                   'buffer room-buffer
+                                   'event_id event-id)))
          ;; Using notification buffer pseudo room
          (matrix-client-insert (matrix-client--notifications-buffer) message
                                :timestamp-prefix t))))))
@@ -156,8 +158,14 @@ This function exists to allow the use of `with-room-buffer'."
 (defun matrix-client-notifications-buffer-pop ()
   "Pop to room buffer for event at point."
   (interactive)
-  (awhen (get-text-property (point) 'buffer)
-    (pop-to-buffer it)))
+  (let* ((properties (text-properties-at (point)))
+         (buffer (lax-plist-get properties 'buffer))
+         (event-id (lax-plist-get properties 'event_id)))
+    (when buffer
+      (pop-to-buffer buffer)
+      (when event-id
+        (awhen (matrix-client--find-propertized-string (list 'event_id event-id))
+          (goto-char (car it)))))))
 
 ;; MAYBE: Use a macro to define the handlers, because they have to
 ;; define their arg lists in a certain way, and the macro would take
