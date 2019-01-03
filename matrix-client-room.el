@@ -556,7 +556,7 @@ If `matrix-client-insert-prefix-fn' is non-nil, call that function with
 point positioned before the inserted message."
   ;; TODO: Convert more callers to use `timestamp-prefix'.
   (unless (get-text-property 0 'timestamp string)
-    (put-text-property 0 (length string) 'timestamp (string-to-number (format-time-string "%s"))))
+    (put-text-property 0 (length string) 'timestamp (string-to-number (format-time-string "%s")) string))
   (with-room-buffer room
     (save-excursion
       (let* ((inhibit-read-only t)      ; MAYBE: use buffer-read-only mode instead
