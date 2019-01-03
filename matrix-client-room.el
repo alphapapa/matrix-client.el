@@ -641,8 +641,8 @@ point positioned before the inserted message."
           (buffer-was-modified-p (buffer-modified-p (current-buffer))))
       (ov-clear)
       (erase-buffer)
-      (matrix-client-insert-prompt room)
-      (matrix-client-insert-last-seen room)
+      (matrix-client-insert-prompt)
+      (matrix-client-insert-last-seen)
       (cl-loop for event in (reverse (oref room timeline))
                do (matrix-client-timeline room event))
       (set-buffer-modified-p buffer-was-modified-p))))
@@ -782,32 +782,30 @@ Called from inside the room's buffer.")
                   ("^\\(https?\\|ftp\\|file\\|nfs\\)://" . matrix-client--dnd-open-file)))
     (when matrix-client-use-tracking
       (tracking-mode 1))
-    (matrix-client-insert-prompt room)
-    (matrix-client-insert-last-seen room)
+    (matrix-client-insert-prompt)
+    (matrix-client-insert-last-seen)
     (run-hooks 'matrix-client-setup-room-buffer-hook)))
 
-(defun matrix-client-insert-last-seen (room)
-  "Insert last-seen overlay into ROOM's buffer."
-  (with-room-buffer room
-    (when-let ((prompt-ov (car (ov-in 'matrix-client-prompt)))
-               (target-pos (1- (ov-beg prompt-ov))))
-      (ov target-pos target-pos
-          'before-string (concat "\n" (propertize "\n\n" 'face 'matrix-client-last-seen))
-          'matrix-client-last-seen t))))
+(defun matrix-client-insert-last-seen ()
+  "Insert last-seen overlay into current buffer."
+  (when-let ((prompt-ov (car (ov-in 'matrix-client-prompt)))
+             (target-pos (1- (ov-beg prompt-ov))))
+    (ov target-pos target-pos
+        'before-string (concat "\n" (propertize "\n\n" 'face 'matrix-client-last-seen))
+        'matrix-client-last-seen t)))
 
-(defun matrix-client-insert-prompt (room)
+(defun matrix-client-insert-prompt ()
   "Insert prompt into ROOM's buffer."
-  (with-room-buffer room
-    (let ((inhibit-read-only t)
-          (ov-sticky-front t))
-      (goto-char (point-max))
-      (insert (propertize "\n" 'read-only t)
-              "\n")
-      (ov (point) (point)
-          'before-string (concat (propertize "\n"
-                                             'face '(:height 0.1))
-                                 matrix-client-input-prompt)
-          'matrix-client-prompt t))))
+  (let ((inhibit-read-only t)
+        (ov-sticky-front t))
+    (goto-char (point-max))
+    (insert (propertize "\n" 'read-only t)
+            "\n")
+    (ov (point) (point)
+        'before-string (concat (propertize "\n"
+                                           'face '(:height 0.1))
+                               matrix-client-input-prompt)
+        'matrix-client-prompt t)))
 
 ;;;;;; Pcomplete
 
