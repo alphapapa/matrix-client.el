@@ -54,7 +54,7 @@ Once the project achieves a sufficiently high quality or demand, it may be submi
 
 * Usage
 
-Either deploy your own homeserver or register an account on a [[https://www.hello-matrix.net/public_servers.php][public homeserver]] such as matrix.org. matrix-client-el doesn't currently support registration but you can use another client like [[https://riot.im/app/#/register][Riot to register for an account]].
+If you don't already have a Matrix account, you can register on a [[https://www.hello-matrix.net/public_servers.php][public homeserver]] such as =matrix.org=. =matrix-client.el= doesn't currently support registration, but you can use another client like [[https://riot.im/app/#/register][Riot]] to register an account.
 
 Then run the command ~matrix-client-connect~ or ~matrix-client-frame~ to connect.
 
