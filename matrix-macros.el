@@ -398,19 +398,4 @@ SUCCESS and ERROR as `body'.  Or, if the body is not needed,
       (set-process-query-on-exit-flag (get-buffer-process response-buffer) nil))
     response-buffer))
 
-(defmacro with-room-buffer (room &rest body)
-  ;; FIXME: I'd rather not declare this here but it seems to be necessary for byte-compilation.
-  (declare (debug (sexp body)) (indent defun))
-  `(with-slots* (((client-data id) ,room)
-                 ((buffer) client-data))
-     (unless buffer
-       ;; Make buffer if necessary.  This seems like the easiest way
-       ;; to guarantee that the room has a buffer, since it seems
-       ;; unclear what the first received event type for a joined room
-       ;; will be.
-       (setq buffer (get-buffer-create (matrix-client-display-name ,room)))
-       (matrix-client-setup-room-buffer ,room))
-     (with-current-buffer buffer
-       ,@body)))
-
 (provide 'matrix-macros)
