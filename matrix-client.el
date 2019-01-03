@@ -184,7 +184,11 @@ Should be called after initial sync."
   ;; room buffer names (which we do not do during processing of timelines during initial
   ;; sync, because doing so for every user "join" event is very slow.
   (dolist (room (oref session rooms))
-    (matrix-client-rename-buffer room)))
+    (matrix-client-rename-buffer room)
+    (with-room-buffer room
+      ;; HACK: Set buffer to not modified.  I don't feel like making another hook function now.
+      ;; TODO: If we ever do caching, this should set the modification flag based on whether it has unseen messages.
+      (set-buffer-modified-p nil))))
 
 (add-hook 'matrix-after-initial-sync-hook #'matrix-client-rename-room-buffers)
 
