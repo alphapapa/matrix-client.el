@@ -265,11 +265,14 @@ MESSAGE and ARGS should be a string and list of strings for
     (when (stringp (car args))
       (setq args (a-list 'message args)))
     (map-put args 'timestamp (format-time-string "%Y-%m-%d %H:%M:%S"))
-    (with-current-buffer (get-buffer-create matrix-log-buffer)
-      (setq buffer-undo-list t)
-      (save-excursion
-        (goto-char (point-max))
-        (insert (pp-to-string args) "\n"))))
+    (let* ((print-circle t)
+           (print-level 5)
+           (print-length 10))
+      (with-current-buffer (get-buffer-create matrix-log-buffer)
+        (setq buffer-undo-list t)
+        (save-excursion
+          (goto-char (point-max))
+          (insert (pp-to-string args) "\n")))))
   ;; Returning t is more convenient than nil, which is returned by `message'.
   t)
 
