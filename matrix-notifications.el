@@ -103,7 +103,7 @@ Automatically trimmed to last 20 notifications.")
   :docstring "Set room notification setting.
 Without argument, displays help and current setting."
   :insert (pcase input
-            ((or 'nil "") (pcase-let* (((eieio client-data id) room)
+            ((or 'nil "") (pcase-let* (((eieio client-data) room)
                                        ((eieio notification-rules) client-data)
                                        (current-rule notification-rules)
                                        (current-rule-name (car (cl-rassoc current-rule matrix-client-notification-rules :test #'equal)))
@@ -163,8 +163,9 @@ Optional REST of args are also applied to hooks and function."
 
 (defun matrix-client-notify--add-to-notifications-buffer (event-type data rest)
   "Add event with DATA to notifications buffer."
+  (declare (indent defun))
   ;; FIXME: Handle other event types.
-  (pcase (matrix-client-notify-p room event)
+  (pcase (matrix-client-notify-p (plist-get rest :room) data)
     ('nil nil)
     (_ (pcase event-type
          ("m.room.message"
@@ -190,21 +191,27 @@ Optional REST of args are also applied to hooks and function."
 (add-hook 'matrix-client-notify-hook #'matrix-client-notify--add-to-notifications-buffer)
 
 (defun matrix-client-notifications-buffer-send-input ()
-  "Send message to room.
-NOTE: This only works for replies!"
+  "Send message to room from notification buffer.
+This only works for replies."
   (interactive)
   (if-let* ((input (matrix-client--room-input :delete t))
             (room (get-text-property 0 'room input)))
       (progn
         (with-room-buffer room
           (matrix-client-send-input :input input))
+        (matrix-client-notify--add-to-notifications-buffer "m.room.message"
+          (a-list 'sender (oref* room session user)
+                  'content (a-list 'body input))
+          (list :room room))
         (matrix-client-update-last-seen (matrix-client--notifications-buffer)))
     (goto-char (matrix-client--prompt-position))
     (insert input)
-    (user-error "Only replies may be sent from the notification buffer")))
+    (message "Only replies may be sent from the notification buffer")))
 
 (defun matrix-client-notifications-buffer-RET ()
-  "Act appropriately for RET keypress."
+  "Act appropriately for RET keypress in notifications buffer.
+If point is on a message, pop to it in its room buffer.
+Otherwise, try to send input.  Then update last-seen line."
   (interactive)
   (cond ((< (point) (matrix-client--prompt-position))
          (matrix-client-notifications-buffer-pop))
@@ -257,7 +264,7 @@ EVENT should be the `event' variable from the
          ;; Trim the list
          (setq matrix-client-notifications-ring (-take 20 matrix-client-notifications-ring))))))
 
-(defun matrix-client-notification-show (id key)
+(defun matrix-client-notification-show (id _key)
   "Show the buffer for a notification.
 This function is called by `notifications-notify' when the user
 activates a notification."
