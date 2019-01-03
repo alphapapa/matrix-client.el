@@ -186,8 +186,10 @@ NOTE: This only works for replies!"
   (interactive)
   (if-let* ((input (matrix-client--room-input :delete t))
             (room (get-text-property 0 'room input)))
-      (with-room-buffer room
-        (matrix-client-send-input :input input))
+      (progn
+        (with-room-buffer room
+          (matrix-client-send-input :input input))
+        (matrix-client-update-last-seen (matrix-client--notifications-buffer)))
     (goto-char (matrix-client--prompt-position))
     (insert input)
     (user-error "Only replies may be sent from the notification buffer")))
