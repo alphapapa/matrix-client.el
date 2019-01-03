@@ -95,6 +95,8 @@ The =*Matrix Notifications*= buffer displays notifications from all rooms, actin
 
 You can also *reply* to messages directly from the notifications buffer.  Just as in a room's buffer, press @@html:<kbd>@@TAB@@html:</kbd>@@/@@html:<kbd>@@S-TAB@@html:</kbd>@@ to navigate between messages, then press @@html:<kbd>@@r@@html:</kbd>@@ on a message, type your reply, and send by pressing @@html:<kbd>@@RET@@html:</kbd>@@.  Note that this only allows replies to messages; to send a non-reply message, do so from the room's buffer.
 
+To jump to a message in the room's buffer, press @@html:<kbd>@@RET@@html:</kbd>@@ with point on the message.
+
 * Configuration
 
 While there are a lot of configuration settings, here are a selection that are
