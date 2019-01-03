@@ -120,7 +120,7 @@ automatically, and other keys are allowed."
 
 ;;;; Classes
 
-(matrix-defclass matrix-session ()
+(matrix-defclass matrix-session (eieio-persistent)
   ((user :initarg :user
          :type string
          :instance-initform (progn
@@ -216,7 +216,7 @@ The sync error handler should increase this for consecutive errors, up to a maxi
    (avatar :initarg :avatar
            :documentation "A string containing the room avatar image in its text properties.")
    (typers :initarg :typers)
-   (name :initarg :name)
+   (room-name :initarg :room-name)
    (topic :initarg :topic)
    (aliases :initarg :aliases)
    (canonical-alias :initarg :canonical-alias)
@@ -822,8 +822,8 @@ requests, and we make a new request."
 
 (defun matrix-event-m.room.name (room event)
   "Process m.room.name EVENT in ROOM."
-  (with-slots (name) room
-    (setq name (a-get* event 'content 'name))
+  (with-slots (room-name) room
+    (setq room-name (a-get* event 'content 'name))
     (run-hook-with-args 'matrix-room-metadata-hook room)))
 
 (defun matrix-event-m.room.canonical_alias (room event)

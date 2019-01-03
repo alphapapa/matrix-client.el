@@ -661,13 +661,13 @@ point positioned before the inserted message."
     (rename-buffer (matrix-client-display-name room))))
 
 (defun matrix-client-display-name (room)
-  "Return display name for ROOM.
-If a buffer already exists with the name that would be returned,
-a different name is returned."
+  "Return display room-name for ROOM.
+If a buffer already exists with the room-name that would be returned,
+a different room-name is returned."
   ;; https://matrix.org/docs/spec/client_server/r0.3.0.html#id267
 
-  ;; FIXME: Make it easier to name the room separately from the room's buffer.  e.g. I want the
-  ;; header line to have the official room name, but I want the buffer name in 1-on-1 chats to be
+  ;; FIXME: Make it easier to room-name the room separately from the room's buffer.  e.g. I want the
+  ;; header line to have the official room room-name, but I want the buffer room-name in 1-on-1 chats to be
   ;; the other person's name.
 
   (cl-macrolet ((displaynames-sorted-by-id (members)
@@ -688,15 +688,15 @@ a different name is returned."
                                                           (cl-loop for this-choice in (-non-nil (-flatten it))
                                                                    unless (or (string-empty-p this-choice)
                                                                               (--when-let (get-buffer this-choice)
-                                                                                ;; Allow reusing current name of current buffer
+                                                                                ;; Allow reusing current room-name of current buffer
                                                                                 (not (equal it (oref* room client-data buffer)))))
                                                                    return this-choice)
                                                         (unless (or (string-empty-p it)
                                                                     (--when-let (get-buffer it)
-                                                                      ;; Allow reusing current name of current buffer
+                                                                      ;; Allow reusing current room-name of current buffer
                                                                       (not (equal it (oref* room client-data buffer)))))
                                                           it)))))))
-    (pcase-let* (((eieio id name avatar aliases canonical-alias members session) room)
+    (pcase-let* (((eieio id room-name avatar aliases canonical-alias members session) room)
                  ((eieio (user self)) session)
                  (avatar (when (and avatar matrix-client-show-room-avatars-in-buffer-names)
                            ;; Make a new image to avoid modifying the avatar in the header.
@@ -707,17 +707,17 @@ a different name is returned."
       (concat avatar
               (pcase (1- (length members))
                 (1 (pick-name (matrix-user-displayname room (caar (members-without-self)))
-                              name canonical-alias aliases id))
-                (2 (pick-name name canonical-alias aliases
+                              room-name canonical-alias aliases id))
+                (2 (pick-name room-name canonical-alias aliases
                               (s-join ", " (displaynames-sorted-by-id (members-without-self)))
                               id))
                 ((or `nil (pred (< 0))) ;; More than 2
-                 (pick-name name canonical-alias aliases
+                 (pick-name room-name canonical-alias aliases
                             (format "%s and %s others"
                                     (car (displaynames-sorted-by-id (members-without-self)))
                                     (- (length members) 2))
                             id))
-                (_ (pick-name name canonical-alias aliases
+                (_ (pick-name room-name canonical-alias aliases
                               ;; FIXME: The API says to use names of previous room
                               ;; members if nothing else works, but I don't feel like
                               ;; coding that right now, so we'll just use the room ID.
@@ -729,7 +729,7 @@ Also update prompt with typers."
   (unless (and (boundp 'tabbar-mode) tabbar-mode)
     ;; Disable when tabbar mode is on.  MAYBE: Remove this.
     (with-room-buffer room
-      (pcase-let* (((eieio avatar typers name topic) room)
+      (pcase-let* (((eieio avatar typers room-name topic) room)
                    (name (when name
                            (propertize name 'face 'font-lock-keyword-face)))
                    (ov (car (ov-in 'matrix-client-prompt)))
