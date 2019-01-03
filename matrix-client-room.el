@@ -1301,7 +1301,8 @@ includes the \"In reply to\" link to the quoted message ID)."
   :object-slots ((room session)
                  (session user initial-sync-p))
   :content-keys (body format formatted_body msgtype thumbnail_url url)
-  :let (;; We don't use `matrix-client-event-data-timestamp', because for
+  :let ((inhibit-read-only t)
+        ;; We don't use `matrix-client-event-data-timestamp', because for
         ;; room messages, the origin_server_ts is the actual message time.
         (timestamp (/ origin_server_ts 1000))
         ;; FIXME: Not sure we need to call `seconds-to-time' here.
