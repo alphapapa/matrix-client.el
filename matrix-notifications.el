@@ -23,6 +23,8 @@
 
 (require 'notifications)
 
+(require 'anaphora)
+
 ;;;; Customization
 
 (defgroup matrix-client-notifications nil
@@ -105,6 +107,51 @@ Optional REST of args are also applied to hooks and function."
       (let ((fn (intern-soft (concat "matrix-client-notify-" event-type))))
         (when (functionp fn)
           (apply #'funcall fn data rest))))))
+
+(defun matrix-client-notify--add-to-notifications-buffer (event-type data rest)
+  "Add event with DATA to notifications buffer."
+  ;; FIXME: Handle other event types.
+  (pcase event-type
+    ("m.room.message"
+     (let-alist data
+       ;; FIXME: Should probably rework a lot of code in this file to pass event arguments in a better way.
+       (let* ((room (plist-get rest :room))
+              (room-name (propertize (matrix-client-display-name room)
+                                     'face 'font-lock-function-name-face))
+              (room-buffer (oref* room client-data buffer))
+              (sender (propertize (concat (matrix-user-displayname room .sender) ">")
+                                  'face 'font-lock-keyword-face))
+              (body .content.body)
+              ;; (blank (propertize " " 'face 'matrix-client-metadata))
+              ;; The space is required because of an idiosyncrasy with
+              ;; how Emacs handles images in display properties.
+              ;; Without it, only the room avatar is visible, and it's
+              ;; doubled, and there is no other text visible.
+              (message (propertize (format$ " $room-name: $sender $body")
+                                   'buffer room-buffer)))
+         ;; Using notification buffer pseudo room
+         (matrix-client-insert (matrix-client--notifications-buffer) message
+                               :timestamp-prefix t))))))
+
+(add-hook 'matrix-client-notify-hook #'matrix-client-notify--add-to-notifications-buffer)
+
+(defun matrix-client--notifications-buffer ()
+  "Return `matrix-room' object whose buffer is the special notifications buffer.
+This function exists to allow the use of `with-room-buffer'."
+  (let ((buffer (or (get-buffer "*Matrix Notifications*")
+                    (aprog1 (get-buffer-create "*Matrix Notifications*")
+                      (with-current-buffer it
+                        (use-local-map (make-sparse-keymap))
+                        (local-set-key (kbd "RET") #'matrix-client-notifications-buffer-pop)
+                        (matrix-client-insert-prompt)
+                        (matrix-client-insert-last-seen))))))
+    (matrix-room :client-data (matrix-room-client-data :buffer buffer))))
+
+(defun matrix-client-notifications-buffer-pop ()
+  "Pop to room buffer for event at point."
+  (interactive)
+  (awhen (get-text-property (point) 'buffer)
+    (pop-to-buffer it)))
 
 ;; MAYBE: Use a macro to define the handlers, because they have to
 ;; define their arg lists in a certain way, and the macro would take
