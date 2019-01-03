@@ -63,6 +63,28 @@ Automatically trimmed to last 20 notifications.")
           "mention" #'matrix-client-event-mentions-user-p)
   "Alist mapping friendly string names to notification rules.")
 
+(defvar matrix-client-notifications-buffer-map
+  (let ((map (make-sparse-keymap))
+        (mappings `(
+                    "r" matrix-client-reply-or-insert
+                    "R" (lambda () (interactive) (matrix-client-reply-or-insert t))
+                    "RET" matrix-client-notifications-buffer-RET
+                    "DEL "matrix-client-delete-backward-char
+                    "C-k" matrix-client-kill-line-or-unsent-message
+                    "TAB" matrix-client-tab
+                    "<backtab>" (lambda ()
+                                  (interactive)
+                                  (matrix-client-tab :backward t))
+                    ;; This seems to work properly, to get the binding from `org-mode-map'.
+                    ,(key-description (where-is-internal 'org-edit-special org-mode-map 'first-only)) matrix-client-room-outorg)))
+    (cl-loop for (key fn) on mappings by #'cddr
+             do (define-key map (cl-typecase key
+                                  (string (kbd key))
+                                  (otherwise key))
+                  fn))
+    map)
+  "Keymap for `matrix-client-mode' notification buffers.")
+
 ;;;; Commands
 
 (matrix-client-def-room-command notify
@@ -149,12 +171,33 @@ Optional REST of args are also applied to hooks and function."
               ;; doubled, and there is no other text visible.
               (message (propertize (format$ " $room-name: $sender $body")
                                    'buffer room-buffer
-                                   'event_id event-id)))
+                                   'event_id event-id
+                                   'sender sender
+                                   'room room)))
          ;; Using notification buffer pseudo room
          (matrix-client-insert (matrix-client--notifications-buffer) message
                                :timestamp-prefix t))))))
 
 (add-hook 'matrix-client-notify-hook #'matrix-client-notify--add-to-notifications-buffer)
+
+(defun matrix-client-notifications-buffer-send-input ()
+  "Send message to room.
+NOTE: This only works for replies!"
+  (interactive)
+  (if-let* ((input (matrix-client--room-input :delete t))
+            (room (get-text-property 0 'room input)))
+      (with-room-buffer room
+        (matrix-client-send-input :input input))
+    (goto-char (matrix-client--prompt-position))
+    (insert input)
+    (user-error "Only replies may be sent from the notification buffer")))
+
+(defun matrix-client-notifications-buffer-RET ()
+  "Act appropriately for RET keypress."
+  (interactive)
+  (cond ((< (point) (matrix-client--prompt-position))
+         (matrix-client-notifications-buffer-pop))
+        (t (matrix-client-notifications-buffer-send-input))))
 
 (defun matrix-client--notifications-buffer ()
   "Return `matrix-room' object whose buffer is the special notifications buffer.
@@ -163,8 +206,7 @@ This function exists to allow the use of `with-room-buffer'."
                     (aprog1 (get-buffer-create "*Matrix Notifications*")
                       (with-current-buffer it
                         (visual-line-mode)
-                        (use-local-map (make-sparse-keymap))
-                        (local-set-key (kbd "RET") #'matrix-client-notifications-buffer-pop)
+                        (use-local-map matrix-client-notifications-buffer-map)
                         (matrix-client-insert-prompt)
                         (matrix-client-insert-last-seen))))))
     (matrix-room :client-data (matrix-room-client-data :buffer buffer))))

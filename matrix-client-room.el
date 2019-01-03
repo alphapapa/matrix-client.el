@@ -183,10 +183,14 @@ method without it."
 With prefix, quote message or selected region of message."
   (interactive "P")
   (if-let* ((sender (get-text-property (point) 'sender)))
-      ;; Start reply
-      (let* ((string (if quote-p
+      ;; Start reply.
+      ;; Getting room from text property is for using from notifications buffer.
+      (let* ((room (or (get-text-property (point) 'room)
+                       matrix-client-room))
+             (string (if quote-p
                          (concat (matrix-client-quote-event-at-point :org matrix-client-send-as-org-by-default) "\n\n")
-                       (propertize (concat (matrix-user-displayname matrix-client-room sender) ": ")
+                       (propertize (concat (matrix-user-displayname room sender) ": ")
+                                   'room room
                                    'sender sender
                                    'quoted-body (matrix-client--this-message)
                                    'reply-p t
