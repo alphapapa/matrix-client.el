@@ -17,6 +17,13 @@
 ;; You should have received a copy of the GNU General Public License
 ;; along with this file.  If not, see <http://www.gnu.org/licenses/>.
 
+;; FIXME: This system is flexible, but a bit complicated and
+;; redundant, e.g. there should be a more central dispatch function
+;; that dispatches only to the appropriate handlers, rather than
+;; having each handler decide what to do by calling `-notify-p'
+;; itself.  Or, the dispatcher could pass the result of `-notify-p' to
+;; each handler so the value could be computed only once.
+
 ;;; Code:
 
 ;;;; Requirements
@@ -60,7 +67,12 @@ Automatically trimmed to last 20 notifications.")
 (defvar matrix-client-notification-rules
   (a-list "always" t
           "never" nil
-          "mention" #'matrix-client-event-mentions-user-p)
+          "mention" #'matrix-client-event-mentions-user-p
+          "silent" 'silent
+          ;; "silent-unless-mention" only shows in the notifications
+          ;; buffer, unless the user is mentioned, in which case it
+          ;; also does a normal notification.  FIXME: Find a way to document/explain this.
+          "silent-unless-mention" #'matrix-client-notify-event-silent-unless-mention)
   "Alist mapping friendly string names to notification rules.")
 
 (defvar matrix-client-notifications-buffer-map
@@ -152,31 +164,33 @@ Optional REST of args are also applied to hooks and function."
 (defun matrix-client-notify--add-to-notifications-buffer (event-type data rest)
   "Add event with DATA to notifications buffer."
   ;; FIXME: Handle other event types.
-  (pcase event-type
-    ("m.room.message"
-     (let-alist data
-       ;; FIXME: Should probably rework a lot of code in this file to pass event arguments in a better way.
-       (let* ((room (plist-get rest :room))
-              (room-name (propertize (matrix-client-display-name room)
-                                     'face 'font-lock-function-name-face))
-              (room-buffer (oref* room client-data buffer))
-              (sender (propertize (concat (matrix-user-displayname room .sender) ">")
-                                  'face 'font-lock-keyword-face))
-              (body .content.body)
-              (event-id .event_id)
-              ;; (blank (propertize " " 'face 'matrix-client-metadata))
-              ;; The space is required because of an idiosyncrasy with
-              ;; how Emacs handles images in display properties.
-              ;; Without it, only the room avatar is visible, and it's
-              ;; doubled, and there is no other text visible.
-              (message (propertize (format$ " $room-name: $sender $body")
-                                   'buffer room-buffer
-                                   'event_id event-id
-                                   'sender sender
-                                   'room room)))
-         ;; Using notification buffer pseudo room
-         (matrix-client-insert (matrix-client--notifications-buffer) message
-                               :timestamp-prefix t))))))
+  (pcase (matrix-client-notify-p room event)
+    ('nil nil)
+    (_ (pcase event-type
+         ("m.room.message"
+          (let-alist data
+            ;; FIXME: Should probably rework a lot of code in this file to pass event arguments in a better way.
+            (let* ((room (plist-get rest :room))
+                   (room-name (propertize (matrix-client-display-name room)
+                                          'face 'font-lock-function-name-face))
+                   (room-buffer (oref* room client-data buffer))
+                   (sender (propertize (concat (matrix-user-displayname room .sender) ">")
+                                       'face 'font-lock-keyword-face))
+                   (body .content.body)
+                   (event-id .event_id)
+                   ;; (blank (propertize " " 'face 'matrix-client-metadata))
+                   ;; The space is required because of an idiosyncrasy with
+                   ;; how Emacs handles images in display properties.
+                   ;; Without it, only the room avatar is visible, and it's
+                   ;; doubled, and there is no other text visible.
+                   (message (propertize (format$ " $room-name: $sender $body")
+                                        'buffer room-buffer
+                                        'event_id event-id
+                                        'sender sender
+                                        'room room)))
+              ;; Using notification buffer pseudo room
+              (matrix-client-insert (matrix-client--notifications-buffer) message
+                                    :timestamp-prefix t))))))))
 
 (add-hook 'matrix-client-notify-hook #'matrix-client-notify--add-to-notifications-buffer)
 
@@ -222,27 +236,28 @@ This function exists to allow the use of `with-room-buffer'."
 EVENT should be the `event' variable from the
 `defmatrix-client-handler'.  ROOM should be the room object."
   ;; NOTE: Adding notification rule suport
-  (when (matrix-client-notify-p room event)
-    (pcase-let* (((map content sender event_id) event)
-                 ((map body) content)
-                 ((eieio client-data) room)
-                 ((eieio buffer) client-data)
-                 (display-name (matrix-user-displayname room sender))
-                 (id (notifications-notify :title (format$ "<b>$display-name</b>")
-                                           ;; Encode the message as ASCII because dbus-notify
-                                           ;; can't handle some Unicode chars.  And
-                                           ;; `ignore-errors' doesn't work to ignore errors
-                                           ;; from it.  Don't ask me why.
-                                           :body (encode-coding-string body 'us-ascii)
-                                           :category "im.received"
-                                           :timeout 5000
-                                           :app-icon nil
-                                           :actions '("default" "Show")
-                                           :on-action #'matrix-client-notification-show)))
-      (map-put matrix-client-notifications-ring id (a-list 'buffer buffer
-                                                           'event_id event_id))
-      ;; Trim the list
-      (setq matrix-client-notifications-ring (-take 20 matrix-client-notifications-ring)))))
+  (pcase (matrix-client-notify-p room event)
+    ((or 'nil 'silent) nil)
+    (_ (pcase-let* (((map content sender event_id) event)
+                    ((map body) content)
+                    ((eieio client-data) room)
+                    ((eieio buffer) client-data)
+                    (display-name (matrix-user-displayname room sender))
+                    (id (notifications-notify :title (format$ "<b>$display-name</b>")
+                                              ;; Encode the message as ASCII because dbus-notify
+                                              ;; can't handle some Unicode chars.  And
+                                              ;; `ignore-errors' doesn't work to ignore errors
+                                              ;; from it.  Don't ask me why.
+                                              :body (encode-coding-string body 'us-ascii)
+                                              :category "im.received"
+                                              :timeout 5000
+                                              :app-icon nil
+                                              :actions '("default" "Show")
+                                              :on-action #'matrix-client-notification-show)))
+         (map-put matrix-client-notifications-ring id (a-list 'buffer buffer
+                                                              'event_id event_id))
+         ;; Trim the list
+         (setq matrix-client-notifications-ring (-take 20 matrix-client-notifications-ring))))))
 
 (defun matrix-client-notification-show (id key)
   "Show the buffer for a notification.
@@ -271,8 +286,14 @@ activates a notification."
   ;; FIXME: Initialize to a user-defined default.
   (pcase (oref* room client-data notification-rules)
     ((and fn (pred functionp)) (funcall fn room event))
+    ('silent 'silent)
     ('nil nil)
     ('t t)))
+
+(defun matrix-client-notify-event-silent-unless-mention (room event)
+  "Return t if EVENT in ROOM mentions user, otherwise `silent'."
+  (or (matrix-client-event-mentions-user-p room event)
+      'silent))
 
 (defun matrix-client-event-mentions-user-p (room event)
   "Return non-nil if EVENT mentions logged-in user in ROOM.
