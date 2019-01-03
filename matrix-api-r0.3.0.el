@@ -246,8 +246,66 @@ The sync error handler should increase this for consecutive errors, up to a maxi
               :documentation "The most recent event-id in a room, used to push read-receipts to the server.")
    (client-data :initarg :client-data
                 :initform (matrix-room-client-data)
-                :documentation "Reserved for users of the library, who may store whatever they want here."))
+                :documentation "Reserved for users of the library, who may store whatever they want here.")
+   (display-name :initarg :display-name
+                 :documentation "Room's computed display name."))
   :allow-nil-initform t)
+
+(defun matrix--room-display-name (room)
+  "Compute and return display name for ROOM."
+  ;; https://matrix.org/docs/spec/client_server/r0.3.0.html#id267
+
+  ;; FIXME: Make it easier to name the room separately from the room's buffer.  e.g. I want the
+  ;; header line to have the official room name, but I want the buffer name in 1-on-1 chats to be
+  ;; the other person's name.
+
+  (cl-macrolet
+      ((displaynames-sorted-by-id (members)
+                                  `(--> ,members
+                                        (-sort (-on #'string< #'car) it)
+                                        (--map (matrix-user-displayname room (car it))
+                                               it)))
+       (members-without-self () `(cl-remove self members :test #'string= :key #'car))
+       (pick-name (&rest choices)
+                  ;; This macro allows short-circuiting the choice forms, only evaluating them when needed.
+                  `(or ,@(cl-loop for choice in choices
+                                  collect `(--when-let ,choice
+                                             ;; NOTE: We check to see if strings are empty,
+                                             ;; because apparently it can happen that an
+                                             ;; mxid is something like "@:hostname", with
+                                             ;; an empty displayname.  Sigh.
+                                             (if (listp it)
+                                                 (cl-loop for this-choice in (-non-nil (-flatten it))
+                                                          unless (string-empty-p this-choice)
+                                                          return this-choice)
+                                               (unless (string-empty-p it)
+                                                 it)))))))
+    (pcase-let* (((eieio id name avatar aliases canonical-alias members session) room)
+                 ((eieio (user self)) session)
+                 (avatar (when (and avatar matrix-client-show-room-avatars-in-buffer-names)
+                           ;; Make a new image to avoid modifying the avatar in the header.
+                           (setq avatar (cl-copy-list (get-text-property 0 'display avatar)))
+                           (setf (image-property avatar :max-width) matrix-client-room-avatar-in-buffer-name-size)
+                           (setf (image-property avatar :max-height) matrix-client-room-avatar-in-buffer-name-size)
+                           (setq avatar (concat (propertize " " 'display avatar) " ")))))
+      (concat avatar
+              (pcase (1- (length members))
+                (1 (pick-name (matrix-user-displayname room (caar (members-without-self)))
+                              name canonical-alias aliases id))
+                (2 (pick-name name canonical-alias aliases
+                              (s-join ", " (displaynames-sorted-by-id (members-without-self)))
+                              id))
+                ((or `nil (pred (< 0))) ;; More than 2
+                 (pick-name name canonical-alias aliases
+                            (format "%s and %s others"
+                                    (car (displaynames-sorted-by-id (members-without-self)))
+                                    (- (length members) 2))
+                            id))
+                (_ (pick-name name canonical-alias aliases
+                              ;; FIXME: The API says to use names of previous room
+                              ;; members if nothing else works, but I don't feel like
+                              ;; coding that right now, so we'll just use the room ID.
+                              id)))))))
 
 (defun matrix-user-displayname (room user-id)
   "Return display name for USER-ID in ROOM."
@@ -809,7 +867,7 @@ requests, and we make a new request."
 
 (defun matrix-event-m.room.member (room event)
   "Process m.room.member EVENT in ROOM."
-  (with-slots (members id) room
+  (with-slots (members id display-name session) room
     (pcase-let* (((map ('state_key user-id) content) event)
                  ((map membership displayname avatar_url) content))
       (pcase membership
@@ -817,8 +875,21 @@ requests, and we make a new request."
         ("join" (map-put members user-id (a-list 'displayname displayname
                                                  'avatar-url avatar_url)))
         ("leave" (setq members (map-delete members user-id)))))
+    (unless (oref session initial-sync-p)
+      (setf display-name (matrix--room-display-name room)))
     ;; FIXME: Don't think we need this hook, the client can just process the event from timeline-new.
     (run-hook-with-args 'matrix-event-m.room.member-hook room event)))
+
+(defun matrix--set-room-display-names (session)
+  "Set display names for all rooms in SESSION.
+To be used in the after-initial-sync hook.  Computing it can be
+expensive in large rooms, so rather than do it for every
+m.room.member event received on initial sync, we do it once,
+here, after initial sync."
+  (dolist (room (oref session rooms))
+    (oset room display-name (matrix--room-display-name room))))
+
+(add-hook 'matrix-after-initial-sync-hook #'matrix--set-room-display-names)
 
 (defun matrix-event-m.room.name (room event)
   "Process m.room.name EVENT in ROOM."
