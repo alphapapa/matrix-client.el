@@ -133,7 +133,7 @@ method without it."
   (declare (debug (sexp body)) (indent defun))
   `(with-slots* (((client-data id) room)
                  ((buffer) client-data))
-     (unless buffer
+     (unless (and buffer (buffer-live-p buffer))
        ;; Make buffer if necessary.  This seems like the easiest way
        ;; to guarantee that the room has a buffer, since it seems
        ;; unclear what the first received event type for a joined room
