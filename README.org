@@ -97,6 +97,10 @@ You can also *reply* to messages directly from the notifications buffer.  Just a
 
 To jump to a message in the room's buffer, press @@html:<kbd>@@RET@@html:</kbd>@@ with point on the message.
 
+Here's an example of following multiple, related conversations across multiple rooms in the notifications buffer:
+
+[[images/notifications-buffer.png]]
+
 * Configuration
 
 While there are a lot of configuration settings, here are a selection that are
