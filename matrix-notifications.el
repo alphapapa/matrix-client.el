@@ -216,6 +216,8 @@ This function exists to allow the use of `with-room-buffer'."
   (let ((buffer (or (get-buffer "*Matrix Notifications*")
                     (aprog1 (get-buffer-create "*Matrix Notifications*")
                       (with-current-buffer it
+                        (setf header-line-format (propertize " Notifications" 'face 'font-lock-function-name-face)
+                              mode-line-format nil)
                         (visual-line-mode)
                         (use-local-map matrix-client-notifications-buffer-map)
                         (matrix-client-insert-prompt)
