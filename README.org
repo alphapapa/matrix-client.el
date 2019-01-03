@@ -1,6 +1,6 @@
 #+TITLE: [[images/logo64.png]] matrix-client.el
 
-[[https://img.shields.io/matrix/matrix-client.el:matrix.org.svg?label=%23matrix-client.el:matrix.org]]
+[[https://matrix.to/#/#matrix-client.el:matrix.org][https://img.shields.io/matrix/matrix-client.el:matrix.org.svg?label=%23matrix-client.el:matrix.org]]
 
 This is a fork of the [[http://doc.rix.si/projects/matrix.el.html][original matrix.el client]] with the intent of maintaining it further, fixing bugs, and providing long-term goals for the project.
 
@@ -54,7 +54,7 @@ Once the project achieves a sufficiently high quality or demand, it may be submi
 
 * Usage
 
-Either deploy your own homeserver or register an account on the [[https://matrix.org/beta/#/login][public homeserver]] .
+Either deploy your own homeserver or register an account on a [[https://www.hello-matrix.net/public_servers.php][public homeserver]] such as matrix.org. matrix-client-el doesn't currently support registration but you can use another client like [[https://riot.im/app/#/register][Riot to register for an account]].
 
 Then run the command ~matrix-client-connect~ or ~matrix-client-frame~ to connect.
 
