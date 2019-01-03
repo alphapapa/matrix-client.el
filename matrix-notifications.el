@@ -182,7 +182,7 @@ Optional REST of args are also applied to hooks and function."
                    (message (propertize (format$ "$room-name: $sender $body")
                                         'buffer room-buffer
                                         'event_id event-id
-                                        'sender sender
+                                        'sender .sender
                                         'room room)))
               ;; Using notification buffer pseudo room
               (matrix-client-insert (matrix-client--notifications-buffer) message
