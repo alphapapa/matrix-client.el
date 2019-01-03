@@ -315,7 +315,7 @@ There is apparently no standard way to do this in Emacs.  This
 function tries to use lookup utilities, which may or may not
 exist on the local system.  If they fail, it returns NAME with
 the standard Matrix port."
-  (let* ((matrix-name (concat "_matrix._tcp." name))
+  (let* ((matrix-name (shell-quote-argument (concat "_matrix._tcp." name)))
          (host-command (concat "host -t srv " matrix-name))
          (host-response (shell-command-to-string host-command)))
     (if (string-match (rx-to-string `(seq ,matrix-name " has SRV record "
