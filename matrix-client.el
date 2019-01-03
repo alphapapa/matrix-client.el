@@ -201,11 +201,13 @@ Should be called after initial sync."
     (with-slots (user server access-token txn-id) session
       ;; FIXME: Change "username" to "user" when we no longer need compatibility with old code
       ;; FIXME: Change token to access-token for clarity.
-      (prin1 (a-list 'username user
-                     'server server
-                     'token access-token
-                     'txn-id txn-id)
-             (current-buffer))))
+      (let ((print-level nil)
+            (print-length nil))
+        (prin1 (a-list 'username user
+                       'server server
+                       'token access-token
+                       'txn-id txn-id)
+               (current-buffer)))))
   ;; Ensure permissions are safe
   (chmod matrix-client-save-token-file #o600))
 
