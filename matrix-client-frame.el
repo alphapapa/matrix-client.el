@@ -116,7 +116,8 @@ automatically."
       (let ((map (copy-keymap (current-local-map))))
         (define-key map [mouse-2] #'matrix-client-frame-sidebar-open-room-frame-mouse)
         (define-key map (kbd "<C-return>") #'matrix-client-frame-sidebar-open-room-frame)
-        (use-local-map map))))
+        (use-local-map map)))
+    (matrix-client-switch-to-notifications-buffer))
   ;; Be sure to return the frame.
   matrix-client-frame)
 

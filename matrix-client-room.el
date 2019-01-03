@@ -21,7 +21,7 @@ Used to add a button for pending messages.")
 (defvar matrix-client-mode-map
   (let ((map (make-sparse-keymap))
         (mappings `(
-                    "C-c C-n" matrix-client-show-notifications-buffer
+                    "C-c C-n" matrix-client-switch-to-notifications-buffer
                     "r" matrix-client-reply-or-insert
                     "R" (lambda () (interactive) (matrix-client-reply-or-insert t))
                     "RET" matrix-client-ret
@@ -759,7 +759,6 @@ Called from inside the room's buffer.")
     (when matrix-client-mark-modified-rooms
       (add-hook 'buffer-list-update-hook #'matrix-client-buffer-list-update-hook 'append 'local))
     (erase-buffer)
-    (switch-to-buffer (current-buffer))
     ;; FIXME: Remove these or update them.
     ;; (set (make-local-variable 'matrix-client-room-connection) con)
     (setq-local matrix-client-room room)
