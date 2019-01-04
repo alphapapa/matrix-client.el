@@ -131,6 +131,14 @@ method without it."
 
 ;;;; Commands
 
+(defun matrix-client-mouse-browse-link (event)
+  "Call `browse-url' for link at mouse click EVENT.
+URL taken from `help-echo' text property."
+  (interactive)
+  (mouse-set-point event)
+  (when-let ((url (get-text-property (point) 'help-echo)))
+    (browse-url url)))
+
 (defun matrix-client-scroll-down ()
   "Call `scroll-down-command'.  If point is at the top of the buffer, load history."
   (interactive)
@@ -1288,7 +1296,7 @@ includes the \"In reply to\" link to the quoted message ID)."
                                                 'mouse-face 'highlight
                                                 'face 'link
                                                 'help-echo matrix-image-url
-                                                'action #'browse-url-at-mouse
+                                                'action #'matrix-client-mouse-browse-link
                                                 'follow-link t))
                              (_ (matrix-client-linkify-urls body)))))
             ;; Apply face for own messages
