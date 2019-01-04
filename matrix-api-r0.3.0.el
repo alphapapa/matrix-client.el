@@ -893,14 +893,16 @@ here, after initial sync."
 
 (defun matrix-event-m.room.name (room event)
   "Process m.room.name EVENT in ROOM."
-  (with-slots (name) room
-    (setq name (a-get* event 'content 'name))
+  (with-slots (name display-name) room
+    (setq name (a-get* event 'content 'name)
+          display-name (matrix--room-display-name room))
     (run-hook-with-args 'matrix-room-metadata-hook room)))
 
 (defun matrix-event-m.room.canonical_alias (room event)
   "Process m.room.canonical_alias EVENT in ROOM."
-  (with-slots (canonical-alias) room
-    (setq canonical-alias (a-get* event 'content 'alias))
+  (with-slots (canonical-alias display-name) room
+    (setq canonical-alias (a-get* event 'content 'alias)
+          display-name (matrix--room-display-name room))
     (run-hook-with-args 'matrix-room-metadata-hook room)))
 
 (defvar matrix-room-metadata-hook nil

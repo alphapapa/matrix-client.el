@@ -152,24 +152,26 @@ Should be called manually, e.g. in `matrix-after-sync-hook', by
     (with-selected-frame matrix-client-frame
       ;; Copied from `frame-purpose--update-sidebar' to add grouping.
       (with-current-buffer (frame-purpose--get-sidebar 'create)
-        (let* ((saved-point (point))
-               (inhibit-read-only t)
-               (buffer-sort-fns (frame-parameter nil 'buffer-sort-fns))
-               ;; FIXME: This works fine but is a little messy.
-               (buffers (funcall (frame-parameter nil 'sidebar-buffers-fn)))
-               (sorted-buffers (dolist (fn buffer-sort-fns buffers)
-                                 (setq buffers (-sort fn buffers))))
-               (buffer-groups (matrix-client-frame-group-buffers sorted-buffers))
-               (standard-groups (cl-loop for header in '("Favorites" "People")
-                                         collect (cons header (alist-get header buffer-groups nil nil #'string=))))
-               (low-priority-group (cons "Low priority" (alist-get "Low priority" buffer-groups nil nil #'string=)))
-               (other-groups (seq-difference buffer-groups (-flatten-n 1 (list standard-groups (list low-priority-group)))
-                                             (lambda (a b)
-                                               (string= (car a) (car b)))))
-               ;; FIXME: Make group order configurable.
-               (separator (pcase (frame-parameter nil 'sidebar)
-                            ((or 'left 'right) "\n")
-                            ((or 'top 'bottom) "  "))))
+        ;; Use `when-let*' so that if this function is called during initial
+        ;; sync and there are no room buffers yet, it won't give an error.
+        (when-let* ((saved-point (point))
+                    (inhibit-read-only t)
+                    (buffer-sort-fns (frame-parameter nil 'buffer-sort-fns))
+                    ;; FIXME: This works fine but is a little messy.
+                    (buffers (funcall (frame-parameter nil 'sidebar-buffers-fn)))
+                    (sorted-buffers (dolist (fn buffer-sort-fns buffers)
+                                      (setq buffers (-sort fn buffers))))
+                    (buffer-groups (matrix-client-frame-group-buffers sorted-buffers))
+                    (standard-groups (cl-loop for header in '("Favorites" "People")
+                                              collect (cons header (alist-get header buffer-groups nil nil #'string=))))
+                    (low-priority-group (cons "Low priority" (alist-get "Low priority" buffer-groups nil nil #'string=)))
+                    (other-groups (seq-difference buffer-groups (-flatten-n 1 (list standard-groups (list low-priority-group)))
+                                                  (lambda (a b)
+                                                    (string= (car a) (car b)))))
+                    ;; FIXME: Make group order configurable.
+                    (separator (pcase (frame-parameter nil 'sidebar)
+                                 ((or 'left 'right) "\n")
+                                 ((or 'top 'bottom) "  "))))
           (setf buffer-groups (-flatten-n 1 (list standard-groups
                                                   other-groups
                                                   (list low-priority-group))))
@@ -193,7 +195,12 @@ Should be called manually, e.g. in `matrix-after-sync-hook', by
           ;; FIXME: Is there a reason I didn't use `save-excursion' here?
           (goto-char saved-point))))))
 
-(add-hook 'matrix-client-room-avatar-callback-hook #'matrix-client-frame-update-sidebar)
+(add-hook 'matrix-after-initial-sync-hook
+          ;; Must not add this to the hook until after initial sync
+          ;; has completed, otherwise the sidebar will fail to update.
+          (lambda (&rest _ignore)
+            "Add `matrix-client-frame-update-sidebar' to `matrix-room-metadata-hook' after initial sync."
+            (add-hook 'matrix-room-metadata-hook #'matrix-client-frame-update-sidebar)))
 
 (defun matrix-client-frame-group-buffers (buffers)
   "Return BUFFERS grouped."
