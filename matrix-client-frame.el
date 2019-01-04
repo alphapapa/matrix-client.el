@@ -148,7 +148,7 @@ Should be called in the frame sidebar buffer."
   "Update the buffer list sidebar when the `matrix-client-frame' is active.
 Should be called manually, e.g. in `matrix-after-sync-hook', by
 `frame-purpose--sidebar-switch-to-buffer', etc."
-  (when (frame-live-p matrix-client-frame)
+  (when (and matrix-client-frame (frame-live-p matrix-client-frame))
     (with-selected-frame matrix-client-frame
       ;; Copied from `frame-purpose--update-sidebar' to add grouping.
       (with-current-buffer (frame-purpose--get-sidebar 'create)
