@@ -1432,7 +1432,11 @@ as an async callback when the image is downloaded."
     (matrix-client-update-header room)
     (matrix-client-rename-buffer room)
     (when message
-      (matrix-client-insert room message))))
+      (matrix-client-insert room message))
+    (run-hook-with-args 'matrix-client-room-avatar-callback-hook room)))
+
+(defvar matrix-client-room-avatar-callback-hook nil
+  "Functions called after a room avatar is downloaded.")
 
 ;;;;; Org syntax
 

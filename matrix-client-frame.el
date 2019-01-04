@@ -193,6 +193,8 @@ Should be called manually, e.g. in `matrix-after-sync-hook', by
           ;; FIXME: Is there a reason I didn't use `save-excursion' here?
           (goto-char saved-point))))))
 
+(add-hook 'matrix-client-room-avatar-callback-hook #'matrix-client-frame-update-sidebar)
+
 (defun matrix-client-frame-group-buffers (buffers)
   "Return BUFFERS grouped."
   (let* ((grouped (-group-by #'matrix-client-frame-default-buffer-groups buffers))
