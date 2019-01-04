@@ -126,6 +126,9 @@ exit
 
 ;;;;# Connect
 
+(setf print-level 1 print-length 1 print-circle t
+  debugger-print-function #'prin1)
+
 (add-hook 'matrix-client-setup-room-buffer-hook
           (lambda (&rest _ignore)
             (setq mode-line-format nil)))

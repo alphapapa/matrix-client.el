@@ -129,23 +129,6 @@ method without it."
                       ,@let)
            ,body)))))
 
-(defmacro with-room-buffer (room &rest body)
-  (declare (debug (sexp body)) (indent defun))
-  `(with-slots* (((client-data id display-name) room)
-                 ((buffer) client-data))
-     (unless (and buffer (buffer-live-p buffer))
-       ;; Make buffer if necessary.  This seems like the easiest way
-       ;; to guarantee that the room has a buffer, since it seems
-       ;; unclear what the first received event type for a joined room
-       ;; will be.
-       (setq buffer (generate-new-buffer (or display-name
-                                             (oset room display-name (matrix--room-display-name room))
-                                             ;; "*matrix-room temporary buffer name*"
-                                             )))
-       (matrix-client-setup-room-buffer room))
-     (with-current-buffer buffer
-       ,@body)))
-
 ;;;; Commands
 
 (defun matrix-client-scroll-down ()
