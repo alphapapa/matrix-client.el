@@ -227,7 +227,7 @@ This function exists to allow the use of `with-room-buffer'."
                     (aprog1 (get-buffer-create "*Matrix Notifications*")
                       (with-current-buffer it
                         (setf header-line-format (propertize " Notifications"
-                                                             'face '(:inherit font-lock-function-name-face :weight bold
+                                                             'face '(:inherit font-lock-keyword-face :weight bold
                                                                               :height 1.25))
                               mode-line-format nil)
                         (visual-line-mode)
