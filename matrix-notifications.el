@@ -24,6 +24,8 @@
 ;; itself.  Or, the dispatcher could pass the result of `-notify-p' to
 ;; each handler so the value could be computed only once.
 
+;; TODO: Factor out code from here and -room.el that's duplicated/modified here.
+
 ;;; Code:
 
 ;;;; Requirements
