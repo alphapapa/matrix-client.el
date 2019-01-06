@@ -91,7 +91,8 @@ exit
 (setq completions-format 'vertical)
 
 ;; Switch buffer command
-(global-set-key (kbd "C-<tab>") #'switch-to-buffer)
+(global-set-key (kbd "C-<tab>") #'matrix-client-switch-buffer)
+(global-set-key [f1] #'matrix-client-switch-to-notifications-buffer)
 
 ;;;# package.el
 
