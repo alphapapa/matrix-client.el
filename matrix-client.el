@@ -164,6 +164,11 @@ connecting, non-nil."
                                     :initial-sync-p t)
                     password))))
 
+(defun matrix-client-sync ()
+  "Sync all Matrix buffers."
+  (interactive)
+  (mapcar #'matrix-sync matrix-client-sessions))
+
 (defun matrix-client-login-hook (session)
   "Callback for successful login.
 Add session to sessions list and run initial sync."
