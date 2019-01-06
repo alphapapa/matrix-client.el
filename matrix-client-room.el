@@ -848,8 +848,6 @@ is sent, if any."
 (matrix-client-def-room-command priority
   :docstring "Set room priority."
   :insert (pcase input
-            ((or "" 'nil)
-             "Priority may be: (high|favorite|favourite), (normal|none), or low.")
             ((or "high" "favorite" "favourite")
              (progn
                (matrix-room-tags room '(m.favourite))
@@ -863,7 +861,8 @@ is sent, if any."
              (progn
                (matrix-room-tags room '(m.lowpriority))
                (matrix-room-tags room '(m.favourite) :action 'delete)
-               "Room set to low priority."))))
+               "Room set to low priority."))
+            (_ "Priority may be: (high|favorite|favourite), (normal|none), or low.")))
 
 (matrix-client-def-room-command raw
   :docstring "Send message without formatting.
