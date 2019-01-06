@@ -104,18 +104,16 @@ Automatically trimmed to last 20 notifications.")
 (matrix-client-def-room-command notify
   :docstring "Set room notification setting.
 Without argument, displays help and current setting."
-  :insert (pcase input
-            ((or 'nil "") (pcase-let* (((eieio client-data) room)
-                                       ((eieio notification-rules) client-data)
-                                       (current-rule notification-rules)
-                                       (current-rule-name (car (cl-rassoc current-rule matrix-client-notification-rules :test #'equal)))
-                                       (available-rules (s-join ", " (-map #'car matrix-client-notification-rules))))
-                            (format "Current notification rule: %s.  Available rules: %s." current-rule-name available-rules)))
-            (_ (let* ((rule (map-elt matrix-client-notification-rules input nil #'equal))
-                      (rule-name (car (cl-rassoc rule matrix-client-notification-rules :test #'equal))))
-                 ;; NOTE: If the user enters an invalid rule, it will default to "never".
-                 (matrix-client-set-notification-rule room rule)
-                 (format "Notification rule set: %s." rule-name)))))
+  :insert (aif (map-elt matrix-client-notification-rules input nil #'equal)
+              (progn
+                (matrix-client-set-notification-rule room it)
+                (format "Notification rule set: %s." input))
+            (pcase-let* (((eieio client-data) room)
+                         ((eieio notification-rules) client-data)
+                         (current-rule notification-rules)
+                         (current-rule-name (car (cl-rassoc current-rule matrix-client-notification-rules :test #'equal)))
+                         (available-rules (s-join ", " (-map #'car matrix-client-notification-rules))))
+              (format "Current notification rule: %s.  Available rules: %s." current-rule-name available-rules))))
 
 (defun matrix-client-switch-to-notifications-buffer (&rest _ignore)
   "Show notifications buffer, if it exists."
