@@ -139,4 +139,5 @@ exit
 
 ;; Local Variables:
 ;; eval: (aggressive-indent-mode -1)
+;; eval: (flycheck-mode -1)
 ;; End:
