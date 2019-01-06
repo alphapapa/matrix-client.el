@@ -30,6 +30,8 @@ To make switching room buffers easy, the default completion settings are improve
 +  @@html:<kbd>@@C-<tab>@@html:</kbd>@@: Switch room buffer.
 +  @@html:<kbd>@@F1@@html:</kbd>@@: Show only =Notifications= buffer.
 
+There's also a context menu available in the sidebar by right-clicking rooms.
+
 After using the "standalone" client, the packages will be installed to your Emacs packages directory, so then you can also use it in your main Emacs config.
 
 Of course, this is a rather unorthodox way to install and use an Emacs package, so if you are uncomfortable with this method, please do inspect the code yourself, or use another installation method.

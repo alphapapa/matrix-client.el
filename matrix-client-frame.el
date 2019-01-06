@@ -113,10 +113,7 @@ automatically."
     ;; Set sidebar keymap.
     (with-current-buffer (frame-purpose--get-sidebar)
       ;; HACK: Either elegant or a hack, to just copy the local map like this.  Should probably define one.
-      (let ((map (copy-keymap (current-local-map))))
-        (define-key map [mouse-2] #'matrix-client-frame-sidebar-open-room-frame-mouse)
-        (define-key map (kbd "<C-return>") #'matrix-client-frame-sidebar-open-room-frame)
-        (use-local-map map)))
+      (use-local-map matrix-client-frame-sidebar-map))
     (matrix-client-switch-to-notifications-buffer))
   ;; Be sure to return the frame.
   matrix-client-frame)
@@ -139,6 +136,65 @@ Should be called in the frame sidebar buffer."
   (interactive "e")
   (mouse-set-point click)
   (matrix-client-frame-sidebar-open-room-frame))
+
+(defun matrix-client-frame-sidebar-mouse-switch-to-room-buffer (&optional event)
+  "Switch to buffer of room at point or at EVENT's position."
+  (interactive "e")
+  (mouse-set-point event)
+  (frame-purpose--sidebar-switch-to-buffer))
+
+;;;; Menus
+
+(defvar matrix-client-frame-sidebar-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map [mouse-1] #'matrix-client-frame-sidebar-mouse-switch-to-room-buffer)
+    (define-key map [mouse-2] #'matrix-client-frame-sidebar-open-room-frame-mouse)
+    (define-key map [down-mouse-3] #'matrix-client-frame-sidebar-mouse-context-menu)
+    (define-key map (kbd "<C-return>") #'matrix-client-frame-sidebar-open-room-frame)
+    map)
+  "Keymap for Matrix Client frame sidebar.")
+
+(defvar matrix-client-frame-sidebar-menu
+  '("Room menu"
+    ["Open room in new frame" matrix-client-frame-sidebar-open-room-frame]
+    ("Notifications"
+     ["Always" (matrix-client-frame-sidebar-room-notify "always")]
+     ["Mention" (matrix-client-frame-sidebar-room-notify "mention")]
+     ["Silent unless mention" (matrix-client-frame-sidebar-room-notify "silent-unless-mention")]
+     ["Silent" (matrix-client-frame-sidebar-room-notify "silent")]
+     ["Never" (matrix-client-frame-sidebar-room-notify "never")])
+    ("Priority"
+     ["Favorite" (matrix-client-frame-sidebar-room-priority "favorite")]
+     ["Normal" (matrix-client-frame-sidebar-room-priority "normal")]
+     ["Low" (matrix-client-frame-sidebar-room-priority "low")]))
+  "Sidebar menu.")
+
+(defun matrix-client-frame-sidebar-mouse-context-menu (&optional event)
+  "Display the context menu for mouse EVENT."
+  ;; Modeled after `org-mouse-context-menu'.
+  (interactive "e")
+  (mouse-set-point event)
+  (popup-menu matrix-client-frame-sidebar-menu (popup-menu-normalize-position event)))
+
+(defun matrix-client-frame-sidebar-room-notify (setting)
+  "Set notification for room at point to SETTING."
+  (let* ((buffer (get-text-property (point) 'buffer))
+         (room (buffer-local-value 'matrix-client-room buffer)))
+    (matrix-client-room-command-notify room setting)
+    (message "%s room notifications set to: %s" (oref room display-name) setting)))
+
+(defun matrix-client-frame-sidebar-room-priority (setting)
+  "Set priority for room at point to SETTING."
+  (let* ((buffer (get-text-property (point) 'buffer))
+         (room (buffer-local-value 'matrix-client-room buffer)))
+    (matrix-client-room-command-priority room setting)
+    (message "%s room priority set to: %s" (oref room display-name) setting)))
+
+(defun matrix-client-frame-sidebar-room-name-at-point ()
+  "Return name of room at point."
+  (let* ((buffer (get-text-property (point) 'buffer))
+         (room (buffer-local-value 'matrix-client-room buffer)))
+    (s-trim (oref room display-name))))
 
 ;;;; Functions
 
