@@ -77,6 +77,8 @@ exit
 ;;; # * matrix-client-standalone.el
 
 ;; Misc settings
+(setf frame-resize-pixelwise t
+      window-resize-pixelwise t)
 (setq load-prefer-newer t)
 (setq tool-bar-mode nil)
 (setq scroll-conservatively 100)
