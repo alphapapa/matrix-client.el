@@ -251,14 +251,26 @@ The sync error handler should increase this for consecutive errors, up to a maxi
                  :documentation "Room's computed display name."))
   :allow-nil-initform t)
 
+(defcustom matrix-client-direct-chat-prefer-room-name nil
+  ;; FIXME: This violates the API/client boundary, but since the room-display-name
+  ;; function lives here now, it must be here.  Maybe that needs to change back.
+  "In direct chat rooms, prefer the room name over the other user's name.
+In 1-on-1 chat rooms, if this option is disabled, the room will
+be displayed using the name of the other user.  If enabled, the
+room's set name will be used when available."
+  :group 'matrix-client
+  :type 'boolean
+  :set (lambda (option value)
+         (set-default option value)
+         (when (bound-and-true-p matrix-client-sessions)
+           (--each matrix-client-sessions
+             (--each (oref it rooms)
+               (oset it display-name (matrix--room-display-name it)))
+             (matrix-client-rename-room-buffers it)))))
+
 (defun matrix--room-display-name (room)
   "Compute and return display name for ROOM."
   ;; https://matrix.org/docs/spec/client_server/r0.3.0.html#id267
-
-  ;; FIXME: Make it easier to name the room separately from the room's buffer.  e.g. I want the
-  ;; header line to have the official room name, but I want the buffer name in 1-on-1 chats to be
-  ;; the other person's name.
-
   (cl-macrolet
       ((displaynames-sorted-by-id (members)
                                   `(--> ,members
@@ -290,8 +302,11 @@ The sync error handler should increase this for consecutive errors, up to a maxi
                            (setq avatar (concat (propertize " " 'display avatar) " ")))))
       (concat avatar
               (pcase (1- (length members))
-                (1 (pick-name (matrix-user-displayname room (caar (members-without-self)))
-                              name canonical-alias aliases id))
+                (1 (if matrix-client-direct-chat-prefer-room-name
+                       (pick-name name (matrix-user-displayname room (caar (members-without-self)))
+                                  canonical-alias aliases id)
+                     (pick-name (matrix-user-displayname room (caar (members-without-self)))
+                                name canonical-alias aliases id)))
                 (2 (pick-name name canonical-alias aliases
                               (s-join ", " (displaynames-sorted-by-id (members-without-self)))
                               id))
