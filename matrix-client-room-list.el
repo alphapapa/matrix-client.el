@@ -160,7 +160,7 @@
   "Return non-nil if entry A has fewer members than room B.
 A and B should be entries from `tabulated-list-mode'."
   (-let (((_room [_unread _avatar _name-for-list _topic a-members _user]) a)
-         ((_room_[_unread _avatar _name-for-list _topic b-members _user]) b))
+         ((_room [_unread _avatar _name-for-list _topic b-members _user]) b))
     (< (string-to-number a-members) (string-to-number b-members))))
 
 ;;;; Footer
