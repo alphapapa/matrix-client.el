@@ -146,6 +146,8 @@ exit
     (call-interactively #'matrix-client-frame)
   (delete-other-frames))
 
+(add-hook 'matrix-after-initial-sync-hook #'matrix-client-room-list)
+
 ;; Bind some keys after loading matrix-client.
 
 ;; One of the cool things about `hippie-expand' is that it dynamically

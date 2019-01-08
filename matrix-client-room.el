@@ -22,6 +22,7 @@ Used to add a button for pending messages.")
   (let ((map (make-sparse-keymap))
         (mappings `(
                     "C-c C-n" matrix-client-switch-to-notifications-buffer
+                    "C-c C-r" matrix-client-room-list
                     "r" matrix-client-reply-or-insert
                     "R" (lambda () (interactive) (matrix-client-reply-or-insert t))
                     "RET" matrix-client-ret

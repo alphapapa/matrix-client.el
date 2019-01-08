@@ -80,6 +80,7 @@ Automatically trimmed to last 20 notifications.")
 (defvar matrix-client-notifications-buffer-map
   (let ((map (make-sparse-keymap))
         (mappings `(
+                    "C-c C-r" matrix-client-room-list
                     "r" matrix-client-reply-or-insert
                     "R" (lambda () (interactive) (matrix-client-reply-or-insert t))
                     "RET" matrix-client-notifications-buffer-RET

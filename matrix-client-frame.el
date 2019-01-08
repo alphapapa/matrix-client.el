@@ -122,7 +122,8 @@ automatically."
   "Open a new frame showing room at point.
 Should be called in the frame sidebar buffer."
   (interactive)
-  (when-let* ((buffer (get-text-property (1+ (line-beginning-position)) 'buffer))
+  (when-let* ((buffer (or (get-text-property (1+ (line-beginning-position)) 'buffer)
+                          (oref* (tabulated-list-get-id) client-data buffer)))
               (frame (make-frame
                       (a-list 'name (buffer-name buffer)
                               ;; MAYBE: Save room avatar to a temp file, pass to `icon-type'.
@@ -151,6 +152,7 @@ Should be called in the frame sidebar buffer."
     (define-key map [mouse-2] #'matrix-client-frame-sidebar-open-room-frame-mouse)
     (define-key map [down-mouse-3] #'matrix-client-frame-sidebar-mouse-context-menu)
     (define-key map (kbd "<C-return>") #'matrix-client-frame-sidebar-open-room-frame)
+    (define-key map [return] #'matrix-client-frame-sidebar-open-room-frame)
     map)
   "Keymap for Matrix Client frame sidebar.")
 
@@ -178,15 +180,17 @@ Should be called in the frame sidebar buffer."
 
 (defun matrix-client-frame-sidebar-room-notify (setting)
   "Set notification for room at point to SETTING."
-  (let* ((buffer (get-text-property (point) 'buffer))
-         (room (buffer-local-value 'matrix-client-room buffer)))
+  (let* ((room (if (eq major-mode 'matrix-client-room-list-mode)
+                   (tabulated-list-get-id)
+                 (buffer-local-value 'matrix-client-room (get-text-property (point) 'buffer)))) )
     (matrix-client-room-command-notify room setting)
     (message "%s room notifications set to: %s" (oref room display-name) setting)))
 
 (defun matrix-client-frame-sidebar-room-priority (setting)
   "Set priority for room at point to SETTING."
-  (let* ((buffer (get-text-property (point) 'buffer))
-         (room (buffer-local-value 'matrix-client-room buffer)))
+  (let* ((room (if (eq major-mode 'matrix-client-room-list-mode)
+                   (tabulated-list-get-id)
+                 (buffer-local-value 'matrix-client-room (get-text-property (point) 'buffer)))) )
     (matrix-client-room-command-priority room setting)
     (message "%s room priority set to: %s" (oref room display-name) setting)))
 

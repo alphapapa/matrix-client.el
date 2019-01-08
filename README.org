@@ -94,6 +94,7 @@ Then run the command ~matrix-client-connect~ or ~matrix-client-frame~ to connect
      -  Return point to input prompt: @@html:<kbd>@@RET@@html:</kbd>@@ (with point before prompt)
      -  Open room in a new frame:  Middle-click or press @@html:<kbd>@@<C-return>@@html:</kbd>@@ in the room list.
      -  Switch to the notifications buffer: @@html:<kbd>@@C-c C-n@@html:</kbd>@@
+     -  Show room list: =/rooms=
 
 ** Notifications buffer
 
@@ -106,6 +107,12 @@ To jump to a message in the room's buffer, press @@html:<kbd>@@RET@@html:</kbd>@
 Here's an example of following multiple, related conversations across multiple rooms in the notifications buffer:
 
 [[images/notifications-buffer.png]]
+
+** Room list
+
+Open the room list by pressing @@html:<kbd>@@C-c C-r@@html:</kbd>@@ or calling command =matrix-client-room-list=.  Just like in the dedicated frame's room-list sidebar, you can click rooms to show their buffers, right-click rooms to change their settings, and middle-click rooms to open them in a new frame.
+
+[[images/notifications-buffer-and-room-list_spacemacs-dark.png]]
 
 * Configuration
 

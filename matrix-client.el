@@ -50,6 +50,7 @@
 (require 'matrix-notifications)
 (require 'matrix-client-images)
 (require 'matrix-client-frame)
+(require 'matrix-client-room-list)
 
 ;;;; Variables
 
@@ -259,6 +260,15 @@ Intended to be called from a timer that runs at midnight."
       (matrix-unimplemented (format$ "Unimplemented client method: $fn-name")))))
 
 ;;;; Helper functions
+
+(defun matrix-client-resize-avatar (avatar-string)
+  "Return new avatar string for AVATAR-STRING, sized accordingly.
+Sized according to `matrix-client-room-avatar-in-buffer-name-size'."
+  ;; Make a new image to avoid modifying the avatar in the header.
+  (let ((avatar (cl-copy-list (get-text-property 0 'display avatar-string))))
+    (setf (image-property avatar :max-width) matrix-client-room-avatar-in-buffer-name-size
+          (image-property avatar :max-height) matrix-client-room-avatar-in-buffer-name-size)
+    (concat (propertize " " 'display avatar) " ")))
 
 (defun matrix-client-event-timestamp (data)
   "Return timestamp of event DATA."
