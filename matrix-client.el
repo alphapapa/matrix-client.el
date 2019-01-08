@@ -161,7 +161,8 @@ connecting, non-nil."
       ;; Log in with username and password
       (matrix-login (matrix-session :user user
                                     :server server
-                                    :initial-sync-p t)
+                                    :initial-sync-p t
+                                    :client-data (matrix-client-session-client-data))
                     password))))
 
 (defun matrix-client-login-hook (session)
