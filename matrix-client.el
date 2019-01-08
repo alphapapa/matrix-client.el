@@ -198,10 +198,8 @@ Add session to sessions list and run initial sync."
   "Call `matrix-sync' again for SESSION.
 To be called by watchdog timer."
   (with-slots (user) session
-    (let* ((message (format$ "Watchdog alerted for session: $user")))
-      (matrix-log (a-list 'fn 'matrix-client-watchdog-alert
-                          'message message))
-      (warn message))
+    (matrix-log (a-list 'fn 'matrix-client-watchdog-alert
+                        'message (format$ "Watchdog alerted for session: $user")))
     (matrix-client-sync session)))
 
 (defun matrix-client-sync (session)
