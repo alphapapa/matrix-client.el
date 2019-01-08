@@ -32,8 +32,10 @@ Options:
 
   --debug        Enable debug-on-error in Emacs
   --help         You're lookin' at it
-  --local PATH   Use git repo at PATH instead of official one on GitHub (helpful for development)
-  --upgrade      Upgrade matrix-client.el and required dependency upgrades before connecting
+
+  --branch BRANCH  Use repo BRANCH instead of master
+  --local PATH     Use git repo at PATH instead of official one on GitHub (helpful for development)
+  --upgrade        Upgrade matrix-client.el and required dependency upgrades before connecting
 EOF
 }
 
@@ -43,6 +45,10 @@ while [[ $1 ]]
 do
 [[ $1 == --debug ]] && debug="(setq debug-on-error t) (setq matrix-log t)"
 [[ $1 == --help ]] && usage && exit
+[[ $1 == --branch ]] && {
+    shift
+    branch=":branch \"$1\""
+}
 [[ $1 == --local ]] && {
     shift
     [[ -d $1/.git ]] && [[ -r $1/.git ]] || die "Not a readable directory (should be a Git repo): $1"
@@ -67,7 +73,7 @@ emacs -q --insert <(tail -n +$bash_end_line "$0") --eval="(progn
 (when (file-readable-p user-init-file)
   (load user-init-file))
 
-(setq recipe \`(matrix-client $recipe_part
+(setq recipe \`(matrix-client $recipe_part $branch
 	                  :files (:defaults \"logo.png\" \"matrix-client-standalone.el.sh\")))
 $upgrade $debug
 (eval-buffer))"
