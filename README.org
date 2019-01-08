@@ -4,11 +4,15 @@
 
 This is a fork of the [[http://doc.rix.si/projects/matrix.el.html][original matrix.el client]] with the intent of maintaining it further, fixing bugs, and providing long-term goals for the project.
 
-[[images/frame-purpose-example.png]]
+[[images/notifications-buffer-and-room-list_spacemacs-dark.png]]
 
 Of course, since it's Emacs, you can use any Emacs theme you like.  Here's [[https://emacsthemes.com/themes/django-theme.html][django]] without scroll bars or fringes. Note the syntax highlighting in the pasted code, which respects the HTML sent by the client, rather than overriding it like Riot--for better or worse, you decide.  =;)=
 
 [[images/django.png]]
+
+And here's the default Emacs theme:
+
+[[images/frame-purpose-example.png]]
 
 * Installation
 
@@ -111,8 +115,6 @@ Here's an example of following multiple, related conversations across multiple r
 ** Room list
 
 Open the room list by pressing @@html:<kbd>@@C-c C-r@@html:</kbd>@@ or calling command =matrix-client-room-list=.  Just like in the dedicated frame's room-list sidebar, you can click rooms to show their buffers, right-click rooms to change their settings, and middle-click rooms to open them in a new frame.
-
-[[images/notifications-buffer-and-room-list_spacemacs-dark.png]]
 
 * Configuration
 
