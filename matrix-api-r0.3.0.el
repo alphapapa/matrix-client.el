@@ -743,9 +743,8 @@ requests, and we make a new request."
                 next-batch (a-get data 'next_batch)
                 sync-retry-delay 0)
           (setq pending-syncs (delete (current-buffer) pending-syncs))
-          (matrix-log "Sync callback complete.  Calling sync again...")
-          (run-hook-with-args 'matrix-after-sync-hook session)
-          (matrix-sync session)))
+          (matrix-log "Sync callback complete.")
+          (run-hook-with-args 'matrix-after-sync-hook session)))
 
 (matrix-defcallback sync-error matrix-session
   "Callback function for sync request error."
@@ -757,9 +756,10 @@ requests, and we make a new request."
                                     'error error
                                     'data data
                                     'sync-retry-delay sync-retry-delay))
+                ;; NOTE: We do NOT run sync again here.  It's the client
+                ;; side's responsibility to do so again in the watchdog-alert.
                 (setq sync-retry-delay (cond ((>= sync-retry-delay 60) 60)
-                                             (t (* sync-retry-delay 2))))
-                (matrix-sync session))))
+                                             (t (* sync-retry-delay 2)))))))
 
 (defun matrix-sync-presence (session state-changes)
   "Process presence STATE-CHANGES."

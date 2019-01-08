@@ -107,6 +107,11 @@ user can recover it from the kill ring instead of retyping it."
 
 ;;;; Classes
 
+(matrix-defclass matrix-client-session-client-data ()
+  ((watchdog :initarg :watchdog
+             :documentation "Watchdog timer used to restart stuck syncs."))
+  "Client data data stored in room objects.")
+
 (matrix-defclass matrix-room-client-data ()
   ((buffer :initarg :buffer)
    (notification-rules :initarg :notification-rules
@@ -158,7 +163,8 @@ connecting, non-nil."
                                                   :server server
                                                   :access-token access-token
                                                   :txn-id txn-id
-                                                  :initial-sync-p t))
+                                                  :initial-sync-p t
+                                                  :client-data (matrix-client-session-client-data)))
       ;; Log in with username and password
       (matrix-login (matrix-session :user user
                                     :server server
@@ -170,7 +176,7 @@ connecting, non-nil."
   "Callback for successful login.
 Add session to sessions list and run initial sync."
   (push session matrix-client-sessions)
-  (matrix-sync session)
+  (matrix-client-sync session)
   (when matrix-client-save-token
     (matrix-client-save-token session))
   ;; NOTE: What happens if the system is asleep at midnight?
@@ -178,6 +184,48 @@ Add session to sessions list and run initial sync."
   (message "Jacked in to %s.  Syncing..." (oref session server)))
 
 (add-hook 'matrix-login-hook #'matrix-client-login-hook)
+
+(defun matrix-client-watchdog-watch (session)
+  "Start or reschedule watchdog timer for SESSION."
+  (with-slots* (((client-data) session)
+                ((watchdog) client-data))
+    (when (timerp watchdog)
+      (cancel-timer watchdog))
+    (let ((fn (apply-partially #'matrix-client-watchdog-alert session)))
+      (setf watchdog (run-at-time 40 nil fn)))))
+
+(defun matrix-client-watchdog-alert (session)
+  "Call `matrix-sync' again for SESSION.
+To be called by watchdog timer."
+  (with-slots (user) session
+    (let* ((message (format$ "Watchdog alerted for session: $user")))
+      (matrix-log (a-list 'fn 'matrix-client-watchdog-alert
+                          'message message))
+      (warn message))
+    (matrix-client-sync session)))
+
+(defun matrix-client-sync (session)
+  "Sync SESSION and start watchdog timer.
+Deletes all outstanding sync request processes and buffers."
+  (with-slots (pending-syncs) session
+    (dolist (buffer pending-syncs)
+      ;; Delete any outstanding syncs.  There can be only one.  I wish these hacky fixes weren't necessary,
+      ;; but it seems that they are.  Without code like this, eventually some processes don't get their
+      ;; sentinels called, and/or their buffers get left behind, and/or sync requests get duplicated, which
+      ;; then race with each other and overwrite the sync token...such a mess.
+      (when (buffer-live-p buffer)
+        (when (get-buffer-process buffer)
+          ;; Somehow a network process's buffer can remain after it has been deleted, so
+          ;; we have to make sure the process is still alive before trying to delete it.
+          (delete-process buffer))
+        ;; Then we have to be sure to kill its buffer, too, because it seems that
+        ;; sometimes the sentinel doesn't get called or doesn't kill the buffer.
+        (kill-buffer buffer)))
+    (setf pending-syncs nil))
+  (matrix-sync session)
+  (matrix-client-watchdog-watch session))
+
+(add-hook 'matrix-after-sync-hook #'matrix-client-sync)
 
 (defun matrix-client-save-token (session)
   "Save username and access token for session SESSION to file."
@@ -215,7 +263,10 @@ tokens (username and password will be required again)."
         (t (matrix-client-save-token (car matrix-client-sessions))))
   (--each matrix-client-sessions
     ;; Kill pending sync response buffer processes
-    (with-slots (pending-syncs disconnect) it
+    (with-slots (pending-syncs disconnect watchdog) it
+      (when (timerp watchdog)
+        (cancel-timer watchdog)
+        (setf watchdog nil))
       (setq disconnect t)
       (ignore-errors
         ;; Ignore errors in case of "Attempt to get process for a dead buffer"
