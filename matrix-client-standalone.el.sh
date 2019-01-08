@@ -140,6 +140,12 @@ exit
     (call-interactively #'matrix-client-frame)
   (delete-other-frames))
 
+;; Bind some keys after loading matrix-client.
+
+;; One of the cool things about `hippie-expand' is that it dynamically
+;; expands file paths, making it helpful for the /upload command.
+(define-key matrix-client-mode-map (kbd "M-/") #'hippie-expand)
+
 ;; Local Variables:
 ;; eval: (aggressive-indent-mode -1)
 ;; eval: (flycheck-mode -1)

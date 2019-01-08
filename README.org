@@ -29,8 +29,9 @@ To make switching room buffers easy, the default completion settings are improve
 
 +  @@html:<kbd>@@C-<tab>@@html:</kbd>@@: Switch room buffer.
 +  @@html:<kbd>@@F1@@html:</kbd>@@: Show only =Notifications= buffer.
++  @@html:<kbd>@@M-/@@html:</kbd>@@: Expand text before point with ~hippie-expand~.  Helpful for the =/upload= command as it dynamically expands filename paths.
 
-There's also a context menu available in the sidebar by right-clicking rooms.
+There's also a context menu available in the sidebar by right-clicking rooms.q
 
 After using the "standalone" client, the packages will be installed to your Emacs packages directory, so then you can also use it in your main Emacs config.
 
