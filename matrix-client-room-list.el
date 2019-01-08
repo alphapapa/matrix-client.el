@@ -34,10 +34,14 @@
 (require 'matrix-macros)
 (require 'matrix-client-room)
 
+;; Silence byte-compiler.
+(declare-function #'matrix-client-resize-avatar "matrix-client.el")
+
 ;;;; Variables
 
 ;; Silence byte-compiler.
 (defvar matrix-client-room-avatar-in-buffer-name-size)
+(defvar matrix-client-sessions)
 
 ;;;; Customization
 
@@ -71,7 +75,7 @@
   (local-set-key (kbd "S") #'tabulated-list-sort)
   (setf tabulated-list-format (vector '("U" 1 t) '("🐱" 4 t) '("Name" 25 t) '("Topic" 35 t)
                                       '("Members" 7 matrix-client-room-list-members<)
-                                      '("D" 1 t) '("F" 1 t) '("Tags" 15 t) '("Session" 15 t))
+                                      '("D" 1 t) '("P" 1 t) '("Tags" 15 t) '("Session" 15 t))
         tabulated-list-revert-hook #'matrix-client-room-list--set-entries
         tabulated-list-sort-key '("Name" . nil))
   (tabulated-list-init-header)
@@ -123,31 +127,34 @@
                          ;; Remove newlines from topic.  Yes, this can happen.
                          (s-replace "\n" " " topic)
                        ""))
-            ((e-tags . favorite-p) (matrix-client-room-list--tags room))
+            ((e-tags favorite-p low-priority-p) (matrix-client-room-list--tags room))
             (e-direct-p (if (matrix-room-direct-p id session) "D" ""))
-            (e-favorite-p (if favorite-p "F" ""))
+            (e-priority (cond (favorite-p "F")
+                              (low-priority-p "l")
+                              ("N")))
             (e-members (format "%s" (length members))))
       ;; NOTE: We use the room object as the identifying object.  This is allowed, according to `tabulated-list-entries',
       ;; but it uses the object to keep the cursor on the same entry when sorting by comparing with `equal', and I wonder
       ;; if that might be a performance problem in some cases.
-      (list room (vector e-unread e-avatar e-name e-topic e-members e-direct-p e-favorite-p e-tags user)))))
+      (list room (vector e-unread e-avatar e-name e-topic e-members e-direct-p e-priority e-tags user)))))
 
 (defun matrix-client-room-list--tags (room)
-  "Return cons (tags-string . favorite-p) for ROOM."
-  (let ((favorite-p))
+  "Return list (tags-string favorite-p low-priority-p) for ROOM."
+  (let (favorite-p low-priority-p)
     (with-slots (tags) room
-      (cons (->> (cl-loop for (tag-symbol . order) in tags
+      (list (->> (cl-loop for (tag-symbol . order) in tags
                           for tag-string = (symbol-name tag-symbol)
                           if (string-prefix-p "u." tag-string)
                           collect (substring tag-string 2)
                           else if (string= tag-string "m.favourite")
                           do (setf favorite-p t)
-                          else collect (pcase tag-string
-                                         ("m.lowpriority" "low-priority")
-                                         (_ tag-string)))
+                          else if (string= tag-string "m.lowpriority")
+                          do (setf low-priority-p t)
+                          ;; This shouldn't happen.
+                          else collect tag-string)
                  (-sort #'string<)
                  (s-join ","))
-            favorite-p))))
+            favorite-p low-priority-p))))
 
 (defun matrix-client-room-list-members< (a b)
   "Return non-nil if entry A has fewer members than room B.
