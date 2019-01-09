@@ -76,8 +76,8 @@
   (setf tabulated-list-format (vector '("U" 1 t) '("🐱" 4 t) '("Name" 25 t) '("Topic" 35 t)
                                       '("Members" 7 matrix-client-room-list-members<)
                                       '("D" 1 t) '("P" 1 t) '("Tags" 15 t) '("Session" 15 t))
-        tabulated-list-revert-hook #'matrix-client-room-list--set-entries
         tabulated-list-sort-key '("Name" . nil))
+  (add-hook 'tabulated-list-revert-hook #'matrix-client-room-list--set-entries nil 'local)
   (tabulated-list-init-header)
   (matrix-client-room-list--set-entries)
   (tabulated-list-revert))
