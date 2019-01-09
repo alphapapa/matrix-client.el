@@ -952,7 +952,7 @@ INPUT should be, e.g. \"#room:matrix.org\".")
                                                        tags))
                                  "none")))))))
 
-(matrix-client-def-room-command addtags
+(matrix-client-def-room-command tag
   :docstring "Add room user-tags."
   :insert (with-slots (tags) room
             (cond (input
@@ -964,7 +964,7 @@ INPUT should be, e.g. \"#room:matrix.org\".")
                              (s-join ", " new-tags))))
                   (t "You may be in the Matrix, but it can't read your mind."))))
 
-(matrix-client-def-room-command deltags
+(matrix-client-def-room-command untag
   :docstring "Delete room user-tags."
   :insert (with-slots (tags) room
             (cond (input
@@ -975,6 +975,14 @@ INPUT should be, e.g. \"#room:matrix.org\".")
                      (concat "Deleted room user-tags: "
                              (s-join ", " deleting-tags))))
                   (t "You may be in the Matrix, but it can't read your mind."))))
+
+(matrix-client-def-room-command addtags
+  :docstring "Obsolete.  Use /tag command."
+  :insert "/addtags is obsolete.  Please use the /tag command.")
+
+(matrix-client-def-room-command deltags
+  :docstring "Obsolete.  Use /untag command."
+  :insert "/deltags is obsolete.  Please use the /untag command.")
 
 (matrix-client-def-room-command topic
   :docstring "Set room topic."

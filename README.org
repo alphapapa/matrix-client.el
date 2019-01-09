@@ -78,8 +78,8 @@ Then run the command ~matrix-client-connect~ or ~matrix-client-frame~ to connect
 +  Room settings
      -  Set room priority: ~/priority~
      -  List or set user-tags: =/tags=
-     -  Add user-tags: =/addtags=
-     -  Delete user-tags: =/deltags=
+     -  Add user-tags: =/tag=
+     -  Delete user-tags: =/untag=
      -  Set notification settings: =/notify=
           +  Note: These settings are currently local to Emacs and do not integrate with the API spec.
 +  Sending messages:
