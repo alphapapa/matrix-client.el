@@ -236,22 +236,24 @@ Should be called manually, e.g. in `matrix-after-sync-hook', by
                                                   other-groups
                                                   (list low-priority-group))))
           (erase-buffer)
-          (--each buffer-groups
-            (-let* (((header . buffers) it))
-              (insert (propertize (concat " " header "\n")
-                                  'face 'matrix-client-date-header))
-              (cl-loop for buffer in buffers
-                       for buffer-string = (frame-purpose--format-buffer buffer)
-                       for properties = (matrix-client--plist-delete (matrix-client--string-properties buffer-string)
-                                                                     'display)
-                       for string = (concat matrix-client-frame-sidebar-buffer-prefix
-                                            buffer-string
-                                            separator)
-                       ;; Apply all the properties to the entire string, including the separator,
-                       ;; so the face will apply all the way to the newline, and getting the
-                       ;; `buffer' property will be less error-prone.
-                       do (insert (apply #'propertize string 'buffer buffer properties)))
-              (insert "\n")))
+          (magit-insert-section (type magit-root-section)
+            (--each buffer-groups
+              (-let* (((header . buffers) it))
+                (magit-insert-section (room-group)
+                  (magit-insert-heading (propertize (concat " " header "\n")
+                                                    'face 'matrix-client-date-header))
+                  (cl-loop for buffer in buffers
+                           for buffer-string = (frame-purpose--format-buffer buffer)
+                           for properties = (matrix-client--plist-delete (matrix-client--string-properties buffer-string)
+                                                                         'display)
+                           for string = (concat matrix-client-frame-sidebar-buffer-prefix
+                                                buffer-string
+                                                separator)
+                           ;; Apply all the properties to the entire string, including the separator,
+                           ;; so the face will apply all the way to the newline, and getting the
+                           ;; `buffer' property will be less error-prone.
+                           do (insert (apply #'propertize string 'buffer buffer properties))))
+                (insert "\n"))))
           ;; FIXME: Is there a reason I didn't use `save-excursion' here?
           (goto-char saved-point))))))
 
