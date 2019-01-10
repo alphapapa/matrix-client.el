@@ -50,7 +50,7 @@ Installing directly with [[https://framagit.org/steckerhalter/quelpa][Quelpa]] i
 
 #+BEGIN_SRC emacs-lisp
   (use-package matrix-client
-    :quelpa ((matrix-client :fetcher github :repo "jgkamat/matrix-client-el"
+    :quelpa ((matrix-client :fetcher github :repo "alphapapa/matrix-client.el"
                             :files (:defaults "logo.png" "matrix-client-standalone.el.sh"))))
 #+END_SRC
 
