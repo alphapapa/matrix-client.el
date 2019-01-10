@@ -261,7 +261,8 @@ tokens (username and password will be required again)."
         (t (matrix-client-save-token (car matrix-client-sessions))))
   (--each matrix-client-sessions
     ;; Kill pending sync response buffer processes
-    (with-slots (pending-syncs disconnect watchdog) it
+    (with-slots* (((pending-syncs disconnect client-data) it)
+                  ((watchdog) client-data))
       (when (timerp watchdog)
         (cancel-timer watchdog)
         (setf watchdog nil))
