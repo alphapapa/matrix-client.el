@@ -9,7 +9,7 @@
 
 # * Defaults
 
-recipe_part=":fetcher github :repo \"jgkamat/matrix-client-el\""
+recipe_part=":fetcher github :repo \"alphapapa/matrix-client.el\""
 custom_file_dir="~/.config/"
 
 # * Functions
