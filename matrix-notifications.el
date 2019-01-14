@@ -167,6 +167,11 @@ Otherwise, try to send input.  Then update last-seen line."
 
 ;;;; Functions
 
+(defun matrix-client-notifications-buffer--typing ()
+  "Send typing notification to room being replied to, when appropriate."
+  (awhen (get-text-property (matrix-client--prompt-position) 'room)
+    (matrix-client-room-typing it t)))
+
 (defun matrix-client-set-notification-rule (room rule)
   "Set notification RULE for ROOM.
 See `matrix-client-notification-rules' for rules."
@@ -235,6 +240,7 @@ This function exists to allow the use of `with-room-buffer'."
                               mode-line-format nil)
                         (visual-line-mode)
                         (use-local-map matrix-client-notifications-buffer-map)
+                        (add-hook 'post-self-insert-hook #'matrix-client-notifications-buffer--typing nil t)
                         (matrix-client-insert-prompt)
                         (matrix-client-insert-last-seen))))))
     (matrix-room :client-data (matrix-room-client-data :buffer buffer))))
