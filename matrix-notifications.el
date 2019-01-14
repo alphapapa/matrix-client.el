@@ -146,7 +146,9 @@ This only works for replies."
           (matrix-client-send-input :input input))
         (matrix-client-notify--add-to-notifications-buffer "m.room.message"
           (a-list 'sender (oref* room session user)
-                  'content (a-list 'body input))
+                  'content (a-list 'body input)
+                  ;; Generate a fake, local event ID so `matrix-client--this-message' can work with it.
+                  'event_id (concat "local--" (oref* room session user) "--" (format-time-string "%s")))
           (list :room room))
         (matrix-client-update-last-seen (matrix-client--notifications-buffer)))
     (goto-char (matrix-client--prompt-position))
