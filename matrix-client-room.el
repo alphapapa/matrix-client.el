@@ -681,13 +681,15 @@ Also update prompt with typers."
   (unless (and (boundp 'tabbar-mode) tabbar-mode)
     ;; Disable when tabbar mode is on.  MAYBE: Remove this.
     (with-room-buffer room
-      (pcase-let* (((eieio avatar typers name topic) room)
+      (pcase-let* (((eieio avatar typers name topic session) room)
+                   ((eieio user) session)
                    (name (when name
                            (propertize name 'face 'font-lock-keyword-face)))
                    (ov (car (ov-in 'matrix-client-prompt)))
-                   (typers-string (s-join ", " (cl-loop for user across typers
-                                                        collect (matrix-user-displayname room user))))
-                   (prompt (if (> (length typers) 0)
+                   (typers-string (s-join ", " (cl-loop for typer across typers
+                                                        unless (string= user typer)
+                                                        collect (matrix-user-displayname room typer))))
+                   (prompt (if (s-present? typers-string)
                                (concat (propertize (concat "Typing: " typers-string)
                                                    'face 'font-lock-comment-face)
                                        "\n" matrix-client-input-prompt)
