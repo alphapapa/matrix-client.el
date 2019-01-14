@@ -1,4 +1,6 @@
 * Tasks
+
+** TODO Mark events as read when last-seen line is moved
 ** TODO format error
 
 #+BEGIN_QUOTE
