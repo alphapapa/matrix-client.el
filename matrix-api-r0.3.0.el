@@ -1275,17 +1275,6 @@ ACTION may be `put' or `delete', as appropriate."
   :slots (id)
   :body (matrix-log "FORGOT ROOM: %s" id))
 
-(cl-defun matrix-typing (room (typing t))
-  "Send TYPING notification to ROOM.
-TYPING should be t or nil."
-  (pcase-let* (((eieio id session) room)
-               ((eieio user) session)
-               (endpoint (format$ "rooms/$id/typing/$user"))
-               (data (a-list 'typing typing
-                             'timeout 30000)))
-    (matrix-put session endpoint
-      :data data)))
-
 (defun matrix-room-direct-p (room-id session)
   "Return non-nil if ROOM-ID in SESSION is \"m.direct\"."
   ;; Yes, this nesting is ugly, but this is how the API presents it.
@@ -1294,6 +1283,25 @@ TYPING should be t or nil."
                 (matrix-account-data "m.direct" session)))
     (cl-loop for (user-id . room-ids) in users
              thereis (seq-contains room-ids room-id #'string=))))
+
+;;;;; Typing notifications
+
+(cl-defun matrix-typing (room typing-p)
+  "Send typing notification for ROOM.
+TYPING-P should be t or nil."
+  (pcase-let* (((eieio id session) room)
+               ((eieio user) session)
+               (endpoint (format$ "rooms/$id/typing/$user"))
+               (data (a-list 'typing (or typing-p :json-false)
+                             'timeout 30000)))
+    (matrix-put session endpoint
+      :data data
+      :success (lambda (&rest args)
+                 (matrix-log (a-list 'fn 'matrix-typing-success-callback
+                                     'args args)))
+      :error (lambda (&rest args)
+               (matrix-log (a-list 'fn 'matrix-typing-error-callback
+                                   'args args))))))
 
 ;;;;; Misc
 

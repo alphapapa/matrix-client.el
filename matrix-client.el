@@ -103,6 +103,11 @@ ad-hoc 'org.matrix.custom.html' messages that Vector emits."
   "Save username and access token to this file."
   :type 'file)
 
+(defcustom matrix-client-send-typing-notifications-p t
+  "Whether to send typing notifications.
+On by default, as this is the typical behavior for a Matrix client."
+  :type 'boolean)
+
 (defcustom matrix-client-use-tracking nil
   "Enable tracking.el support in matrix-client."
   :type 'boolean)
@@ -118,13 +123,17 @@ user can recover it from the kill ring instead of retyping it."
 (matrix-defclass matrix-client-session-client-data ()
   ((watchdog :initarg :watchdog
              :documentation "Watchdog timer used to restart stuck syncs."))
-  "Client data data stored in room objects.")
+  "Client data stored in session objects.")
 
 (matrix-defclass matrix-room-client-data ()
   ((buffer :initarg :buffer)
    (notification-rules :initarg :notification-rules
-                       :documentation "List of functions to test events against; if one returns non-nil, a notification should be displayed."))
-  "Client data data stored in room objects.")
+                       :documentation "List of functions to test events against; if one returns non-nil, a notification should be displayed.")
+   (is-typing-timer
+    :documentation "Timer that repeatedly sends is-typing notifications to the server while the user is typing.")
+   (not-typing-timer
+    :documentation "Timer that sends not-typing notification to the server after the user stops typing."))
+  "Client data stored in room objects.")
 
 ;;;; Mode
 

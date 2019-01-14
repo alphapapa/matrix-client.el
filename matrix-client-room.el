@@ -386,7 +386,8 @@ If HTML is non-nil, treat INPUT as HTML."
                                           'formatted_body formatted-body)
                          'type "m.room.message"))
           (matrix-client-update-last-seen room))
-      (display-warning 'matrix-client-send-input-1 "`matrix-send-message' failed."))))
+      (display-warning 'matrix-client-send-input-1 "`matrix-send-message' failed."))
+    (matrix-client-room-typing room nil)))
 
 (defun matrix-client--event-body (id)
   "Return event message body for ID."
@@ -736,6 +737,10 @@ Called from inside the room's buffer.")
                   ("^file://" . matrix-client--dnd-open-file)
                   ("^file:" . matrix-client--dnd-open-local-file)
                   ("^\\(https?\\|ftp\\|file\\|nfs\\)://" . matrix-client--dnd-open-file)))
+    ;; Typing notifications
+    (add-hook 'post-self-insert-hook (lambda (&rest _args)
+                                       (matrix-client-room-typing matrix-client-room t))
+              nil t)
     (when matrix-client-use-tracking
       (tracking-mode 1))
     (matrix-client-insert-prompt)
@@ -1517,6 +1522,36 @@ Web-compatible HTML output, using HTML like:
 		;; Contents.
 		(format "<pre><code class=\"src language-%s\"%s>%s</code></pre>"
 			lang label code))))))
+
+(defun matrix-client-room-typing (room typing-p &optional force)
+  "Send notification that user is or isn't typing in ROOM.
+TYPING-P should be t or nil.
+
+If TYPING-P is non-nil, reset not-typing timer; and if ROOM's
+is-typing-timer is not running or FORCE is non-nil, send typing
+notification to server and start is-typing timer.
+
+If TYPING-P is nil, stop both of ROOM's typing timers."
+  (when matrix-client-send-typing-notifications-p
+    (with-slots* (((client-data) room)
+                  ((is-typing-timer not-typing-timer) client-data))
+      (if typing-p
+          (progn
+            (when (or force (not is-typing-timer))
+              ;; Timer not already set: send notification and start repeat timer.
+              (matrix-typing room t)
+              (setf is-typing-timer (run-at-time 25 nil #'matrix-client-room-typing room t t)))
+            ;; Always reset not-typing timer.
+            (when (timerp not-typing-timer)
+              (cancel-timer not-typing-timer))
+            (setf not-typing-timer (run-at-time 5 nil #'matrix-client-room-typing room nil)))
+        ;; Not typing.
+        (matrix-typing room nil)
+        ;; `cancel-timer' returns nil.
+        (setf is-typing-timer (when (timerp is-typing-timer)
+                                (cancel-timer is-typing-timer))
+              not-typing-timer (when (timerp not-typing-timer)
+                                 (cancel-timer not-typing-timer)))))))
 
 ;;;; Update-room-at-once approach
 
