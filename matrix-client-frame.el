@@ -151,8 +151,8 @@ Should be called in the frame sidebar buffer."
     (define-key map [mouse-1] #'matrix-client-frame-sidebar-mouse-switch-to-room-buffer)
     (define-key map [mouse-2] #'matrix-client-frame-sidebar-open-room-frame-mouse)
     (define-key map [down-mouse-3] #'matrix-client-frame-sidebar-mouse-context-menu)
+    (define-key map [return] #'frame-purpose--sidebar-switch-to-buffer)
     (define-key map (kbd "<C-return>") #'matrix-client-frame-sidebar-open-room-frame)
-    (define-key map [return] #'matrix-client-frame-sidebar-open-room-frame)
     map)
   "Keymap for Matrix Client frame sidebar.")
 
