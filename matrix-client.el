@@ -1,15 +1,22 @@
-;;; matrix-client.el --- A matrix client ---  -*- lexical-binding: t; -*-
+;;; matrix-client.el --- A Matrix client  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2018 Adam Poter
-;; Author: Adam Porter <adam@alphapapa.net>
+;; Copyright (C) 2015-2016  Ryan Rix
+;; Copyright (C) 2017-2019  Jay Kamat
+;; Copyright (C) 2017-2019  Adam Porter
+
+;; Original Author: Ryan Rix
+;; Author/Maintainer: Adam Porter <adam@alphapapa.net>
 ;; Maintainer: Jay Kamat <jaygkamat@gmail.com>
-;; Created: 28 October 2018
+
 ;; Keywords: web, comm
-;; Homepage: https://github.com/jgkamat/matrix-client-el
-;; Package-Version: 0.1.0
+;; Homepage: https://github.com/alphapapa/matrix-client.el
+
+;; Package-Version: 0.2.0-pre
 ;; Package-Requires: ((emacs "25.1") (anaphora "1.0.0") (dash "2.13.0") (dash-functional "1.2.0") (f "0.17.2") (request "0.2.0") (a "0.1.0") (ov "1.0.6") (s "1.12.0") (tracking "2.9") (esxml "0.3.4") (ht "2.2") (rainbow-identifiers "0.2.2") (frame-purpose "1.2"))
 
 ;; This file is not part of GNU Emacs.
+
+;;; License:
 
 ;; matrix-client.el is free software: you can redistribute it and/or
 ;; modify it under the terms of the GNU General Public License as published by
@@ -26,7 +33,8 @@
 
 ;;; Commentary:
 
-;; Commentary.
+;; What started as a fork of, but became a rewrite of, Ryan Rix's
+;; original matrix.el client.
 
 ;;; Code:
 
