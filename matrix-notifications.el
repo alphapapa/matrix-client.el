@@ -135,6 +135,34 @@ Without argument, displays help and current setting."
         (awhen (matrix-client--find-propertized-string (list 'event_id event-id))
           (goto-char (car it)))))))
 
+(defun matrix-client-notifications-buffer-send-input ()
+  "Send message to room from notification buffer.
+This only works for replies."
+  (interactive)
+  (if-let* ((input (matrix-client--room-input :delete t))
+            (room (get-text-property 0 'room input)))
+      (progn
+        (with-room-buffer room
+          (matrix-client-send-input :input input))
+        (matrix-client-notify--add-to-notifications-buffer "m.room.message"
+          (a-list 'sender (oref* room session user)
+                  'content (a-list 'body input))
+          (list :room room))
+        (matrix-client-update-last-seen (matrix-client--notifications-buffer)))
+    (goto-char (matrix-client--prompt-position))
+    (insert input)
+    (message "Only replies may be sent from the notification buffer")))
+
+(defun matrix-client-notifications-buffer-RET ()
+  "Act appropriately for RET keypress in notifications buffer.
+If point is on a message, pop to it in its room buffer.
+Otherwise, try to send input.  Then update last-seen line."
+  (interactive)
+  (cond ((< (point) (matrix-client--prompt-position))
+         (matrix-client-notifications-buffer-pop))
+        (t (matrix-client-notifications-buffer-send-input)))
+  (matrix-client-update-last-seen (matrix-client--notifications-buffer)))
+
 ;;;; Functions
 
 (defun matrix-client-set-notification-rule (room rule)
@@ -192,34 +220,6 @@ Optional REST of args are also applied to hooks and function."
                                     :timestamp-prefix t))))))))
 
 (add-hook 'matrix-client-notify-hook #'matrix-client-notify--add-to-notifications-buffer)
-
-(defun matrix-client-notifications-buffer-send-input ()
-  "Send message to room from notification buffer.
-This only works for replies."
-  (interactive)
-  (if-let* ((input (matrix-client--room-input :delete t))
-            (room (get-text-property 0 'room input)))
-      (progn
-        (with-room-buffer room
-          (matrix-client-send-input :input input))
-        (matrix-client-notify--add-to-notifications-buffer "m.room.message"
-          (a-list 'sender (oref* room session user)
-                  'content (a-list 'body input))
-          (list :room room))
-        (matrix-client-update-last-seen (matrix-client--notifications-buffer)))
-    (goto-char (matrix-client--prompt-position))
-    (insert input)
-    (message "Only replies may be sent from the notification buffer")))
-
-(defun matrix-client-notifications-buffer-RET ()
-  "Act appropriately for RET keypress in notifications buffer.
-If point is on a message, pop to it in its room buffer.
-Otherwise, try to send input.  Then update last-seen line."
-  (interactive)
-  (cond ((< (point) (matrix-client--prompt-position))
-         (matrix-client-notifications-buffer-pop))
-        (t (matrix-client-notifications-buffer-send-input)))
-  (matrix-client-update-last-seen (matrix-client--notifications-buffer)))
 
 (defun matrix-client--notifications-buffer ()
   "Return `matrix-room' object whose buffer is the special notifications buffer.
