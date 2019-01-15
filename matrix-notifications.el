@@ -152,8 +152,9 @@ This only works for replies."
           (list :room room))
         (matrix-client-update-last-seen (matrix-client--notifications-buffer)))
     (goto-char (matrix-client--prompt-position))
-    (insert input)
-    (message "Only replies may be sent from the notification buffer")))
+    (when (s-present? input)
+      (insert input)
+      (message "Only replies may be sent from the notification buffer"))))
 
 (defun matrix-client-notifications-buffer-RET ()
   "Act appropriately for RET keypress in notifications buffer.
