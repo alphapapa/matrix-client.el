@@ -169,11 +169,10 @@ connecting, non-nil."
       ;; Not saved: prompt for username and password
       (setq user (or user (read-string "User ID: "))
             password (or password (read-passwd "Password: "))
-            server (or server
-                       (--> (read-passwd "Server (leave blank to fill automatically): ")
-                            (if (string-empty-p it)
-                                nil
-                              it)))))
+            server (or server (read-string "Server: "
+                                           (or (awhen (string-match (rx ":" (group (1+ anything))) user)
+                                                 (match-string 1 user))
+                                               "matrix.org")))))
     (if access-token
         ;; Use saved token and call post-login hook
         (matrix-client-login-hook (matrix-session :user user
