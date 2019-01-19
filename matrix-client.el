@@ -48,6 +48,7 @@
 (require 'cl-lib)
 (require 'calendar)
 
+(require 'anaphora)
 (require 'f)
 (require 'ov)
 (require 'tracking)
