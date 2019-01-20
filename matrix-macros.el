@@ -398,7 +398,10 @@ SUCCESS and ERROR as `body'.  Or, if the body is not needed,
       (set-process-query-on-exit-flag (get-buffer-process response-buffer) nil))
     response-buffer))
 
-(defmacro with-room-buffer (room &rest body)
+(defmacro with-room-buffer (_room &rest body)
+  ;; FIXME: This macro uses the value of `room' from the surrounding environment
+  ;; rather than the symbol passed to the macro.  This should be fixed someday.
+
   ;; NOTE: Don't move this macro to another file.  It's not worth it.  Trust me.
   (declare (debug (sexp body)) (indent defun))
   `(with-slots* (((client-data id display-name) room)
