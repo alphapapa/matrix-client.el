@@ -1501,7 +1501,7 @@ Web-compatible HTML output, using HTML like:
     (let ((lang (pcase (org-element-property :language src-block)
                   ;; Riot's syntax coloring doesn't support "elisp", but "lisp" works.
                   ("elisp" "lisp")
-                  (else ,else)))
+                  (else else)))
 	  (code (org-html-format-code src-block info))
 	  (label (let ((lbl (and (org-element-property :name src-block)
 				 (org-export-get-reference src-block info))))
