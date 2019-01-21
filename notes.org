@@ -1,6 +1,9 @@
+#+PROPERTY: logging nil
+
 * Tasks
 
 ** TODO Mark events as read when last-seen line is moved
+
 ** TODO format error
 
 #+BEGIN_QUOTE
@@ -22,6 +25,7 @@ Debugger entered--Lisp error: (error "Not enough arguments for format string")
   request--curl-callback(#<process request curl> "finished\n")
 
 #+END_QUOTE
+
 ** TODO Avatar change events are displayed as joins
 
 I wonder how Riot determines that it's a profile change event. e.g.
@@ -81,11 +85,14 @@ Debugger entered--Lisp error: (error "Keyword argument :url not one of (:cbargs 
   url-http-end-of-document-sentinel(#<process i.imgur.com> "connection broken by remote peer\n")
   url-http-async-sentinel(#<process i.imgur.com> "connection broken by remote peer\n")
 #+END_EXAMPLE
+
 ** TODO Make /sync update existing events
 
 The cleanest way to do "pending/sending" messages would be to make fake room message events and give them to the standard handler.  The problem is that some fields, like =origin_server_ts=, can only come from the server (we could fake that field, but then it wouldn't be accurate).
 
 So what we need is to update existing events in the message buffer.  (Or try using =ewoc=, but that would be a major rewrite of a lot of things, so maybe later...)
+
+** MAYBE Use [[https://github.com/kiwanami/emacs-ctable][ctable]] for room list instead of =tabulated-list=
 
 * Plans
 
