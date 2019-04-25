@@ -332,7 +332,8 @@ This function checks the result of `current-buffer', and run
 the last buffer and it is one of matrix room buffers.
 This function should be hooked to `post-command-hook'."
 
-  (unless (and (not matrix-client-mark-as-read-on-buffer-switch)
+  (unless (or (not matrix-client-mark-as-read-on-buffer-switch)
+               (not matrix-client-sessions)
                (eq (current-buffer)
                    matrix--last-buffer))
 
