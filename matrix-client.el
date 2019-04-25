@@ -331,18 +331,18 @@ This function checks the result of `current-buffer', and run
 `matrix-mark-fully-read' when it has been changed from
 the last buffer and it is one of matrix room buffers.
 This function should be hooked to `post-command-hook'."
+  (while-no-input (redisplay)
+    (unless (or (not matrix-client-mark-as-read-on-buffer-switch)
+                (not matrix-client-sessions)
+                (eq (current-buffer)
+                    matrix--last-buffer))
 
-  (unless (or (not matrix-client-mark-as-read-on-buffer-switch)
-               (not matrix-client-sessions)
-               (eq (current-buffer)
-                   matrix--last-buffer))
-
-    (let ((current (current-buffer)))
-      (dolist (room (oref (car matrix-client-sessions) rooms))
-        (let ((room-buffer (oref* room client-data buffer)))
-          (if (eq current room-buffer)
-              (matrix-mark-fully-read room))))
-      (setq matrix--last-buffer current))))
+      (let ((current (current-buffer)))
+        (dolist (room (oref (car matrix-client-sessions) rooms))
+          (let ((room-buffer (oref* room client-data buffer)))
+            (if (eq current room-buffer)
+                (matrix-mark-fully-read room))))
+        (setq matrix--last-buffer current)))))
 
 (add-hook 'post-command-hook 'matrix--on-buffer-switch)
 
