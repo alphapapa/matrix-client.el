@@ -1303,6 +1303,24 @@ TYPING-P should be t or nil."
                (matrix-log (a-list 'fn 'matrix-typing-error-callback
                                    'args args))))))
 
+(cl-defun matrix-mark-fully-read (room)
+  "mark ROOM as fully read"
+  ;; spec link
+  (with-slots* (((id session timeline) room)
+                ((txn-id) session))
+
+    (let* ((type "m.room.message")
+           (event-id (alist-get 'event_id (car timeline)))
+           (data (a-list "m.fully_read" event-id
+                         "m.read" event-id))
+           (txn-id (cl-incf txn-id))
+           (room-id (url-hexify-string id))
+           (endpoint (format$ "rooms/$room-id/read_markers")))
+      (matrix-request-request session endpoint
+        :method "POST"
+        :data data
+        :timeout 30))))
+
 ;;;;; Misc
 
 (defun matrix-account-data (type session)

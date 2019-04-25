@@ -71,6 +71,10 @@
 (defvar matrix-client-midnight-timer nil
   "Timer used to update date headers at midnight.")
 
+(defvar matrix--last-buffer nil
+  "The last current buffer.
+used by `matrix--on-buffer-switch' to track buffer change")
+
 (defgroup matrix-client nil
   "Options for Matrix Client."
   :group 'applications)
@@ -117,6 +121,10 @@ On by default, as this is the typical behavior for a Matrix client."
   "Save outgoing messages in kill ring before sending.
 This way, in the event that a message gets lost in transit, the
 user can recover it from the kill ring instead of retyping it."
+  :type 'boolean)
+
+(defcustom matrix-client-mark-as-read-on-buffer-switch t
+  "mark rooms as read after switching to room buffer "
   :type 'boolean)
 
 ;;;; Classes
@@ -316,6 +324,26 @@ Intended to be called from a timer that runs at midnight."
     (dolist (room (oref session rooms))
       (with-room-buffer room
         (matrix-client--update-date-headers)))))
+
+(defun matrix--on-buffer-switch ()
+  "Runs matrix-mark-fully-read if needed.
+This function checks the result of `current-buffer', and run
+`matrix-mark-fully-read' when it has been changed from
+the last buffer and it is one of matrix room buffers.
+This function should be hooked to `post-command-hook'."
+
+  (unless (and (not matrix-client-mark-as-read-on-buffer-switch)
+               (eq (current-buffer)
+                   matrix--last-buffer))
+
+    (let ((current (current-buffer)))
+      (dolist (room (oref (car matrix-client-sessions) rooms))
+        (let ((room-buffer (oref* room client-data buffer)))
+          (if (eq current room-buffer)
+              (matrix-mark-fully-read room))))
+      (setq matrix--last-buffer current))))
+
+(add-hook 'post-command-hook 'matrix--on-buffer-switch)
 
 ;;;;; Timeline
 
