@@ -71,10 +71,6 @@
 (defvar matrix-client-midnight-timer nil
   "Timer used to update date headers at midnight.")
 
-(defvar matrix--last-buffer nil
-  "The last current buffer.
-used by `matrix--on-buffer-switch' to track buffer change")
-
 (defgroup matrix-client nil
   "Options for Matrix Client."
   :group 'applications)
@@ -325,26 +321,22 @@ Intended to be called from a timer that runs at midnight."
       (with-room-buffer room
         (matrix-client--update-date-headers)))))
 
-(defun matrix--on-buffer-switch ()
-  "Runs matrix-mark-fully-read if needed.
-This function checks the result of `current-buffer', and run
-`matrix-mark-fully-read' when it has been changed from
-the last buffer and it is one of matrix room buffers.
-This function should be hooked to `post-command-hook'."
+(defun matrix-get-buffer-room (buffer)
+  "if BUFFER is a matrix buffer return its room object if not return nil"
+  (when matrix-client-sessions
+    (dolist (room (oref (car matrix-client-sessions) rooms))
+      (let ((room-buffer (oref* room client-data buffer)))
+        (if (eq buffer room-buffer) (return room))))))
+
+(defun matrix-mark-buffer-fully-read (previous current)
+  "mark the room of the current buffer as fully read unless its not a matrix buffer"
   (while-no-input (redisplay)
-    (unless (or (not matrix-client-mark-as-read-on-buffer-switch)
-                (not matrix-client-sessions)
-                (eq (current-buffer)
-                    matrix--last-buffer))
+    (unless (or (not matrix-client-sessions)
+                (not matrix-client-mark-as-read-on-buffer-switch))
+      (let ((room (matrix-get-buffer-room current)))
+        (when room (matrix-mark-fully-read room))))))
 
-      (let ((current (current-buffer)))
-        (dolist (room (oref (car matrix-client-sessions) rooms))
-          (let ((room-buffer (oref* room client-data buffer)))
-            (if (eq current room-buffer)
-                (matrix-mark-fully-read room))))
-        (setq matrix--last-buffer current)))))
-
-(add-hook 'post-command-hook 'matrix--on-buffer-switch)
+(add-hook 'switch-buffer-functions 'matrix-mark-buffer-fully-read)
 
 ;;;;; Timeline
 
