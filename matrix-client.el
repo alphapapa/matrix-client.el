@@ -321,19 +321,12 @@ Intended to be called from a timer that runs at midnight."
       (with-room-buffer room
         (matrix-client--update-date-headers)))))
 
-(defun matrix-get-buffer-room (buffer)
-  "if BUFFER is a matrix buffer return its room object if not return nil"
-  (when matrix-client-sessions
-    (dolist (room (oref (car matrix-client-sessions) rooms))
-      (let ((room-buffer (oref* room client-data buffer)))
-        (if (eq buffer room-buffer) (return room))))))
-
 (defun matrix-mark-buffer-fully-read (previous current)
   "mark the room of the current buffer as fully read unless its not a matrix buffer"
-    (unless (or (not matrix-client-sessions)
-                (not matrix-client-mark-as-read-on-buffer-switch))
-      (let ((room (matrix-get-buffer-room current)))
-        (when room (matrix-mark-fully-read room)))))
+  (let ((room (buffer-local-value 'matrix-client-room current)))
+    (when (and matrix-client-mark-as-read-on-buffer-switch
+               room)
+      (matrix-mark-fully-read room))))
 
 (add-hook 'switch-buffer-functions 'matrix-mark-buffer-fully-read)
 
