@@ -1325,7 +1325,7 @@ TYPING-P should be t or nil."
           :data data
           :timeout 30)
         (setf last-read event)
-        (message "marked room as read")))))
+        (message "marked room as read"))))))
 
 ;;;;; Misc
 
