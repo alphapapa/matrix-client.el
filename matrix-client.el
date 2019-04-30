@@ -321,7 +321,7 @@ Intended to be called from a timer that runs at midnight."
       (with-room-buffer room
         (matrix-client--update-date-headers)))))
 
-(defun matrix-mark-buffer-fully-read (previous current)
+(defun matrix-mark-buffer-fully-read (_previous current)
   "mark the room of the current buffer as fully read unless its not a matrix buffer"
   (let ((room (buffer-local-value 'matrix-client-room current)))
     (when (and matrix-client-mark-as-read-on-buffer-switch
