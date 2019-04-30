@@ -1306,7 +1306,7 @@ TYPING-P should be t or nil."
                                    'args args))))))
 
 (cl-defun matrix-mark-fully-read (room)
-  "mark ROOM as fully read"
+  "updates the fully_read marker and read receipt location for ROOM"
   ;; spec link
   (with-slots* (((id session timeline last-read) room)
                 ((txn-id) session))
