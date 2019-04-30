@@ -330,11 +330,10 @@ Intended to be called from a timer that runs at midnight."
 
 (defun matrix-mark-buffer-fully-read (previous current)
   "mark the room of the current buffer as fully read unless its not a matrix buffer"
-  (while-no-input (redisplay)
     (unless (or (not matrix-client-sessions)
                 (not matrix-client-mark-as-read-on-buffer-switch))
       (let ((room (matrix-get-buffer-room current)))
-        (when room (matrix-mark-fully-read room))))))
+        (when room (matrix-mark-fully-read room)))))
 
 (add-hook 'switch-buffer-functions 'matrix-mark-buffer-fully-read)
 

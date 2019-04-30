@@ -1324,8 +1324,7 @@ TYPING-P should be t or nil."
           :method "POST"
           :data data
           :timeout 30)
-        (setf last-read event)
-        (message "marked room as read")))))
+        (setf last-read event)))))
 
 ;;;;; Misc
 
