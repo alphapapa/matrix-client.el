@@ -244,6 +244,8 @@ The sync error handler should increase this for consecutive errors, up to a maxi
    (end-token :initarg :end-token
               :initform nil
               :documentation "The most recent event-id in a room, used to push read-receipts to the server.")
+   (last-read :initform nil
+              :documentation "last event marked as read")
    (client-data :initarg :client-data
                 :initform (matrix-room-client-data)
                 :documentation "Reserved for users of the library, who may store whatever they want here.")
@@ -1306,20 +1308,24 @@ TYPING-P should be t or nil."
 (cl-defun matrix-mark-fully-read (room)
   "mark ROOM as fully read"
   ;; spec link
-  (with-slots* (((id session timeline) room)
+  (with-slots* (((id session timeline last-read room)
                 ((txn-id) session))
 
     (let* ((type "m.room.message")
-           (event-id (alist-get 'event_id (car timeline)))
+           (event (car timeline))
+           (event-id (alist-get 'event_id event))
            (data (a-list "m.fully_read" event-id
                          "m.read" event-id))
            (txn-id (cl-incf txn-id))
            (room-id (url-hexify-string id))
            (endpoint (format$ "rooms/$room-id/read_markers")))
-      (matrix-request-request session endpoint
-        :method "POST"
-        :data data
-        :timeout 30))))
+      (unless (eq event last-read)
+        (matrix-request-request session endpoint
+          :method "POST"
+          :data data
+          :timeout 30)
+        (setf last-read event)
+        (message "marked room as read")))))
 
 ;;;;; Misc
 
