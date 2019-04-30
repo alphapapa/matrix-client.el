@@ -1308,7 +1308,7 @@ TYPING-P should be t or nil."
 (cl-defun matrix-mark-fully-read (room)
   "mark ROOM as fully read"
   ;; spec link
-  (with-slots* (((id session timeline last-read room)
+  (with-slots* (((id session timeline last-read) room)
                 ((txn-id) session))
 
     (let* ((type "m.room.message")
@@ -1325,7 +1325,7 @@ TYPING-P should be t or nil."
           :data data
           :timeout 30)
         (setf last-read event)
-        (message "marked room as read"))))))
+        (message "marked room as read")))))
 
 ;;;;; Misc
 
