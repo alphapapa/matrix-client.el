@@ -1319,12 +1319,12 @@ TYPING-P should be t or nil."
            (txn-id (cl-incf txn-id))
            (room-id (url-hexify-string id))
            (endpoint (format$ "rooms/$room-id/read_markers")))
-      (unless (eq event last-read)
+      (unless (eq event last-seen-event)
         (matrix-request-request session endpoint
           :method "POST"
           :data data
           :timeout 30)
-        (setf last-read event)))))
+        (setf last-seen-event event)))))
 
 ;;;;; Misc
 
