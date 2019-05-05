@@ -1320,8 +1320,7 @@ TYPING-P should be t or nil."
            (room-id (url-hexify-string id))
            (endpoint (format$ "rooms/$room-id/read_markers")))
       (unless (eq event last-seen-event)
-        (matrix-request-request session endpoint
-          :method "POST"
+        (matrix-post session endpoint
           :data data
           :timeout 30)
         (setf last-seen-event event)))))
