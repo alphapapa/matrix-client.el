@@ -360,24 +360,24 @@ MESSAGE and ARGS should be a string and list of strings for
     (apply #'matrix-log args)))
 
 (defun matrix-get (&rest args)
-  "Call `matrix-request' with ARGS for a \"GET\" request."
+  "Call `matrix-request-request' with ARGS for a \"GET\" request."
   (declare (indent defun))
   (apply #'matrix-request-request args ))
 
 (defun matrix-post (&rest args)
-  "Call `matrix-request' with ARGS for a \"POST\" request."
+  "Call `matrix-request-request' with ARGS for a \"POST\" request."
   (declare (indent defun))
   (nconc args (list :method 'post))
   (apply #'matrix-request-request args))
 
 (defun matrix-put (&rest args)
-  "Call `matrix-request' with ARGS for a \"PUT\" request."
+  "Call `matrix-request-request' with ARGS for a \"PUT\" request."
   (declare (indent defun))
   (nconc args (list :method 'put))
   (apply #'matrix-request-request args))
 
 (defun matrix-delete (&rest args)
-  "Call `matrix-request' with ARGS for a \"DELETE\" request."
+  "Call `matrix-request-request' with ARGS for a \"DELETE\" request."
   (declare (indent defun))
   (nconc args (list :method 'delete))
   (apply #'matrix-request-request args))
