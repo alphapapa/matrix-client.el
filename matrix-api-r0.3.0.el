@@ -1308,15 +1308,13 @@ TYPING-P should be t or nil."
 (cl-defun matrix-mark-fully-read (room)
   "updates the fully_read marker and read receipt location for ROOM"
   ;; https://matrix.org/docs/spec/client_server/r0.4.0.html#post-matrix-client-r0-rooms-roomid-read-markers
-  (with-slots* (((id session timeline last-seen-event) room)
-                ((txn-id) session))
+  (with-slots* (((id session timeline last-seen-event) room))
 
     (let* ((type "m.room.message")
            (event (car timeline))
            (event-id (alist-get 'event_id event))
            (data (a-list "m.fully_read" event-id
                          "m.read" event-id))
-           (txn-id (cl-incf txn-id))
            (room-id (url-hexify-string id))
            (endpoint (format$ "rooms/$room-id/read_markers")))
       (unless (eq event last-seen-event)
