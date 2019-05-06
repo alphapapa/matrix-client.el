@@ -119,9 +119,14 @@ This way, in the event that a message gets lost in transit, the
 user can recover it from the kill ring instead of retyping it."
   :type 'boolean)
 
-(defcustom matrix-client-mark-as-read-on-buffer-switch t
-  "mark rooms as read after switching to room buffer "
-  :type 'boolean)
+(defcustom matrix-client-mark-room-read-on-window-select t
+  "mark rooms as read after selecting its window"
+  :type 'boolean
+  :set (lambda (option value)
+         (if value
+             (add-hook 'switch-buffer-functions 'matrix-mark-buffer-fully-read)
+           (remove-hook 'switch-buffer-functions 'matrix-mark-buffer-fully-read))
+         (set-default option value)))
 
 ;;;; Classes
 
