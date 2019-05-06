@@ -124,7 +124,7 @@ user can recover it from the kill ring instead of retyping it."
   :type 'boolean
   :set (lambda (option value)
          (if value
-             (add-hook 'switch-buffer-functions 'matrix-mark-buffer-fully-read)
+           (add-hook 'switch-buffer-functions 'matrix-mark-buffer-fully-read)
            (remove-hook 'switch-buffer-functions 'matrix-mark-buffer-fully-read))
          (set-default option value)))
 
