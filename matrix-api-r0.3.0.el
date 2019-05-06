@@ -1307,7 +1307,7 @@ TYPING-P should be t or nil."
 
 (cl-defun matrix-mark-fully-read (room)
   "updates the fully_read marker and read receipt location for ROOM"
-  ;; spec link
+  ;; https://matrix.org/docs/spec/client_server/r0.4.0.html#post-matrix-client-r0-rooms-roomid-read-markers
   (with-slots* (((id session timeline last-seen-event) room)
                 ((txn-id) session))
 
