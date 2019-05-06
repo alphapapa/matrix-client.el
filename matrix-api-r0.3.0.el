@@ -245,7 +245,8 @@ The sync error handler should increase this for consecutive errors, up to a maxi
               :initform nil
               :documentation "The most recent event-id in a room, used to push read-receipts to the server.")
    (last-seen-event :initform nil
-              :documentation "last event marked as read")
+                    :documentation "last event seen by the user.
+See variable `matrix-client-mark-room-read-on-buffer-switch`.")
    (client-data :initarg :client-data
                 :initform (matrix-room-client-data)
                 :documentation "Reserved for users of the library, who may store whatever they want here.")
