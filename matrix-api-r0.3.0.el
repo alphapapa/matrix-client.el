@@ -1319,8 +1319,7 @@ TYPING-P should be t or nil."
            (endpoint (format$ "rooms/$room-id/read_markers")))
       (unless (eq event last-seen-event)
         (matrix-post session endpoint
-          :data data
-          :timeout 30)
+          :data data)
         (setf last-seen-event event)))))
 
 ;;;;; Misc
