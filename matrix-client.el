@@ -328,7 +328,8 @@ Intended to be called from a timer that runs at midnight."
 
 (defun matrix-mark-buffer-fully-read (_previous current)
   (when-let* ((room (buffer-local-value 'matrix-client-room current)))
-    (matrix-mark-fully-read room)))
+    (with-slots (timeline) room
+      (matrix-update-read-markers room (car timeline)))))
 
 ;;;;; Timeline
 

@@ -244,9 +244,10 @@ The sync error handler should increase this for consecutive errors, up to a maxi
    (end-token :initarg :end-token
               :initform nil
               :documentation "The most recent event-id in a room, used to push read-receipts to the server.")
-   (last-seen-event :initform nil
-                    :documentation "last event seen by the user.
-See variable `matrix-client-mark-room-read-on-buffer-switch`.")
+   (last-read :initform nil
+              :documentation "last read event by the user. See variable `matrix-client-mark-room-read-on-window-select`.")
+   (last-fully-read :initform nil
+                    :documentation "last fully-read event by the user. See variable `matrix-client-mark-room-read-on-window-select`.")
    (client-data :initarg :client-data
                 :initform (matrix-room-client-data)
                 :documentation "Reserved for users of the library, who may store whatever they want here.")
@@ -1306,22 +1307,23 @@ TYPING-P should be t or nil."
                (matrix-log (a-list 'fn 'matrix-typing-error-callback
                                    'args args))))))
 
-(cl-defun matrix-mark-fully-read (room)
-  "updates the fully_read marker and read receipt location for ROOM"
+(cl-defun matrix-update-read-markers (room fully-read &optional (read fully-read))
+  "updates ROOM's fully_read marker and optionally read marker to point to FULLY-READ and READ events respectively
+if READ is not specified it's assumed to be the same as FULLY-READ"
   ;; https://matrix.org/docs/spec/client_server/r0.4.0.html#post-matrix-client-r0-rooms-roomid-read-markers
-  (with-slots* (((id session timeline last-seen-event) room))
 
-    (let* ((type "m.room.message")
-           (event (car timeline))
-           (event-id (alist-get 'event_id event))
-           (data (a-list "m.fully_read" event-id
-                         "m.read" event-id))
-           (room-id (url-hexify-string id))
-           (endpoint (format$ "rooms/$room-id/read_markers")))
-      (unless (eq event last-seen-event)
+  (with-slots* (((id session last-read last-fully-read) room))
+    (unless (and (eq fully-read last-fully-read) (eq read last-read))
+      (let* ((fully-read-id (alist-get 'event_id fully-read))
+            (read-id (alist-get 'event_id read))
+            (data (a-list "m.fully_read" fully-read-id
+                          "m.read" read-id))
+            (room-id (url-hexify-string id))
+            (endpoint (format$ "rooms/$room-id/read_markers")))
         (matrix-post session endpoint
           :data data)
-        (setf last-seen-event event)))))
+        (setf last-fully-read fully-read)
+        (setf last-read read)))))
 
 ;;;;; Misc
 
