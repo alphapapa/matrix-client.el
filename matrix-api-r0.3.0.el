@@ -1321,7 +1321,13 @@ if READ is not specified it's assumed to be the same as FULLY-READ"
             (room-id (url-hexify-string id))
             (endpoint (format$ "rooms/$room-id/read_markers")))
         (matrix-post session endpoint
-          :data data)
+          :data data
+          :success (lambda (&rest args)
+                    (matrix-log (a-list 'fn 'matrix-read-marker-success-callback
+                                        'args args)))
+          :error (lambda (&rest args)
+                  (matrix-log (a-list 'fn 'matrix-read-marker-error-callback
+                                      'args args))))
         (setf last-fully-read fully-read)
         (setf last-read read)))))
 
