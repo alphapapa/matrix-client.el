@@ -296,14 +296,15 @@ Should be called manually, e.g. in `matrix-after-sync-hook', by
 
 (defun matrix-client-room-buffer-priority< (buffer-a buffer-b)
   "Return non-nil if BUFFER-A's room is a higher priority than BUFFER-B's."
-  (cl-macrolet ((room-buffer-tag-p
-                 (tag buffer)
-                 `(with-slots (tags) (buffer-local-value 'matrix-client-room ,buffer)
-                    (assq ,tag tags))))
-    (or (and (room-buffer-tag-p 'm.favourite buffer-a)
-             (not (room-buffer-tag-p 'm.favourite buffer-b)))
-        (and (not (room-buffer-tag-p 'm.lowpriority buffer-a))
-             (room-buffer-tag-p 'm.lowpriority buffer-b)))))
+  ;; HACK: Like the other sorting functions, we're getting the room object from the buffer
+  ;; instead of passing the room directly.  It would be better to pass the room directly,
+  ;; but it would require reworking some of the calling functions.
+  (let* ((a-tags (oref (buffer-local-value 'matrix-client-room buffer-a) tags))
+         (b-tags (oref (buffer-local-value 'matrix-client-room buffer-b) tags)))
+    (or (and (assq 'm.favourite a-tags)
+             (not (assq 'm.favourite b-tags)))
+        (and (not (assq 'm.lowpriority a-tags))
+             (assq 'm.lowpriority b-tags)))))
 
 (defun matrix-client-room-buffer-name< (buffer-a buffer-b)
   "Return non-nil if BUFFER-A's room name is `string<' than BUFFER-B's."
