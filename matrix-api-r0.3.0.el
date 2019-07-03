@@ -226,7 +226,8 @@ The sync error handler should increase this for consecutive errors, up to a maxi
              :type boolean)
    (state :documentation "Updates to the state, between the time indicated by the since parameter, and the start of the timeline (or all state up to the start of the timeline, if since is not given, or full_state is true).")
    (state-new :documentation "List of new state events.  Clients should clear this list by calling `matrix-clear-state'.")
-   (tags :documentation "Room tags, as a list of symbols."
+   (tags :documentation "Room tags.
+An alist in which room tags, as symbols, are the CAR of each element, and the CDR is an alist of attributes, like tag order."
          :type list)
    (timeline :documentation "List of timeline events."
              :type list)
