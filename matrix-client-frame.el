@@ -103,7 +103,9 @@ automatically."
          :sidebar-buffers-fn (lambda ()
                                (cl-loop for session in matrix-client-sessions
                                         append (cl-loop for room in (oref* session rooms)
-                                                        collect (oref* room client-data buffer))))
+                                                        for buffer = (oref* room client-data buffer)
+                                                        when buffer
+                                                        collect buffer)))
          :sidebar-update-fn #'matrix-client-frame-update-sidebar
          :sidebar-auto-update nil
          :sidebar-update-on-buffer-switch t
