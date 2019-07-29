@@ -218,11 +218,13 @@ Optional REST of args are also applied to hooks and function."
                                        'face 'font-lock-function-name-face))
                    (body .content.body)
                    (event-id .event_id)
+                   (timestamp (matrix-client-event-timestamp data))
                    (message (propertize (format$ "$room-name: $sender $body")
                                         'buffer room-buffer
                                         'event_id event-id
                                         'sender .sender
-                                        'room room)))
+                                        'room room
+                                        'timestamp timestamp)))
               ;; Using notification buffer pseudo room
               (matrix-client-insert (matrix-client--notifications-buffer) message
                                     :timestamp-prefix t))))))))
