@@ -289,6 +289,8 @@ If HTML is non-nil, treat input as HTML."
       ;; Valid command or normal message
       (when matrix-client-save-outgoing-messages
         (push input kill-ring))
+      (when (oref matrix-client-room encrypted-p)
+        (user-error "E2E encrypted rooms are unsupported.  Message not sent"))
       (if command-fn
           (funcall command-fn matrix-client-room args)
         (matrix-client-send-input-1 :input args :html html)))))
@@ -681,7 +683,7 @@ Also update prompt with typers."
   (unless (and (boundp 'tabbar-mode) tabbar-mode)
     ;; Disable when tabbar mode is on.  MAYBE: Remove this.
     (with-room-buffer room
-      (pcase-let* (((eieio avatar typers name topic session) room)
+      (pcase-let* (((eieio avatar typers name topic session encrypted-p) room)
                    ((eieio user) session)
                    (name (when name
                            (propertize name 'face 'font-lock-keyword-face)))
@@ -693,11 +695,15 @@ Also update prompt with typers."
                                (concat (propertize (concat "Typing: " typers-string)
                                                    'face 'font-lock-comment-face)
                                        "\n" matrix-client-input-prompt)
-                             matrix-client-input-prompt)))
+                             matrix-client-input-prompt))
+                   (encrypted (if encrypted-p
+                                  (propertize "ENCRYPTED ROOM: UNSUPPORTED. "
+                                              'face 'matrix-client-warn-encrypted)
+                                "")))
         (ov-set ov 'before-string prompt)
         (setq header-line-format (concat avatar
                                          ;; NOTE: Not sure if using `format' with an image-containing string works.
-                                         (format$ " $name: $topic")))))))
+                                         (format " %s%s: %s" encrypted name topic)))))))
 
 (add-hook 'matrix-room-metadata-hook #'matrix-client-update-header)
 

@@ -60,4 +60,8 @@
   "Face for date headers."
   :group 'matrix-client)
 
+(defface matrix-client-warn-encrypted
+  (t (:foreground "red" :weight bold))
+  "Face for displaying warnings about encrypted rooms.")
+
 (provide 'matrix-client-faces)

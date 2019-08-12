@@ -224,6 +224,8 @@ The sync error handler should increase this for consecutive errors, up to a maxi
             :type list)
    (direct-p :documentation "Non-nil if the room is an \"m.direct\" room."
              :type boolean)
+   (encrypted-p :documentation "Non-nil if room appears to be an E2E encrypted room.  Note that such rooms are unsupported by this client."
+                :type boolean)
    (state :documentation "Updates to the state, between the time indicated by the since parameter, and the start of the timeline (or all state up to the start of the timeline, if since is not given, or full_state is true).")
    (state-new :documentation "List of new state events.  Clients should clear this list by calling `matrix-clear-state'.")
    (tags :documentation "Room tags.
@@ -919,6 +921,12 @@ here, after initial sync."
   (with-slots (canonical-alias display-name) room
     (setq canonical-alias (a-get* event 'content 'alias)
           display-name (matrix--room-display-name room))
+    (run-hook-with-args 'matrix-room-metadata-hook room)))
+
+(defun matrix-event-m.room.encrypted (room event)
+  "Process m.room.encrypted EVENT in ROOM."
+  (with-slots (encrypted-p) room
+    (setf encrypted-p t)
     (run-hook-with-args 'matrix-room-metadata-hook room)))
 
 (defvar matrix-room-metadata-hook nil
