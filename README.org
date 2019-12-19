@@ -81,7 +81,7 @@ Then run the command ~matrix-client-connect~ or ~matrix-client-frame~ to connect
      -  Add user-tags: =/tag=
      -  Delete user-tags: =/untag=
      -  Set notification settings: =/notify=
-          +  Note: These settings are currently local to Emacs and do not integrate with the API spec.
+          +  Note: Notification settings are local to Emacs and do not integrate with the API spec.
 +  Sending messages:
      -  Send *Org-formatted* messages: =/org=
           +  *Note: Sending Org-formatted messages is the default.*  You can disable it by changing the option ~matrix-client-send-as-org-by-default~, after which Org messages can be sent with the =/org= command.
@@ -93,6 +93,7 @@ Then run the command ~matrix-client-connect~ or ~matrix-client-frame~ to connect
 +  Upload a file: =/upload PATH-OR-URL=, or drag-and-drop files or URLs onto the room buffer
 +  Enable pretty colors: =/rainbow=
 +  Other:
+     -  Reply to messages: With point on a message, @@html:<kbd>@@r@@html:</kbd>@@, or @@html:<kbd>@@R@@html:</kbd>@@ to reply with quote.
      -  Complete usernames and IDs: @@html:<kbd>@@TAB@@html:</kbd>@@ (with point at prompt)
      -  Move point between messages:  @@html:<kbd>@@TAB@@html:</kbd>@@/@@html:<kbd>@@S-TAB@@html:</kbd>@@
      -  Return point to input prompt: @@html:<kbd>@@RET@@html:</kbd>@@ (with point before prompt)
@@ -102,7 +103,7 @@ Then run the command ~matrix-client-connect~ or ~matrix-client-frame~ to connect
 
 ** Notifications buffer
 
-The =*Matrix Notifications*= buffer displays notifications from all rooms, acting as a sort of meta-buffer.  By setting a room's notifications to =always=, you can monitor all messages from that room in the notifications buffer.  Press @@html:<kbd>@@C-c C-n@@html:</kbd>@@ from a room buffer to show the notifications buffer. 
+The =*Matrix Notifications*= buffer displays notifications from all rooms, acting as a sort of meta-buffer.  By setting a room's notifications to =always=, =silent=, or =silent-unless-mention=, you can monitor all messages from that room in the notifications buffer.  Press @@html:<kbd>@@C-c C-n@@html:</kbd>@@ from a room buffer to show the notifications buffer.
 
 You can also *reply* to messages directly from the notifications buffer.  Just as in a room's buffer, press @@html:<kbd>@@TAB@@html:</kbd>@@/@@html:<kbd>@@S-TAB@@html:</kbd>@@ to navigate between messages, then press @@html:<kbd>@@r@@html:</kbd>@@ on a message, type your reply, and send by pressing @@html:<kbd>@@RET@@html:</kbd>@@.  Note that this only allows replies to messages; to send a non-reply message, do so from the room's buffer.
 
@@ -115,6 +116,13 @@ Here's an example of following multiple, related conversations across multiple r
 ** Room list
 
 Open the room list by pressing @@html:<kbd>@@C-c C-r@@html:</kbd>@@ or calling command =matrix-client-room-list=.  Just like in the dedicated frame's room-list sidebar, you can click rooms to show their buffers, right-click rooms to change their settings, and middle-click rooms to open them in a new frame.
+
+** Missing features
+
+=matrix-client= is very usable, but it does not implement all Matrix features, so it may be necessary to perform some actions from Riot or another client.
+
++  Invitations :: Room invitations are not currently supported, so they must be sent and accepted elsewhere (this could be fixed with a little work).
++  Room encryption (E2EE) :: Room encryption is not supported, and it probably will not be supported natively, because =libolm= is not usable from Emacs.  However, the [[https://github.com/matrix-org/pantalaimon][Pantalaimon]] E2EE proxy may be a good solution, and perhaps some integration for it could be added.
 
 * Configuration
 
