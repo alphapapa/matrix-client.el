@@ -84,13 +84,13 @@ After installation, upgrading can be done through =quelpa=, e.g. with [[https://
 ** Manual installation
 
 1. Install all dependency packages, which are listed in the =Package-Requires= header in =matrix-client.el=.
-2. Put this repo's directory onto your ~load-path~, and eval ~(require 'matrix-client)~.
+2. Put this repo's directory onto your ~load-path~, and veal ~(require 'matrix-client)~.
 
 * Usage
 
 If you don't already have a Matrix account, you can register on a [[https://www.hello-matrix.net/public_servers.php][public homeserver]] such as =matrix.org=. =matrix-client.el= doesn't currently support registration, but you can use another client like [[https://riot.im/app/#/register][Riot]] to register an account.
 
-Then run the command ~matrix-client-connect~ or ~matrix-client-frame~ to connect.
+Then run the command ~matrix-client-connect~ or ~matrix-client-frame~ to connect.  Customization options are available in the =matrix-client= group.
 
 ** Commands
 
@@ -148,49 +148,27 @@ Open the room list by pressing @@html:<kbd>@@C-c C-r@@html:</kbd>@@ or calling c
 +  Invitations :: Room invitations are not currently supported, so they must be sent and accepted elsewhere (this could be fixed with a little work).
 +  Room encryption (E2EE) :: Room encryption is not supported, and it probably will not be supported natively, because =libolm= is not usable from Emacs.  However, the [[https://github.com/matrix-org/pantalaimon][Pantalaimon]] E2EE proxy may be a good solution, and perhaps some integration for it could be added.
 
-* Configuration
-:PROPERTIES:
-:TOC:      ignore
-:END:
-
-While there are a lot of configuration settings, here are a selection that are
-the most useful:
-
-| Variable                          | Description                           |
-|-----------------------------------+---------------------------------------|
-| ~matrix-client-show-images~       | Control if images are shown inline    |
-| ~matrix-client-render-presence~   | Control display of presence           |
-| ~matrix-client-render-membership~ | Control display of membership changes |
-| ~matrix-client-use-tracking~      | Enable tracking.el integration        |
-
-Many more settings are documented through customize.
-
 * Contributing
 
-Contributions are much appreciated, and what help this project stay afloat! If
-you have an issue, please report it via [[https://github.com/jgkamat/matrix-client-legacy-el/issues][github issues]]. If you have a patch, you
-may submit it via [[https://github.com/jgkamat/matrix-client-legacy-el/pulls][a pull request]].
+Contributions are welcome!  Please feel free to submit an issue or pull request.
 
-A room for discussion is located at [[https://matrix.to/#/#matrix-client-el:matrix.org][#matrix-client-el:matrix.org]]
-
-Development alerts are available at #matrix-client-el-dev:matrix.org.
+For discussion, feel free to join us in [[https://matrix.to/#/#matrix-client.el:matrix.org][#matrix-client.el:matrix.org]].
 
 * Authors
 :PROPERTIES:
 :TOC:      ignore
 :END:
 
-- [[http://whatthefuck.computer/][Ryan Rix]] - Created the initial matrix-client.el.
-- [[https://github.com/alphapapa][alphapapa]] - Images, Performance optimizations, Last seen tracking, and a shiny
-  new backend!
-- [[https://jgkamat.github.io/][jgkamat]] - Maintenance and reviews.
++  [[http://whatthefuck.computer/][Ryan Rix]]: The original author of =matrix-client=.
++  [[https://github.com/alphapapa][Adam Porter]]: Rewrote most of the client and added new features.
++  [[https://jgkamat.github.io/][Jay Kamat]]: Contributes maintenance and reviews.
 
 * License
 :PROPERTIES:
 :TOC:      ignore
 :END:
 
-See LICENSE in the root of the repository for legal information.
+GPLv3.
 
 * COMMENT Config                                                   :noexport:
 :PROPERTIES:
