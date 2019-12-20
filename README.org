@@ -4,6 +4,23 @@
 
 This is a fork of the [[http://doc.rix.si/projects/matrix.el.html][original matrix.el client]] with the intent of maintaining it further, fixing bugs, and providing long-term goals for the project.
 
+* Contents
+:PROPERTIES:
+:TOC:      this
+:END:
+  -  [[#installation][Installation]]
+  -  [[#usage][Usage]]
+    -  [[#commands][Commands]]
+    -  [[#notifications-buffer][Notifications buffer]]
+    -  [[#room-list][Room list]]
+    -  [[#missing-features][Missing features]]
+  -  [[#contributing][Contributing]]
+
+* Screenshots
+:PROPERTIES:
+:TOC:      ignore
+:END:
+
 [[images/notifications-buffer-and-room-list_spacemacs-dark.png]]
 
 Of course, since it's Emacs, you can use any Emacs theme you like.  Here's [[https://emacsthemes.com/themes/django-theme.html][django]] without scroll bars or fringes. Note the syntax highlighting in the pasted code, which respects the HTML sent by the client, rather than overriding it like Riot--for better or worse, you decide.  =;)=
@@ -15,6 +32,9 @@ And here's the default Emacs theme:
 [[images/frame-purpose-example.png]]
 
 * Installation
+:PROPERTIES:
+:TOC:      0
+:END:
 
 There are two ways to use the client:
 
@@ -129,6 +149,9 @@ Open the room list by pressing @@html:<kbd>@@C-c C-r@@html:</kbd>@@ or calling c
 +  Room encryption (E2EE) :: Room encryption is not supported, and it probably will not be supported natively, because =libolm= is not usable from Emacs.  However, the [[https://github.com/matrix-org/pantalaimon][Pantalaimon]] E2EE proxy may be a good solution, and perhaps some integration for it could be added.
 
 * Configuration
+:PROPERTIES:
+:TOC:      ignore
+:END:
 
 While there are a lot of configuration settings, here are a selection that are
 the most useful:
@@ -153,6 +176,9 @@ A room for discussion is located at [[https://matrix.to/#/#matrix-client-el:matr
 Development alerts are available at #matrix-client-el-dev:matrix.org.
 
 * Authors
+:PROPERTIES:
+:TOC:      ignore
+:END:
 
 - [[http://whatthefuck.computer/][Ryan Rix]] - Created the initial matrix-client.el.
 - [[https://github.com/alphapapa][alphapapa]] - Images, Performance optimizations, Last seen tracking, and a shiny
@@ -160,5 +186,23 @@ Development alerts are available at #matrix-client-el-dev:matrix.org.
 - [[https://jgkamat.github.io/][jgkamat]] - Maintenance and reviews.
 
 * License
+:PROPERTIES:
+:TOC:      ignore
+:END:
 
 See LICENSE in the root of the repository for legal information.
+
+* COMMENT Config                                                   :noexport:
+:PROPERTIES:
+:TOC:      ignore
+:END:
+
+** File-local variables
+
+# NOTE: Setting org-comment-string buffer-locally is a nasty hack to work around GitHub's org-ruby's HTML rendering, which does not respect noexport tags.  The only way to hide this tree from its output is to use the COMMENT keyword, but that prevents Org from processing the export options declared in it.  So since these file-local variables don't affect org-ruby, wet set org-comment-string to an unused keyword, which prevents Org from deleting this tree from the export buffer, which allows it to find the export options in it.  And since org-export does respect the noexport tag, the tree is excluded from the info page.
+
+# Local Variables:
+# before-save-hook: org-make-toc
+# org-export-initial-scope: buffer
+# org-comment-string: "NOTCOMMENT"
+# End:
