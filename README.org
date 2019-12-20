@@ -16,18 +16,25 @@ And here's the default Emacs theme:
 
 * Installation
 
-*Note:* This package currently requires Emacs 26 or greater.
+There are two ways to use the client:
+
+1.  In a separate Emacs instance as a "standalone client."  This provides easy access to the dedicated-frame and other UI features, and it isolates the client from your main Emacs process (the main benefit of which is to avoid delays while processing large initial sync responses, which can take a little time, depending on how many rooms you're in and how large they are).
+2.  In an existing Emacs process and configuration, like any other Emacs package.
+
+*Notes:*
++  This client is not available on MELPA.  See [[https://github.com/alphapapa/matrix-client.el/issues/47][this discussion]] for more information.
++  Emacs 26 or later is required.
 
 ** Standalone client
 
-The easiest way to start using this package is to download the script =matrix-client-standalone.el.sh= ([[https://github.com/jgkamat/matrix-client-el/blob/master/matrix-client-standalone.el.sh][GitHub link]]), make it executable, and run it from a shell (not from within Emacs).  If any packages are missing, it uses Emacs's built-in =package.el= to install =quelpa= from MELPA, and =quelpa= then installs this client and its dependencies.  Then it runs the "standalone" client.
+The standalone client is launched with the script =matrix-client-standalone.el.sh= ([[https://github.com/jgkamat/matrix-client-el/blob/master/matrix-client-standalone.el.sh][GitHub link]]).  To use, download the script, make it executable, and run it separately--not from within Emacs.  If any packages are missing, it uses Emacs's built-in =package.el= to install =quelpa= from MELPA, and =quelpa= then installs this client package and its dependencies.  Then it runs the "standalone client" as a separate Emacs process.
 
 The script accepts these options (use =--help= for full list):
 
 +  =--debug=: Enable ~debug-on-error~ in the Emacs session.
 +  =--upgrade=: Upgrade the client to the latest version before connecting.  (This also upgrades the script in the package directory, but any changes to it won't take effect until the next time it's run.)
 
-The script doesn't load any standard Emacs user configuration files, so it's basically like a clean Emacs config.  However, it does initialize and use the existing Emacs packages directory (e.g. =~/.emacs.d/elpa=), so keep that in mind; any necessary packages will be installed there, and all autoload files will be read (which means that you can load any themes that you already have installed).  It also loads and saves its own =user-init-file= at =~/.config/matrix-client-standalone.el=, which preserves customized variables and faces; you can add your own code to it, just as you would to your regular Emacs =.emacs= or =init.el= file, which gives you a config mostly independent from your main Emacs config.
+The script doesn't load any standard Emacs user configuration files, so it's /almost/ like a clean Emacs config.  However, it uses the default Emacs packages directory (e.g. =~/.emacs.d/elpa=): all packages will be installed and read from there, which means that you can load any packages that you already have installed in Emacs, including themes (and after installation you can load the client in your main Emacs config, as well).  It also loads and saves its own =user-init-file= at =~/.config/matrix-client-standalone.el=, which preserves customized variables and faces; you can add your own code to it, just as you would to your regular Emacs =.emacs= or =init.el= file, which gives you a config mostly independent from your main Emacs config.
 
 To make switching room buffers easy, the default completion settings are improved, and these key bindings are in effect by default:
 
@@ -37,30 +44,27 @@ To make switching room buffers easy, the default completion settings are improve
 
 There's also a context menu available in the sidebar by right-clicking rooms.
 
-After using the "standalone" client, the packages will be installed to your Emacs packages directory, so then you can also use it in your main Emacs config.
+Of course, all this is an unorthodox way of installing and using an Emacs package, so if you are uncomfortable with this method, please do inspect the code yourself, or use another installation method.
 
-Of course, this is a rather unorthodox way to install and use an Emacs package, so if you are uncomfortable with this method, please do inspect the code yourself, or use another installation method.
+** Existing Emacs configuration
 
-** Quelpa
+=matrix-client= is not available on MELPA, so it's recommended to install it with with [[https://github.com/quelpa/quelpa][Quelpa]].
 
-Installing directly with [[https://framagit.org/steckerhalter/quelpa][Quelpa]] into your Emacs config is also very easy:
-
-1.  Install [[https://framagit.org/steckerhalter/quelpa-use-package#installation][quelpa-use-package]] (which can be installed directly from MELPA).
+1.  Install [[https://github.com/quelpa/quelpa][Quelpa]] and [[https://github.com/quelpa/quelpa-use-package][quelpa-use-package]] (which can be installed directly from MELPA).
 2.  Add this form to your init file:
 
 #+BEGIN_SRC emacs-lisp
   (use-package matrix-client
-    :quelpa ((matrix-client :fetcher github :repo "alphapapa/matrix-client.el"
-                            :files (:defaults "logo.png" "matrix-client-standalone.el.sh"))))
+    :quelpa (matrix-client :fetcher github :repo "alphapapa/matrix-client.el"
+                           :files (:defaults "logo.png" "matrix-client-standalone.el.sh")))
 #+END_SRC
 
-After installation, upgrading can be done through =quelpa=, e.g. with @@html:<kbd>@@C-u M-x quelpa RET matrix-client RET@@html:</kbd>@@.
+After installation, upgrading can be done through =quelpa=, e.g. with [[https://github.com/alphapapa/unpackaged.el#upgrade-a-quelpa-use-package-forms-package][this command]].
 
-** Manually
+** Manual installation
 
-Simply put this repo's directory onto your ~load-path~, and eval ~(require 'matrix-client)~.  Note that when installing manually, you will also need to manually install all dependencies.  
-
-Once the project achieves a sufficiently high quality or demand, it may be submitted to MELPA, but that probably won't happen anytime soon.
+1. Install all dependency packages, which are listed in the =Package-Requires= header in =matrix-client.el=.
+2. Put this repo's directory onto your ~load-path~, and eval ~(require 'matrix-client)~.
 
 * Usage
 
