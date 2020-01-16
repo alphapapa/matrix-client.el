@@ -17,6 +17,7 @@
 
 ;; Built-in
 (require 'cl-lib)
+(require 'dns)
 (require 'eieio)
 (require 'map)
 (require 'seq)
@@ -383,25 +384,13 @@ MESSAGE and ARGS should be a string and list of strings for
   (nconc args (list :method 'delete))
   (apply #'matrix-request args))
 
-(defun matrix-lookup (name)
-  "Return host for Matrix server for domain NAME.
-There is apparently no standard way to do this in Emacs.  This
-function tries to use lookup utilities, which may or may not
-exist on the local system.  If they fail, it returns NAME with
-the standard Matrix port."
-  (let* ((matrix-name (shell-quote-argument (concat "_matrix._tcp." name)))
-         (host-command (concat "host -t srv " matrix-name))
-         (host-response (shell-command-to-string host-command)))
-    (if (string-match (rx-to-string `(seq ,matrix-name " has SRV record "
-                                          (1+ digit) " "
-                                          (1+ digit) " "
-                                          (group (1+ digit)) " "
-                                          (group (1+ nonl)) "."))
-                      host-response)
-        (match-string 2 host-response)
-      (display-warning 'matrix-client
-                       (concat "Unable to lookup server name automatically (maybe the \"host\" utility is not found).  Using: " name))
-      name)))
+(defun matrix-lookup (domain)
+  "Return hostname of Matrix server for DOMAIN.
+If DNS lookup fails, return DOMAIN."
+  ;; TODO: Also return port, and actually use that port elsewhere.
+  (pcase-let* ((`(_ _ (port ,_port) (target ,target))
+                (dns-query (concat "_matrix._tcp." domain) 'SRV)))
+    (or target domain)))
 
 ;;;; Methods
 
