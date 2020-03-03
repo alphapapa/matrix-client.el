@@ -141,7 +141,10 @@ automatically, and other keys are allowed."
                                                   user)))
            :documentation "FQDN of server, e.g. \"matrix.org\" for the official homeserver.  Derived automatically when not explicitly set.")
    (api-url-prefix :type string
-                   :instance-initform (concat "https://" server "/_matrix/client/r0/")
+                   :instance-initform (concat (if (string-match-p (rx bos "http" (opt "s") "://")
+                                                                  server)
+                                                  "" "https://")
+                                              server "/_matrix/client/r0/")
                    :documentation "URL prefix for API requests.  Derived automatically from server-name and built-in API version.")
    (device-id :initarg :device-id
               :initform (md5 (concat "matrix-client.el" (system-name)))
