@@ -112,8 +112,10 @@
           (matrix-client-room-avatar-in-buffer-name-size (* 2 (default-font-width))))
       (save-window-excursion
         (bufler))
-      (display-buffer-in-side-window (get-buffer "*Bufler*")
-                                     '((side . right))))))
+      (when-let* ((window (display-buffer-in-side-window (get-buffer "*Bufler*")
+                                                         '((side . right)))))
+        (set-window-parameter window 'delete-window #'ignore)
+        (select-window window)))))
 
 ;;;; Footer
 
