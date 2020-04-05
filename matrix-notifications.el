@@ -30,6 +30,8 @@
 
 ;;;; Requirements
 
+(require 'matrix-client-room)
+
 (require 'notifications)
 
 (require 'anaphora)
