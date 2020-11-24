@@ -315,7 +315,8 @@ Intended to be called from a timer that runs at midnight."
   (dolist (session matrix-client-sessions)
     (dolist (room (oref session rooms))
       (with-room-buffer room
-        (matrix-client--update-date-headers)))))
+        (with-silent-modifications
+          (matrix-client--update-date-headers))))))
 
 ;;;;; Timeline
 
