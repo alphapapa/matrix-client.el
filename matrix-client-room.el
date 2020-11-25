@@ -637,6 +637,7 @@ point positioned before the inserted message."
 
 (defun matrix-client-replay (room)
   "Erase and replay events into ROOM's buffer."
+  ;; FIXME: Probably use `with-silent-modifications' here.
   (with-room-buffer room
     (let ((inhibit-read-only t)
           (matrix-client-notifications nil)
