@@ -109,14 +109,26 @@ ad-hoc 'org.matrix.custom.html' messages that Vector emits."
 On by default, as this is the typical behavior for a Matrix client."
   :type 'boolean)
 
-(defcustom matrix-client-use-tracking nil
-  "Enable tracking.el support in matrix-client."
+(defcustom matrix-client-show-room-avatars t
+  "Download and show room avatars."
   :type 'boolean)
 
-(defcustom matrix-client-save-outgoing-messages t
-  "Save outgoing messages in kill ring before sending.
-This way, in the event that a message gets lost in transit, the
-user can recover it from the kill ring instead of retyping it."
+(defcustom matrix-client-show-room-avatars-in-buffer-names t
+  "Show room avatars in buffer names."
+  :type 'boolean)
+
+(defcustom matrix-client-room-avatar-in-buffer-name-size (default-font-height)
+  "Size of room avatars in buffer names."
+  :type '(choice (const :tag "Default font height" default-font-height)
+                 (integer :tag "Size in pixels")
+                 (function :tag "Custom function (should return integer)"))
+  :set (lambda (option value)
+         (set-default option (cl-typecase value
+                               (function (funcall value))
+                               (integer value)))))
+
+(defcustom matrix-client-use-tracking nil
+  "Enable tracking.el support in matrix-client."
   :type 'boolean)
 
 ;;;; Classes

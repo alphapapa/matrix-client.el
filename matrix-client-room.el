@@ -1,5 +1,6 @@
 (require 'cl-lib)
 (require 'dnd)
+(require 'map)
 (require 'pcomplete)
 (require 'shr)
 
@@ -43,35 +44,27 @@ Used to add a button for pending messages.")
     map)
   "Keymap for `matrix-client-mode'.")
 
+(defgroup matrix-client-room nil
+  "Room buffer settings."
+  :group 'matrix-client)
+
 (defcustom matrix-client-room-member-event-modifies-buffer nil
   "Mark room buffer modified when a member joins/leaves."
   :type 'boolean)
 
-(defcustom matrix-client-send-as-org-by-default t
+(defcustom matrix-client-room-save-outgoing-messages t
+  "Save outgoing messages in kill ring before sending.
+This way, in the event that a message gets lost in transit, the
+user can recover it from the kill ring instead of retyping it."
+  :type 'boolean)
+
+(defcustom matrix-client-room-send-as-org-by-default t
   "Send messages as Org-formatted text by default.
 When disabled, use the \"/org\" command to send Org-formatted
 text."
   :type 'boolean)
 
-(defcustom matrix-client-show-room-avatars t
-  "Download and show room avatars."
-  :type 'boolean)
-
-(defcustom matrix-client-show-room-avatars-in-buffer-names t
-  "Show room avatars in buffer names."
-  :type 'boolean)
-
-(defcustom matrix-client-room-avatar-in-buffer-name-size (default-font-height)
-  "Size of room avatars in buffer names."
-  :type '(choice (const :tag "Default font height" default-font-height)
-                 (integer :tag "Size in pixels")
-                 (function :tag "Custom function (should return integer)"))
-  :set (lambda (option value)
-         (set-default option (cl-typecase value
-                               (function (funcall value))
-                               (integer value)))))
-
-(defcustom matrix-client-timestamp-header-delta 300
+(defcustom matrix-client-room-timestamp-header-delta 300
   "Number of seconds between messages after which a timestamp header is shown."
   :type 'integer)
 
@@ -79,7 +72,7 @@ text."
   "List of room commands, without leading slash.
 Used for completion.")
 
-(defvar matrix-client-shr-external-rendering-functions
+(defvar matrix-client-room-shr-external-rendering-functions
   (a-list 'mx-reply #'matrix-client--shr-mx-reply)
   "Functions used to render HTML in Matrix messages.  See `shr-external-rendering-functions'.")
 
@@ -187,7 +180,7 @@ With prefix, quote message or selected region of message."
       (let* ((room (or (get-text-property (point) 'room)
                        matrix-client-room))
              (string (if quote-p
-                         (concat (matrix-client-quote-event-at-point :org matrix-client-send-as-org-by-default) "\n\n")
+                         (concat (matrix-client-quote-event-at-point :org matrix-client-room-send-as-org-by-default) "\n\n")
                        (propertize (concat (matrix-user-displayname room sender) ": ")
                                    'room room
                                    'sender sender
@@ -281,7 +274,7 @@ If HTML is non-nil, treat input as HTML."
                                   (match-string 2 input))))
           (command-fn (if command
                           (matrix-client--room-command command)
-                        (when (and matrix-client-send-as-org-by-default args)
+                        (when (and matrix-client-room-send-as-org-by-default args)
                           ;; Only call /org when input is non-empty.
                           (matrix-client--room-command "org")))))
     (when (and command (not command-fn))
@@ -291,7 +284,7 @@ If HTML is non-nil, treat input as HTML."
       (user-error "Invalid room command: /%s (to send messages starting with \"/\", insert a space first)" command))
     (when (or command-fn (not (s-blank-str? args)))
       ;; Valid command or normal message
-      (when matrix-client-save-outgoing-messages
+      (when matrix-client-room-save-outgoing-messages
         (push input kill-ring))
       (if command-fn
           (funcall command-fn matrix-client-room args)
@@ -619,9 +612,9 @@ point positioned before the inserted message."
                                                       time-to-seconds)
                                       'matrix-client-day-header t)))
     (when (or (not previous-timestamp)
-              (>= (abs (- timestamp previous-timestamp)) matrix-client-timestamp-header-delta))
+              (>= (abs (- timestamp previous-timestamp)) matrix-client-room-timestamp-header-delta))
       ;; NOTE: When retrieving earlier messages, this inserts a new hour:minute header before every
-      ;; batch of messages.  That's not consistent with `matrix-client-timestamp-header-delta',
+      ;; batch of messages.  That's not consistent with `matrix-client-room-timestamp-header-delta',
       ;; but it does visually distinguish each batch of old messages, which is helpful, so I'm going
       ;; to leave this behavior for now.  If we decide it's not what we want, we could do something
       ;; like check the next timestamp rather than the previous one, when inserting newer messages.
@@ -879,7 +872,7 @@ is sent, if any."
 
 (matrix-client-def-room-command raw
   :docstring "Send message without formatting.
-When `matrix-client-send-as-org-by-default' is non-nil, this
+When `matrix-client-room-send-as-org-by-default' is non-nil, this
 cancels Org formatting."
   :message input)
 
@@ -1303,7 +1296,7 @@ includes the \"In reply to\" link to the quoted message ID)."
                                 ;; `-let*' in `matrix-client--shr-mx-reply'.  This should be good
                                 ;; enough.
                                 (insert (replace-regexp-in-string (rx ">" (1+ "\n") "<") "><" formatted_body))
-                                (let* ((shr-external-rendering-functions matrix-client-shr-external-rendering-functions)
+                                (let* ((shr-external-rendering-functions matrix-client-room-shr-external-rendering-functions)
                                        (dom (libxml-parse-html-region (point-min) (point-max))))
                                   (erase-buffer)
                                   (cl-letf (((symbol-function 'shr-fill-line) (lambda (&rest ignore) nil)))
