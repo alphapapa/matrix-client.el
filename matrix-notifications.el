@@ -159,12 +159,26 @@ This only works for replies."
 (defun matrix-client-notifications-buffer-RET ()
   "Act appropriately for RET keypress in notifications buffer.
 If point is on a message, pop to it in its room buffer.
-Otherwise, try to send input.  Then update last-seen line."
+Otherwise, try to send input.  Then update last-seen line,
+marking all rooms with newly seen events as read.."
   (interactive)
   (cond ((< (point) (matrix-client--prompt-position))
          (matrix-client-notifications-buffer-pop))
         (t (matrix-client-notifications-buffer-send-input)))
-  (matrix-client-update-last-seen (matrix-client--notifications-buffer)))
+  ;; Mark rooms as read, then update last-seen line.
+  (cl-macrolet ((moves-point
+                 (form) `(let ((old-pos (point)))
+                           ,form
+                           (/= old-pos (point)))))
+    (cl-loop initially do (goto-char (ov-beg (car (ov-in 'matrix-client-last-seen))))
+             for buffer = (get-text-property (point) 'buffer)
+             do (with-current-buffer buffer
+                  (matrix-client-update-last-seen matrix-client-room)
+                  (set-buffer-modified-p nil))
+             while (moves-point
+                    (awhen (matrix-client--next-event-pos)
+                      (goto-char it)))
+             finally do (matrix-client-update-last-seen (matrix-client--notifications-buffer)))))
 
 ;;;; Functions
 
