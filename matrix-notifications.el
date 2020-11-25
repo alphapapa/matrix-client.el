@@ -169,16 +169,19 @@ marking all rooms with newly seen events as read.."
   (cl-macrolet ((moves-point
                  (form) `(let ((old-pos (point)))
                            ,form
-                           (/= old-pos (point)))))
-    (cl-loop initially do (goto-char (ov-beg (car (ov-in 'matrix-client-last-seen))))
-             for buffer = (get-text-property (point) 'buffer)
-             do (with-current-buffer buffer
-                  (matrix-client-update-last-seen matrix-client-room)
-                  (set-buffer-modified-p nil))
-             while (moves-point
-                    (awhen (matrix-client--next-event-pos)
-                      (goto-char it)))
-             finally do (matrix-client-update-last-seen (matrix-client--notifications-buffer)))))
+                           (/= old-pos (point))))
+                (goto-next-event
+                 () (awhen (matrix-client--next-event-pos)
+                      (goto-char it))))
+    (save-excursion
+      (goto-char (ov-beg (car (ov-in 'matrix-client-last-seen))))
+      (cl-loop do (awhen (get-text-property (point) 'buffer)
+                    (with-current-buffer it
+                      (matrix-client-update-last-seen matrix-client-room)
+                      (set-buffer-modified-p nil)
+                      (run-hook-with-args 'matrix-room-metadata-hook matrix-client-room)))
+               while (moves-point (goto-next-event)))
+      (matrix-client-update-last-seen (matrix-client--notifications-buffer)))))
 
 ;;;; Functions
 
