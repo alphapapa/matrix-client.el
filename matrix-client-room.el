@@ -43,6 +43,10 @@ Used to add a button for pending messages.")
     map)
   "Keymap for `matrix-client-mode'.")
 
+(defcustom matrix-client-room-member-event-modifies-buffer nil
+  "Mark room buffer modified when a member joins/leaves."
+  :type 'boolean)
+
 (defcustom matrix-client-send-as-org-by-default t
   "Send messages as Org-formatted text by default.
 When disabled, use the \"/org\" command to send Org-formatted
@@ -1380,9 +1384,12 @@ includes the \"In reply to\" link to the quoted message ID)."
   :body (unless initial-sync-p
           ;; FIXME: This does not seem to work; on initial connect, "user joined" messages still
           ;; show up from when the user initially joined the room.
-          (matrix-client-insert room message)
           (with-room-buffer room
-            (rename-buffer display-name 'unique))))
+            (let ((was-modified-p (buffer-modified-p)))
+              (matrix-client-insert room message)
+              (rename-buffer display-name 'unique)
+              (when (or was-modified-p matrix-client-room-member-event-modifies-buffer)
+                (set-buffer-modified-p t))))))
 
 (matrix-client-defevent m.typing
   "Handle m.typing events."
