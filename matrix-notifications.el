@@ -171,8 +171,8 @@ marking all rooms with newly seen events as read.."
                            ,form
                            (/= old-pos (point))))
                 (goto-next-event
-                 () (awhen (matrix-client--next-event-pos)
-                      (goto-char it))))
+                 () `(awhen (matrix-client--next-event-pos)
+                       (goto-char it))))
     (save-excursion
       (goto-char (ov-beg (car (ov-in 'matrix-client-last-seen))))
       (cl-loop do (awhen (get-text-property (point) 'buffer)
