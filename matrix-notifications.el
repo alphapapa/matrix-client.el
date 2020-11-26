@@ -175,11 +175,14 @@ marking all rooms with newly seen events as read.."
                        (goto-char it))))
     (save-excursion
       (goto-char (ov-beg (car (ov-in 'matrix-client-last-seen))))
-      (cl-loop do (awhen (get-text-property (point) 'buffer)
-                    (with-current-buffer it
-                      (matrix-client-update-last-seen matrix-client-room)
-                      (set-buffer-modified-p nil)
-                      (run-hook-with-args 'matrix-room-metadata-hook matrix-client-room)))
+      (cl-loop with updated-buffers
+               do (awhen (get-text-property (point) 'buffer)
+                    (unless (member it updated-buffers)
+                      (with-current-buffer it
+                        (matrix-client-update-last-seen matrix-client-room)
+                        (set-buffer-modified-p nil)
+                        (run-hook-with-args 'matrix-room-metadata-hook matrix-client-room))
+                      (push buffer updated-buffers)))
                while (moves-point (goto-next-event)))
       (matrix-client-update-last-seen (matrix-client--notifications-buffer)))))
 
