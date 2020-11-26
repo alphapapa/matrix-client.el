@@ -1,3 +1,4 @@
+(require 'anaphora)
 (require 'cl-lib)
 (require 'dnd)
 (require 'map)
