@@ -182,7 +182,7 @@ marking all rooms with newly seen events as read.."
                         (matrix-client-update-last-seen matrix-client-room)
                         (set-buffer-modified-p nil)
                         (run-hook-with-args 'matrix-room-metadata-hook matrix-client-room))
-                      (push buffer updated-buffers)))
+                      (push it updated-buffers)))
                while (moves-point (goto-next-event)))
       (matrix-client-update-last-seen (matrix-client--notifications-buffer)))))
 

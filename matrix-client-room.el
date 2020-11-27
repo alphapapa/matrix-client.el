@@ -1379,11 +1379,11 @@ includes the \"In reply to\" link to the quoted message ID)."
           ;; FIXME: This does not seem to work; on initial connect, "user joined" messages still
           ;; show up from when the user initially joined the room.
           (with-room-buffer room
-            (let ((was-modified-p (buffer-modified-p)))
-              (matrix-client-insert room message)
+            (with-silent-modifications
               (rename-buffer display-name 'unique)
-              (when (or was-modified-p matrix-client-room-member-event-modifies-buffer)
-                (set-buffer-modified-p t))))))
+              (matrix-client-insert room message))
+            (when matrix-client-room-member-event-modifies-buffer
+              (set-buffer-modified-p t)))))
 
 (matrix-client-defevent m.typing
   "Handle m.typing events."
