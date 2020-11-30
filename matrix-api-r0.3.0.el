@@ -20,6 +20,7 @@
 (require 'dns)
 (require 'eieio)
 (require 'map)
+(require 'pcase)
 (require 'seq)
 
 ;; MELPA
