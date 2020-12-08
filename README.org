@@ -68,8 +68,9 @@ Of course, all this is an unorthodox way of installing and using an Emacs packag
 
 ** Existing Emacs configuration
 
-=matrix-client= is not available on MELPA, so it's recommended to install it with with [[https://github.com/quelpa/quelpa][Quelpa]].
+=matrix-client= is not available on MELPA, so it's recommended to install it with [[https://github.com/quelpa/quelpa][Quelpa]] or [[https://github.com/raxod502/straight.el][straight.el]].
 
+*** Quelpa installation
 1.  Install [[https://github.com/quelpa/quelpa][Quelpa]] and [[https://github.com/quelpa/quelpa-use-package][quelpa-use-package]] (which can be installed directly from MELPA).
 2.  Add this form to your init file:
 
@@ -80,6 +81,20 @@ Of course, all this is an unorthodox way of installing and using an Emacs packag
 #+END_SRC
 
 After installation, upgrading can be done through =quelpa=, e.g. with [[https://github.com/alphapapa/unpackaged.el#upgrade-a-quelpa-use-package-forms-package][this command]].
+
+*** Straight.el installation
+
+1.  Install [[https://github.com/quelpa/quelpa-use-package][quelpa-use-package]] (which can be installed directly from MELPA).
+2. Follow the setup instructions for [[https://github.com/raxod502/straight.el][straight.el]] which can be found [[https://github.com/raxod502/straight.el#user-content-getting-started][here]].
+3.  Add this form to your init file:
+
+#+BEGIN_SRC emacs-lisp
+ (use-package matrix-client
+  :straight
+  (matrix-client.el :type git
+                    :host github
+                    :repo "alphapapa/matrix-client.el"))
+#+END_SRC
 
 ** Manual installation
 
