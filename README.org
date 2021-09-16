@@ -4,6 +4,10 @@
 
 This is a fork of the [[http://doc.rix.si/projects/matrix.el.html][original matrix.el client]] with the intent of maintaining it further, fixing bugs, and providing long-term goals for the project.
 
+* Deprecation
+
+This client is deprecated in favor of [[https://github.com/alphapapa/ement.el][Ement.el]], a newer Matrix client for Emacs.  This client will probably receive no further updates.
+
 * Contents
 :PROPERTIES:
 :TOC:      this
